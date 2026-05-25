@@ -44,8 +44,9 @@ def copy_google_sheet(sheet_id):
 # ==========================================
 # 4. تشغيل بوت تيليجرام
 # ==========================================
-session_path = os.path.join(os.path.dirname(__file__), 'my_bot_session')
-client = TelegramClient(session_path, API_ID, API_HASH)
+from telethon.sessions import StringSession
+session_string = os.environ.get("SHEETS_SESSION_STRING", "")
+client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
 
 @client.on(events.NewMessage(chats=TARGET_CHANNEL))
 async def handler(event):

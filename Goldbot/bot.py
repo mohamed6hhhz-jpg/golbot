@@ -16,9 +16,17 @@ client = Groq(api_key=GROQ_API_KEY)
 
 def get_market_data():
     try:
-        gold = yf.Ticker("GC=F").history(period="1d")['Close'].iloc[-1]
-        dxy = yf.Ticker("DX-Y.NYB").history(period="1d")['Close'].iloc[-1]
-        tnx = yf.Ticker("^TNX").history(period="1d")['Close'].iloc[-1]
+        gold_df = yf.Ticker("GC=F").history(period="5d")
+        dxy_df = yf.Ticker("DX-Y.NYB").history(period="5d")
+        tnx_df = yf.Ticker("^TNX").history(period="5d")
+        
+        if gold_df.empty or dxy_df.empty or tnx_df.empty:
+            print("الأسواق مغلقة أو البيانات غير متاحة حالياً.")
+            return None, None, None
+            
+        gold = gold_df['Close'].iloc[-1]
+        dxy = dxy_df['Close'].iloc[-1]
+        tnx = tnx_df['Close'].iloc[-1]
         return gold, dxy, tnx
     except Exception as e:
         print(f"حدث خطأ أثناء سحب البيانات: {e}")

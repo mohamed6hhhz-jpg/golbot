@@ -37,6 +37,28 @@ def copy_google_sheet(sheet_id):
         copied_file = drive_service.files().copy(
             fileId=sheet_id, body=file_metadata, supportsAllDrives=True
         ).execute()
+        
+        try:
+            # Fetch the owner of the destination folder automatically
+            folder_info = drive_service.files().get(fileId=DESTINATION_FOLDER_ID, fields="owners", supportsAllDrives=True).execute()
+            owner_email = folder_info['owners'][0]['emailAddress']
+            
+            # Transfer ownership to the folder's owner
+            permission = {
+                'type': 'user',
+                'role': 'owner',
+                'emailAddress': owner_email
+            }
+            drive_service.permissions().create(
+                fileId=copied_file['id'],
+                body=permission,
+                transferOwnership=True,
+                supportsAllDrives=True
+            ).execute()
+            logging.info(f"✅ تم نقل ملكية الملف بنجاح إلى: {owner_email}")
+        except Exception as perm_error:
+            logging.warning(f"⚠️ تحذير: فشل نقل الملكية التلقائي (قد يكون بسبب قيود Google للحسابات العادية): {perm_error}")
+            
         logging.info(f"✅ تم النسخ بنجاح! الشيت موجود دلوقتي في فولدرك.")
     except Exception as e:
         logging.error(f"❌ حصلت مشكلة في جوجل درايف: {e}")

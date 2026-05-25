@@ -83,9 +83,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
-    allow_methods=["POST"],
-    allow_headers=["Content-Type", "X-Service-Key"],
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Single shared orchestrator instance (stateless — safe to share across workers)
@@ -156,6 +156,7 @@ async def health() -> dict:
 
 
 @app.post("/analyze", tags=["analysis"], dependencies=[Depends(verify_service_key)])
+@app.post("/ewa", tags=["analysis"], dependencies=[Depends(verify_service_key)])
 async def analyze(request_body: AnalyzeRequest) -> JSONResponse:
     """
     Full Elliott Wave analysis endpoint.

@@ -10,7 +10,7 @@ from googleapiclient.discovery import build
 # ==========================================
 API_ID = 34105911  
 API_HASH = 'b444ab6b4eeba8a66db4143b934dc540'  
-TARGET_CHANNEL = 'https://t.me/egxupdates' 
+TARGET_CHANNEL = ['https://t.me/egxupdates', 'me']
 
 DESTINATION_FOLDER_ID = '10qMINGvBxf_O57xnv90LflgklfTPyh0J' 
 CREDENTIALS_FILE = 'credentials.json' 

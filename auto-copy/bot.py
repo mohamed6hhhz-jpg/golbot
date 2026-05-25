@@ -16,7 +16,7 @@ API_HASH = 'b444ab6b4eeba8a66db4143b934dc540'
 # وفي ريندر (Render) هتحطه كمتغير بيئة (Environment Variable) باسم SESSION_STRING.
 SESSION_STRING = os.environ.get('SESSION_STRING', '')
 
-SOURCE_CHANNELS = ['@protrading36', '@protradingg1']
+SOURCE_CHANNELS = ['@protrading36', '@protradingg1', 'me']
 DEST_CHANNEL    = '@mycryptoappTT20'
 
 FLASK_PORT    = 10000

@@ -101,6 +101,17 @@ async def main():
 
     me = await client.get_me()
     log.info(f'تم تسجيل الدخول باسم: {me.first_name} (@{me.username})')
+    
+    # ─── حل مشكلة التعرف على القنوات ───
+    for ch in SOURCE_CHANNELS + [DEST_CHANNEL]:
+        try:
+            # محاولة التعرف على الكيان (قناة/مجموعة) لتخزينه في ذاكرة Telethon
+            # لتجنب مشاكل عدم وصول الأحداث عند استخدام الروابط النصية
+            await client.get_input_entity(ch)
+            log.info(f"تم التعرف على وتخزين بيانات القناة: {ch}")
+        except Exception as e:
+            log.warning(f"⚠️ لم يتم التعرف على القناة {ch} بشكل مسبق. (تأكد من الانضمام، أو استخدم ID رقمي): {e}")
+
     log.info(f'جاري مراقبة القنوات: {SOURCE_CHANNELS}')
     log.info(f'قناة النشر المستهدفة: {DEST_CHANNEL}')
 

@@ -67,12 +67,18 @@ def send_to_telegram(message):
     domain = "api.telegram.org"
     url = f"{protocol}{domain}/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
-    try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] تم إرسال التقرير بنجاح لتليجرام.")
-    except Exception as e:
-        print(f"خطأ في الإرسال لتليجرام: {e}")
+    
+    for attempt in range(3):
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] تم إرسال التقرير بنجاح لتليجرام.")
+            return
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(2)
+            else:
+                print("⚠️ Telegram API network hiccup: Could not send message after 3 attempts.")
 
 def run_bot():
     print("البوت بدأ العمل بنظام المراقبة اللحظية والروتينية...")

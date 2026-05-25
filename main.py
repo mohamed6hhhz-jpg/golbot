@@ -19,7 +19,7 @@ from Auto_Sheets_Bot.bot import start_sheets_bot
 auto_copy_bot = importlib.import_module("auto-copy.bot")
 start_telethon_bot = auto_copy_bot.start_telethon_bot
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {"status": "ok", "message": "All bots are running smoothly! 🚀"}
 

@@ -44,7 +44,8 @@ def copy_google_sheet(sheet_id):
 # ==========================================
 # 4. تشغيل بوت تيليجرام
 # ==========================================
-client = TelegramClient('my_bot_session', API_ID, API_HASH)
+session_path = os.path.join(os.path.dirname(__file__), 'my_bot_session')
+client = TelegramClient(session_path, API_ID, API_HASH)
 
 @client.on(events.NewMessage(chats=TARGET_CHANNEL))
 async def handler(event):
@@ -57,6 +58,5 @@ async def handler(event):
 
 async def start_sheets_bot():
     logging.info("🚀 البوت شغال دلوقتي ومستني الرسايل...")
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    await client.start(bot_token=bot_token)
+    await client.start()
     await client.run_until_disconnected()

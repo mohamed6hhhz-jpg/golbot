@@ -1,0 +1,61 @@
+import re
+import logging
+import os
+from telethon import TelegramClient, events
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+
+# ==========================================
+# 1. إعدادات تيليجرام وجوجل
+# ==========================================
+API_ID = 34105911  
+API_HASH = 'b444ab6b4eeba8a66db4143b934dc540'  
+TARGET_CHANNEL = 'https://t.me/egxupdates' 
+
+DESTINATION_FOLDER_ID = '10qMINGvBxf_O57xnv90LflgklfTPyh0J' 
+CREDENTIALS_FILE = 'credentials.json' 
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+
+# ==========================================
+# 2. السيرفر الوهمي (عشان Render ماينامش)
+# ==========================================
+# تم حذف الفلاسك هنا لأننا نستخدم FastAPI كأساس
+
+# ==========================================
+# 3. دالة الاتصال بجوجل درايف والنسخ
+# ==========================================
+def copy_google_sheet(sheet_id):
+    try:
+        scopes = ['https://www.googleapis.com/auth/drive']
+        credentials = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+        drive_service = build('drive', 'v3', credentials=credentials)
+
+        file_metadata = {'parents': [DESTINATION_FOLDER_ID]}
+        
+        logging.info(f"جاري نسخ الشيت رقم: {sheet_id} ...")
+        copied_file = drive_service.files().copy(
+            fileId=sheet_id, body=file_metadata, supportsAllDrives=True
+        ).execute()
+        logging.info(f"✅ تم النسخ بنجاح! الشيت موجود دلوقتي في فولدرك.")
+    except Exception as e:
+        logging.error(f"❌ حصلت مشكلة في جوجل درايف: {e}")
+
+# ==========================================
+# 4. تشغيل بوت تيليجرام
+# ==========================================
+client = TelegramClient('my_bot_session', API_ID, API_HASH)
+
+@client.on(events.NewMessage(chats=TARGET_CHANNEL))
+async def handler(event):
+    message_text = event.message.message
+    if message_text:
+        match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', message_text)
+        if match:
+            sheet_id = match.group(1)
+            copy_google_sheet(sheet_id)
+
+async def start_sheets_bot():
+    logging.info("🚀 البوت شغال دلوقتي ومستني الرسايل...")
+    await client.start()
+    await client.run_until_disconnected()

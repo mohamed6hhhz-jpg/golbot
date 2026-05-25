@@ -57,5 +57,6 @@ async def handler(event):
 
 async def start_sheets_bot():
     logging.info("🚀 البوت شغال دلوقتي ومستني الرسايل...")
-    await client.start()
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    await client.start(bot_token=bot_token)
     await client.run_until_disconnected()

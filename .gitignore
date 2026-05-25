@@ -1,4 +1,4 @@
-*.session
+# *.session ignored previously, but needed for HF
 credentials.json
 __pycache__/
 *.pyc

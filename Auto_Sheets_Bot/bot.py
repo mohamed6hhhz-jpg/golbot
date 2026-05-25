@@ -58,6 +58,9 @@ async def handler(event):
             copy_google_sheet(sheet_id)
 
 async def start_sheets_bot():
+    if not session_string:
+        logging.error("❌ SHEETS_SESSION_STRING is missing from environment variables!")
+        return
     logging.info("🚀 البوت شغال دلوقتي ومستني الرسايل...")
     await client.start()
     await client.run_until_disconnected()

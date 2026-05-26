@@ -25,19 +25,36 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 # ==========================================
 # 3. دالة الاتصال بجوجل درايف والنسخ
 # ==========================================
+def get_drive_service():
+    """Build Google Drive service from env var secret or fallback to local file."""
+    import json
+    scopes = ['https://www.googleapis.com/auth/drive']
+    
+    google_creds_env = os.environ.get("GOOGLE_CREDENTIALS")
+    if google_creds_env:
+        logging.info("🔑 تحميل بيانات الاعتماد من متغير البيئة GOOGLE_CREDENTIALS...")
+        creds_info = json.loads(google_creds_env)
+        credentials = Credentials.from_service_account_info(creds_info, scopes=scopes)
+    elif os.path.exists(CREDENTIALS_FILE):
+        logging.info(f"🔑 تحميل بيانات الاعتماد من الملف المحلي: {CREDENTIALS_FILE}")
+        credentials = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+    else:
+        logging.error("❌ لا يوجد ملف credentials.json ولا متغير بيئة GOOGLE_CREDENTIALS. البوت لن يعمل.")
+        return None
+    
+    return build('drive', 'v3', credentials=credentials)
+
 def copy_google_sheet(sheet_id):
     try:
-        scopes = ['https://www.googleapis.com/auth/drive']
-        credentials = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
-        drive_service = build('drive', 'v3', credentials=credentials)
+        drive_service = get_drive_service()
+        if not drive_service:
+            return
 
         file_metadata = {'parents': [DESTINATION_FOLDER_ID]}
-        
         logging.info(f"جاري نسخ الشيت رقم: {sheet_id} ...")
         copied_file = drive_service.files().copy(
             fileId=sheet_id, body=file_metadata, supportsAllDrives=True
         ).execute()
-            
         logging.info(f"✅ تم النسخ بنجاح! الشيت موجود دلوقتي في فولدرك (Shared Drive).")
     except Exception as e:
         logging.error(f"❌ حصلت مشكلة في جوجل درايف: {e}")

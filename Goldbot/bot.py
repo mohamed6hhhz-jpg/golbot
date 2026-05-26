@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 # ================= الإعدادات =================
 GROQ_API_KEY       = os.environ.get("GROQ_API_KEY")
 TELEGRAM_BOT_TOKEN = "8678714877:AAE2v6jeeYzsNFYj_83rXK32RJEA7fszQew"
-TELEGRAM_CHAT_ID   = int("7737655407")
+TELEGRAM_CHAT_ID   = -1003775201576   # قناة Gold Reports
 
 # Telethon credentials (same as the other bots in this project)
 API_ID   = 34105911

@@ -6,6 +6,9 @@ import time
 import os
 import logging
 import numpy as np
+import asyncio
+from telethon import TelegramClient
+from telethon.sessions import StringSession
 
 # ══ قائمة الموديلات مرتبة بالأولوية — كل موديل له حد يومي مستقل ══
 # إذا رُفض الأول بسبب 429، ينتقل تلقائياً للتالي وهكذا.
@@ -22,11 +25,21 @@ log = logging.getLogger(__name__)
 # ================= الإعدادات =================
 GROQ_API_KEY       = os.environ.get("GROQ_API_KEY")
 TELEGRAM_BOT_TOKEN = "8678714877:AAE2v6jeeYzsNFYj_83rXK32RJEA7fszQew"
-TELEGRAM_CHAT_ID   = "7737655407"
+TELEGRAM_CHAT_ID   = int("7737655407")
 
-ALERT_THRESHOLD  = 6.0   # دولارات — تنبيه فوري عند هذا التحرك
-ROUTINE_MINUTES  = 60    # تقرير روتيني كل ساعة
-MORNING_HOUR     = 9     # تقرير الصباح في الساعة 9 صباحاً بتوقيت الخادم
+# Telethon credentials (same as the other bots in this project)
+API_ID   = 34105911
+API_HASH = 'b444ab6b4eeba8a66db4143b934dc540'
+# يستخدم أول session string متاح — يجرب AUTO_COPY أولاً ثم SHEETS
+SESSION_STRING = (
+    os.environ.get("AUTO_COPY_SESSION_STRING") or
+    os.environ.get("SHEETS_SESSION_STRING") or
+    ""
+)
+
+ALERT_THRESHOLD  = 6.0
+ROUTINE_MINUTES  = 60
+MORNING_HOUR     = 9
 # ==============================================
 
 
@@ -401,73 +414,101 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
 
 
 # ══════════════════════════════════════════════
-#  5. إرسال تيليجرام مع تقسيم ذكي للرسائل الطويلة
+#  5. إرسال تيليجرام — Telethon أولاً (MTProto) ثم HTTP fallback
 # ══════════════════════════════════════════════
-CHUNK_SIZE = 3500  # حد آمن أقل من حد تيليجرام 4096
+CHUNK_SIZE = 3800  # حد آمن تحت 4096
 
 def _split_message(text: str) -> list[str]:
-    """تقسيم النص الطويل إلى أجزاء عند حدود الأسطر لتجنب قطع الكلمات."""
+    """تقسيم النص الطويل عند حدود الأسطر."""
     if len(text) <= CHUNK_SIZE:
         return [text]
-    
-    chunks = []
-    current = ""
+    chunks, current = [], ""
     for line in text.split("\n"):
-        # إذا إضافة السطر الجديد ستتخطى الحد، احفظ الجزء الحالي وابدأ جديداً
         if len(current) + len(line) + 1 > CHUNK_SIZE:
             if current:
                 chunks.append(current.strip())
             current = line
         else:
-            current = current + "\n" + line if current else line
+            current = (current + "\n" + line) if current else line
     if current:
         chunks.append(current.strip())
     return chunks
 
 
-def _send_single(text: str, max_retries: int = 5) -> bool:
-    """إرسال رسالة واحدة مع Retry وbackoff أسي."""
-    url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text}
-    headers = {"Connection": "close"}
+async def _telethon_send(text: str) -> bool:
+    """إرسال عبر Telethon MTProto — يعمل حتى لو HTTP API محجوب."""
+    if not SESSION_STRING:
+        return False
+    try:
+        async with TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH) as client:
+            await client.send_message(TELEGRAM_CHAT_ID, text)
+        return True
+    except Exception as e:
+        log.warning(f"⚠️ [Telethon] فشل الإرسال عبر MTProto: {e}")
+        return False
 
-    for attempt in range(max_retries):
+
+def _http_send(text: str) -> bool:
+    """Fallback: HTTP Bot API بـ timeout قصير."""
+    url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": str(TELEGRAM_CHAT_ID), "text": text}
+    headers = {"Connection": "close"}
+    for attempt in range(3):
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=30)
+            r = requests.post(url, json=payload, headers=headers, timeout=(5, 20))
             r.raise_for_status()
             return True
-        except requests.exceptions.SSLError:
-            wait = 2 ** attempt
-            log.warning(f"⚠️ [SSL] محاولة {attempt+1}/{max_retries} — انتظار {wait}s...")
-            time.sleep(wait)
         except Exception as e:
-            wait = 2 ** attempt
-            log.warning(f"⚠️ [Telegram ERR] محاولة {attempt+1}/{max_retries} — {e} — انتظار {wait}s...")
-            time.sleep(wait)
+            log.warning(f"⚠️ [HTTP API] محاولة {attempt+1}/3 — {e}")
+            time.sleep(2 ** attempt)
     return False
 
 
+def _send_single(text: str) -> bool:
+    """يجرب Telethon أولاً، ثم HTTP API كـ fallback."""
+    # محاولة Telethon (MTProto)
+    try:
+        result = asyncio.run(_telethon_send(text))
+        if result:
+            log.info("✅ [Telethon] تم الإرسال عبر MTProto بنجاح.")
+            return True
+    except RuntimeError:
+        # asyncio.run() لا يعمل داخل event loop — نستخدم طريقة بديلة
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(_telethon_send(text))
+            loop.close()
+            if result:
+                log.info("✅ [Telethon] تم الإرسال عبر MTProto (new loop) بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"⚠️ [Telethon loop] {e}")
+    except Exception as e:
+        log.warning(f"⚠️ [Telethon] {e}")
+
+    # Fallback إلى HTTP API
+    log.info("🔄 [Goldbot] Telethon فشل، جاري المحاولة عبر HTTP API...")
+    return _http_send(text)
+
+
 def send_to_telegram(message: str) -> bool:
-    """إرسال رسالة بأي طول — يتم التقسيم التلقائي عند الحاجة."""
+    """إرسال رسالة بأي طول مع تقسيم تلقائي."""
     if not message:
         return False
-
     chunks = _split_message(message)
-    log.info(f"📤 إرسال التقرير في {len(chunks)} جزء/أجزاء...")
-
+    log.info(f"📤 إرسال التقرير في {len(chunks)} جزء...")
     all_ok = True
     for i, chunk in enumerate(chunks, 1):
         prefix = f"[{i}/{len(chunks)}] " if len(chunks) > 1 else ""
-        success = _send_single(prefix + chunk)
-        if success:
-            log.info(f"✅ الجزء {i}/{len(chunks)} تم إرساله بنجاح.")
+        ok = _send_single(prefix + chunk)
+        if ok:
+            log.info(f"✅ الجزء {i}/{len(chunks)} وصل بنجاح.")
         else:
             log.error(f"❌ فشل إرسال الجزء {i}/{len(chunks)}.")
             all_ok = False
-        # تأخير صغير بين الأجزاء لتجنب flood limit
         if i < len(chunks):
             time.sleep(1.5)
-
     return all_ok
 
 

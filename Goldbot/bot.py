@@ -436,15 +436,17 @@ def _split_message(text: str) -> list[str]:
 
 
 async def _telethon_send(text: str) -> bool:
-    """إرسال عبر Telethon MTProto — يعمل حتى لو HTTP API محجوب."""
-    if not SESSION_STRING:
-        return False
+    """إرسال عبر Telethon MTProto باستخدام Bot Token — يصل للـ chat الصحيح."""
     try:
-        async with TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH) as client:
-            await client.send_message(TELEGRAM_CHAT_ID, text)
+        # نستخدم Bot Token مع Telethon بدلاً من User Session
+        # هذا يضمن إن الرسالة توصل لـ TELEGRAM_CHAT_ID الصحيح تماماً زي HTTP API
+        client = TelegramClient(StringSession(), API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN)
+        await client.send_message(TELEGRAM_CHAT_ID, text)
+        await client.disconnect()
         return True
     except Exception as e:
-        log.warning(f"⚠️ [Telethon] فشل الإرسال عبر MTProto: {e}")
+        log.warning(f"⚠️ [Telethon Bot] فشل الإرسال عبر MTProto: {e}")
         return False
 
 

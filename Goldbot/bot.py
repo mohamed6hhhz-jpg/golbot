@@ -21,19 +21,36 @@ def get_groq_client():
         return None
     return Groq(api_key=GROQ_API_KEY)
 
+def _fetch_ticker(symbol: str, period: str = "5d", max_retries: int = 4) -> float | None:
+    """Fetch single ticker close price with exponential backoff for rate limits."""
+    for attempt in range(max_retries):
+        try:
+            df = yf.Ticker(symbol).history(period=period)
+            if df.empty:
+                print(f"[yfinance] لا توجد بيانات للرمز {symbol} — السوق مغلق أو إجازة.")
+                return None
+            return float(df['Close'].iloc[-1])
+        except Exception as e:
+            wait = 2 ** attempt  # 1s, 2s, 4s, 8s
+            print(f"[yfinance] محاولة {attempt+1}/{max_retries} للرمز {symbol} فشلت: {e} — انتظار {wait}s")
+            time.sleep(wait)
+    print(f"[yfinance] ❌ فشل تحميل بيانات {symbol} بعد {max_retries} محاولات.")
+    return None
+
 def get_market_data():
-    try:
-        # تم التعديل إلى 5 أيام لتجنب أخطاء أيام الإجازات وإغلاق الأسواق
-        gold = yf.Ticker("GC=F").history(period="5d")['Close'].iloc[-1]
-        dxy = yf.Ticker("DX-Y.NYB").history(period="5d")['Close'].iloc[-1]
-        tnx = yf.Ticker("^TNX").history(period="5d")['Close'].iloc[-1]
-        return gold, dxy, tnx
-    except IndexError:
-        print("السوق مغلق أو لا توجد بيانات كافية.")
+    """Fetch Gold, DXY and US10Y with individual retries and graceful holiday handling."""
+    gold = _fetch_ticker("GC=F")
+    if gold is None:
         return None, None, None
-    except Exception as e:
-        print(f"حدث خطأ أثناء سحب البيانات: {e}")
+    # Small pause between requests to reduce Yahoo rate-limit likelihood
+    time.sleep(1)
+    dxy = _fetch_ticker("DX-Y.NYB")
+    time.sleep(1)
+    tnx = _fetch_ticker("^TNX")
+    if dxy is None or tnx is None:
+        print("[yfinance] بيانات غير مكتملة — سيتم التخطي لهذه الدورة.")
         return None, None, None
+    return gold, dxy, tnx
 
 def generate_report(gold, dxy, tnx, is_alert=False, price_diff=0.0):
     client = get_groq_client()
@@ -141,17 +158,30 @@ def generate_report(gold, dxy, tnx, is_alert=False, price_diff=0.0):
         return None
 
 
-def send_to_telegram(message):
-    protocol = "https://"
-    domain = "api.telegram.org"
-    url = f"{protocol}{domain}/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+def send_to_telegram(message: str, max_retries: int = 5) -> bool:
+    """Send message to Telegram with exponential backoff to survive SSL drops."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
-    try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] تم إرسال التقرير بنجاح لتليجرام.")
-    except Exception as e:
-        print(f"خطأ في الإرسال لتليجرام: {e}")
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, json=payload, timeout=15)
+            response.raise_for_status()
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ تم إرسال التقرير بنجاح لتليجرام.")
+            return True
+        except requests.exceptions.SSLError as e:
+            wait = 2 ** attempt  # 1s, 2s, 4s, 8s, 16s
+            print(f"⚠️ [Telegram SSL] محاولة {attempt+1}/{max_retries} — SSL انقطع، انتظار {wait}s ثم إعادة المحاولة...")
+            time.sleep(wait)
+        except requests.exceptions.ConnectionError as e:
+            wait = 2 ** attempt
+            print(f"⚠️ [Telegram NET] محاولة {attempt+1}/{max_retries} — خطأ شبكة، انتظار {wait}s...")
+            time.sleep(wait)
+        except Exception as e:
+            wait = 2 ** attempt
+            print(f"⚠️ [Telegram ERR] محاولة {attempt+1}/{max_retries} — {e} — انتظار {wait}s...")
+            time.sleep(wait)
+    print(f"❌ [Telegram] فشل إرسال التقرير نهائياً بعد {max_retries} محاولات. سيتم الاحتفاظ بالتقرير للدورة القادمة.")
+    return False
 
 def run_bot():
     print("البوت بدأ العمل بنظام المراقبة المؤسسي الآمن...")

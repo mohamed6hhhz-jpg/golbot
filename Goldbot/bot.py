@@ -7,6 +7,15 @@ import os
 import logging
 import numpy as np
 
+# ══ قائمة الموديلات مرتبة بالأولوية — كل موديل له حد يومي مستقل ══
+# إذا رُفض الأول بسبب 429، ينتقل تلقائياً للتالي وهكذا.
+GROQ_MODELS = [
+    "llama-3.3-70b-versatile",   # الأقوى — 100K token/day
+    "llama-3.1-8b-instant",      # سريع وخفيف — 500K token/day
+    "gemma2-9b-it",              # جوجل — حد مستقل
+    "mixtral-8x7b-32768",        # ميكستراল — حد مستقل
+]
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
 log = logging.getLogger(__name__)
 
@@ -363,20 +372,32 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
 "⚠️ تنويه قانوني: جميع المستويات والسيناريوهات الواردة في هذا التقرير هي نتاج نماذج كمية واحتمالية مبنية على تقاطعات السوق اللحظية. الأسعار المذكورة حقيقية ومباشرة من الأسواق العالمية. أما التحليلات والتوقعات فهي أداة مساعدة لصنع القرار وليست توصية مالية ملزمة بالبيع أو الشراء."
 """
 
-    try:
-        resp = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt},
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.12,
-            max_tokens=3000,
-        )
-        return resp.choices[0].message.content
-    except Exception as e:
-        log.warning(f"⚠️ خطأ في Groq API: {e}")
-        return None
+    # ── نظام Fallback الذكي: يجرب كل موديل على حدة ──
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 جاري الاتصال بـ Groq — الموديل: {model_name}")
+            resp = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": user_prompt},
+                ],
+                model=model_name,
+                temperature=0.12,
+                max_tokens=2500,
+            )
+            log.info(f"✅ نجح الاتصال مع الموديل: {model_name}")
+            return resp.choices[0].message.content
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str or "rate_limit" in err_str.lower():
+                log.warning(f"⚠️ [{model_name}] وصل للحد الأقصى (429) — الانتقال للموديل التالي...")
+                time.sleep(2)  # انتظر ثانيتين قبل المحاولة التالية
+                continue
+            else:
+                log.error(f"❌ [{model_name}] خطأ غير متوقع: {e}")
+                break
+    log.error("❌ جميع الموديلات وصلت للحد الأقصى أو فشلت. سيتم المحاولة في الدورة القادمة.")
+    return None
 
 
 # ══════════════════════════════════════════════

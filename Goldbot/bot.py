@@ -161,10 +161,20 @@ def generate_report(gold, dxy, tnx, is_alert=False, price_diff=0.0):
 def send_to_telegram(message: str, max_retries: int = 5) -> bool:
     """Send message to Telegram with exponential backoff to survive SSL drops."""
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
+    
+    # 1. Truncate to Telegram's 4096 char limit to prevent errors
+    safe_message = message[:4000] if message else ""
+    
+    # 2. Remove parse_mode="Markdown" because Groq's markdown (like **text**) 
+    # breaks Telegram's strict MarkdownV1 and can cause API hangs/drops.
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": safe_message}
+    
     for attempt in range(max_retries):
         try:
-            response = requests.post(url, json=payload, timeout=45)
+            # 3. Disable HTTP Keep-Alive. Hugging Face Docker networking sometimes 
+            # drops persistent SSL connections, causing "Read timed out".
+            headers = {"Connection": "close"}
+            response = requests.post(url, json=payload, headers=headers, timeout=45)
             response.raise_for_status()
             print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ تم إرسال التقرير بنجاح لتليجرام.")
             return True

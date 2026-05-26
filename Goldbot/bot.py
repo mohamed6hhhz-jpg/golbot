@@ -401,21 +401,42 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
 
 
 # ══════════════════════════════════════════════
-#  5. إرسال تيليجرام مع Retry
+#  5. إرسال تيليجرام مع تقسيم ذكي للرسائل الطويلة
 # ══════════════════════════════════════════════
-def send_to_telegram(message: str, max_retries: int = 5) -> bool:
-    url        = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    safe_msg   = message[:4000] if message else ""
-    payload    = {"chat_id": TELEGRAM_CHAT_ID, "text": safe_msg}
-    headers    = {"Connection": "close"}
+CHUNK_SIZE = 3500  # حد آمن أقل من حد تيليجرام 4096
+
+def _split_message(text: str) -> list[str]:
+    """تقسيم النص الطويل إلى أجزاء عند حدود الأسطر لتجنب قطع الكلمات."""
+    if len(text) <= CHUNK_SIZE:
+        return [text]
+    
+    chunks = []
+    current = ""
+    for line in text.split("\n"):
+        # إذا إضافة السطر الجديد ستتخطى الحد، احفظ الجزء الحالي وابدأ جديداً
+        if len(current) + len(line) + 1 > CHUNK_SIZE:
+            if current:
+                chunks.append(current.strip())
+            current = line
+        else:
+            current = current + "\n" + line if current else line
+    if current:
+        chunks.append(current.strip())
+    return chunks
+
+
+def _send_single(text: str, max_retries: int = 5) -> bool:
+    """إرسال رسالة واحدة مع Retry وbackoff أسي."""
+    url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text}
+    headers = {"Connection": "close"}
 
     for attempt in range(max_retries):
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=45)
+            r = requests.post(url, json=payload, headers=headers, timeout=30)
             r.raise_for_status()
-            log.info(f"✅ تم إرسال التقرير بنجاح لتيليجرام.")
             return True
-        except requests.exceptions.SSLError as e:
+        except requests.exceptions.SSLError:
             wait = 2 ** attempt
             log.warning(f"⚠️ [SSL] محاولة {attempt+1}/{max_retries} — انتظار {wait}s...")
             time.sleep(wait)
@@ -423,8 +444,31 @@ def send_to_telegram(message: str, max_retries: int = 5) -> bool:
             wait = 2 ** attempt
             log.warning(f"⚠️ [Telegram ERR] محاولة {attempt+1}/{max_retries} — {e} — انتظار {wait}s...")
             time.sleep(wait)
-    log.error(f"❌ فشل إرسال التقرير نهائياً بعد {max_retries} محاولات.")
     return False
+
+
+def send_to_telegram(message: str) -> bool:
+    """إرسال رسالة بأي طول — يتم التقسيم التلقائي عند الحاجة."""
+    if not message:
+        return False
+
+    chunks = _split_message(message)
+    log.info(f"📤 إرسال التقرير في {len(chunks)} جزء/أجزاء...")
+
+    all_ok = True
+    for i, chunk in enumerate(chunks, 1):
+        prefix = f"[{i}/{len(chunks)}] " if len(chunks) > 1 else ""
+        success = _send_single(prefix + chunk)
+        if success:
+            log.info(f"✅ الجزء {i}/{len(chunks)} تم إرساله بنجاح.")
+        else:
+            log.error(f"❌ فشل إرسال الجزء {i}/{len(chunks)}.")
+            all_ok = False
+        # تأخير صغير بين الأجزاء لتجنب flood limit
+        if i < len(chunks):
+            time.sleep(1.5)
+
+    return all_ok
 
 
 # ══════════════════════════════════════════════

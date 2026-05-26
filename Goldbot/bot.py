@@ -3,8 +3,6 @@ from groq import Groq
 import requests
 from datetime import datetime
 import time
-from flask import Flask
-from threading import Thread
 import os
 
 # ================= الإعدادات الآمنة والنهائية =================
@@ -16,8 +14,6 @@ TELEGRAM_CHAT_ID = "7737655407"
 ALERT_THRESHOLD = 8.0 
 ROUTINE_MINUTES = 60  
 # ==========================================================
-
-app = Flask(__name__)
 
 def get_groq_client():
     if not GROQ_API_KEY:
@@ -134,8 +130,5 @@ def run_bot():
         time.sleep(60)
         minutes_counter += 1
 
-if __name__ == "__main__":
-    bot_thread = Thread(target=run_bot)
-    bot_thread.start()
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+# Note: run_bot() is called by the root main.py orchestrator as a background thread.
+# The __main__ block is intentionally removed to avoid conflicts with FastAPI.

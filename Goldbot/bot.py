@@ -164,7 +164,7 @@ def send_to_telegram(message: str, max_retries: int = 5) -> bool:
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     for attempt in range(max_retries):
         try:
-            response = requests.post(url, json=payload, timeout=15)
+            response = requests.post(url, json=payload, timeout=45)
             response.raise_for_status()
             print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ تم إرسال التقرير بنجاح لتليجرام.")
             return True

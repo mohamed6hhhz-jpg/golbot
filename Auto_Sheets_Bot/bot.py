@@ -45,17 +45,34 @@ def get_drive_service():
     return build('drive', 'v3', credentials=credentials)
 
 def copy_google_sheet(sheet_id):
+    """Create a Drive Shortcut (alias) to the sheet instead of a physical copy.
+    Shortcuts consume ZERO storage against the Service Account's quota."""
     try:
         drive_service = get_drive_service()
         if not drive_service:
             return
 
-        file_metadata = {'parents': [DESTINATION_FOLDER_ID]}
-        logging.info(f"جاري نسخ الشيت رقم: {sheet_id} ...")
-        copied_file = drive_service.files().copy(
-            fileId=sheet_id, body=file_metadata, supportsAllDrives=True
+        # Fetch the original file name so the shortcut has a meaningful label
+        try:
+            original = drive_service.files().get(
+                fileId=sheet_id, fields="name", supportsAllDrives=True
+            ).execute()
+            original_name = original.get("name", sheet_id)
+        except Exception:
+            original_name = sheet_id
+
+        shortcut_metadata = {
+            'name': f"[رابط] {original_name}",
+            'mimeType': 'application/vnd.google-apps.shortcut',
+            'shortcutDetails': {'targetId': sheet_id},
+            'parents': [DESTINATION_FOLDER_ID]
+        }
+
+        logging.info(f"جاري إنشاء اختصار للشيت: {original_name} ({sheet_id}) ...")
+        drive_service.files().create(
+            body=shortcut_metadata, supportsAllDrives=True
         ).execute()
-        logging.info(f"✅ تم النسخ بنجاح! الشيت موجود دلوقتي في فولدرك (Shared Drive).")
+        logging.info(f"✅ تم إنشاء الاختصار بنجاح! الشيت متاح في فولدرك بدون استهلاك أي مساحة.")
     except Exception as e:
         logging.error(f"❌ حصلت مشكلة في جوجل درايف: {e}")
 

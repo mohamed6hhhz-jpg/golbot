@@ -12,6 +12,7 @@ python-dotenv==1.0.1
 yfinance
 groq
 requests
+numpy
 
 # Telethon Bots Dependencies
 telethon==1.36.0

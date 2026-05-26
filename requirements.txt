@@ -20,3 +20,8 @@ telethon==1.36.0
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
+
+# PDF to Sheets Bot Dependencies
+pdfplumber==0.11.0
+arabic-reshaper==3.0.0
+python-bidi==0.4.2

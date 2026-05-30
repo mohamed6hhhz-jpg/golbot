@@ -27,23 +27,60 @@ async def root():
 @app.get("/test_gold")
 async def test_gold():
     """
-    Endpoint لاختبار Goldbot فوراً — يجلب البيانات ويبعت تقرير كامل لتيليجرام.
-    استخدم: GET https://<your-space>.hf.space/test_gold
+    يجلب البيانات، يولد تقرير، يبعته لتيليجرام،
+    ويرجع النتيجة الكاملة في المتصفح مباشرة.
+    ملاحظة: يستغرق 2-4 دقائق بسبب جلب البيانات.
     """
-    import threading
+    import asyncio, traceback
+
     def _run():
-        from Goldbot.bot import get_full_market_data, generate_report, send_to_telegram
-        data = get_full_market_data()
-        if not data:
-            send_to_telegram("❌ [TEST] فشل جلب البيانات — تحقق من yfinance أو الشبكة.")
-            return
-        report = generate_report(data, is_alert=False)
-        if report:
-            send_to_telegram("🧪 [TEST REPORT — تقرير اختبار]\n" + report)
-        else:
-            send_to_telegram("❌ [TEST] فشل توليد التقرير — تحقق من GROQ_API_KEY.")
-    threading.Thread(target=_run, daemon=True).start()
-    return {"status": "started", "message": "✅ جاري إرسال تقرير الاختبار إلى تيليجرام... انتظر 60 ثانية."}
+        result = {"steps": {}}
+        try:
+            from Goldbot.bot import get_full_market_data, generate_report, send_to_telegram
+
+            # الخطوة 1: جلب البيانات
+            result["steps"]["fetch"] = "جاري..."
+            data = get_full_market_data()
+            if not data:
+                result["steps"]["fetch"] = "❌ FAILED — get_full_market_data() returned None"
+                send_to_telegram("❌ [TEST] فشل جلب البيانات من yfinance.")
+                result["status"] = "error"
+                return result
+            result["steps"]["fetch"] = f"✅ gold={data['gold']:.2f}$, indicators loaded"
+
+            # الخطوة 2: توليد التقرير
+            result["steps"]["generate"] = "جاري..."
+            report = generate_report(data, is_alert=False)
+            if not report:
+                result["steps"]["generate"] = "❌ FAILED — generate_report() returned None (Groq API error?)"
+                send_to_telegram("❌ [TEST] فشل توليد التقرير — تحقق من GROQ_API_KEY.")
+                result["status"] = "error"
+                return result
+            result["steps"]["generate"] = f"✅ تقرير جُنِّز بنجاح ({len(report)} حرف)"
+
+            # الخطوة 3: الإرسال
+            result["steps"]["send"] = "جاري..."
+            ok = send_to_telegram("🧪 [TEST REPORT — تقرير اختبار]\n" + report)
+            result["steps"]["send"] = "✅ وصل لتيليجرام" if ok else "❌ فشل الإرسال لتيليجرام"
+            result["status"] = "success" if ok else "send_failed"
+            result["report_preview"] = report[:300] + "..."
+
+        except Exception as e:
+            result["status"]  = "exception"
+            result["error"]   = str(e)
+            result["traceback"] = traceback.format_exc()[-1000:]
+            try:
+                from Goldbot.bot import send_to_telegram
+                send_to_telegram(f"❌ [TEST EXCEPTION]\n{str(e)[:300]}")
+            except Exception:
+                pass
+        return result
+
+    loop   = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, _run)
+    return result
+
+
 
 @app.on_event("startup")
 async def startup_event():

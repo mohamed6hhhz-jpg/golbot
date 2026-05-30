@@ -561,6 +561,7 @@ def get_full_market_data() -> dict | None:
         real_yield_signal=real_yield_signal, real_yield_label=real_yield_label,
         tf_weekly=tf_weekly, tf_daily=tf_daily, tf_hourly=tf_hourly, tf_label=tf_label,
         gs_ratio=gs_ratio, dxy_bias=dxy_bias, bond_bias=bond_bias, gold_pressure=gold_pres,
+        vix_label=vix_label,
     )
 
     d['confluence'] = calc_confluence(d)

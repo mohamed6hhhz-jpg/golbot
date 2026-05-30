@@ -23,6 +23,28 @@ start_telethon_bot = auto_copy_bot.start_telethon_bot
 async def root():
     return {"status": "ok", "message": "All bots are running smoothly! 🚀"}
 
+
+@app.get("/test_gold")
+async def test_gold():
+    """
+    Endpoint لاختبار Goldbot فوراً — يجلب البيانات ويبعت تقرير كامل لتيليجرام.
+    استخدم: GET https://<your-space>.hf.space/test_gold
+    """
+    import threading
+    def _run():
+        from Goldbot.bot import get_full_market_data, generate_report, send_to_telegram
+        data = get_full_market_data()
+        if not data:
+            send_to_telegram("❌ [TEST] فشل جلب البيانات — تحقق من yfinance أو الشبكة.")
+            return
+        report = generate_report(data, is_alert=False)
+        if report:
+            send_to_telegram("🧪 [TEST REPORT — تقرير اختبار]\n" + report)
+        else:
+            send_to_telegram("❌ [TEST] فشل توليد التقرير — تحقق من GROQ_API_KEY.")
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started", "message": "✅ جاري إرسال تقرير الاختبار إلى تيليجرام... انتظر 60 ثانية."}
+
 @app.on_event("startup")
 async def startup_event():
     """

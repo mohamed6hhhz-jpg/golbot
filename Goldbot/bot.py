@@ -159,14 +159,15 @@ def calc_adx(df, period: int = 14):
         dm_plus.append(up   if up > down and up > 0 else 0)
         dm_minus.append(down if down > up and down > 0 else 0)
     def wilder(arr, n):
-        res = [sum(arr[:n]) / n]   # ← متوسط لا مجموع (إصلاح خطأ ADX>100)
+        res = [sum(arr[:n]) / n]
         for v in arr[n:]: res.append(res[-1] - res[-1]/n + v)
         return res
     atr_s  = wilder(tr_list, period)
     dip_s  = wilder(dm_plus,  period)
     dim_s  = wilder(dm_minus, period)
-    di_p   = [100 * dip_s[i] / (atr_s[i] + 1e-9) for i in range(len(atr_s))]
-    di_m   = [100 * dim_s[i] / (atr_s[i] + 1e-9) for i in range(len(atr_s))]
+    # ← تقييد DI+/DI- بـ 100 حتى لا يتجاوز ADX النطاق
+    di_p   = [min(100.0, 100 * dip_s[i] / (atr_s[i] + 1e-9)) for i in range(len(atr_s))]
+    di_m   = [min(100.0, 100 * dim_s[i] / (atr_s[i] + 1e-9)) for i in range(len(atr_s))]
     dx     = [100 * abs(di_p[i]-di_m[i]) / (di_p[i]+di_m[i]+1e-9) for i in range(len(atr_s))]
     adx_s  = wilder(dx, period)
     return round(float(min(adx_s[-1], 100.0)), 2), round(float(di_p[-1]), 2), round(float(di_m[-1]), 2)

@@ -80,10 +80,14 @@ def _last_with_date(df) -> tuple[float | None, str]:
     """يرجع (آخر سعر, تاريخه كنص) — حتى لو السوق مغلق."""
     if df is None or df.empty:
         return None, ""
-    last_row = df.iloc[-1]
+    # ابحث عن آخر صف بدون NaN
+    valid = df[df['Close'].notna()]
+    if valid.empty:
+        return None, ""
+    last_row = valid.iloc[-1]
     price    = float(last_row['Close'])
     try:
-        ts = df.index[-1]
+        ts = valid.index[-1]
         if hasattr(ts, 'strftime'):
             label = ts.strftime("%d/%m %H:%M")
         else:
@@ -457,9 +461,13 @@ def get_full_market_data() -> dict | None:
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
     # الفوري: نجرب 1h أولاً للحصول على أحدث سعر متاح
-    gold_spot_df= _fetch("XAUUSD=X", period="5d",  interval="1h");  time.sleep(0.7)
-    if gold_spot_df is None or gold_spot_df.empty:
-        gold_spot_df = _fetch("XAUUSD=X", period="5d", interval="1d"); time.sleep(0.5)
+    gold_spot_df = _fetch("XAUUSD=X", period="5d",  interval="1h");  time.sleep(0.7)
+    _spot_p, _   = _last_with_date(gold_spot_df)
+    if not _spot_p:   # لو فشل 1h نجرب 1d
+        gold_spot_df = _fetch("XAUUSD=X", period="30d", interval="1d"); time.sleep(0.5)
+    _spot_p2, _  = _last_with_date(gold_spot_df)
+    if not _spot_p2: # لو فشل كلهم نستخدم GLD كبديل قريب من الفوري
+        gold_spot_df = _fetch("GLD",      period="5d",  interval="1d"); time.sleep(0.5)
 
     if gold_daily is None or gold_daily.empty:
         return None
@@ -475,6 +483,10 @@ def get_full_market_data() -> dict | None:
 
     gold_futures, futures_date = _last_with_date(gold_daily)
     gold_spot,    spot_date    = _last_with_date(gold_spot_df)
+    # لو الفوري مش متاح نستخدم الآجل كمرجع (فارقهم صغير)
+    if not gold_spot:
+        gold_spot  = gold_futures
+        spot_date  = futures_date + " (آجل)"
     silver = _last_close(silver_df)
     oil    = _last_close(oil_df)
     dxy    = _last_close(dxy_df)
@@ -684,7 +696,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
 **🔍 الإطارات الزمنية:** [جملتان — هل متوافقة؟ ماذا تعني؟]
 
-**📊 أبرز مؤشرين:** [مؤشران فقط — كل واحد في جملة بمثال بسيط]
+**📊 أبرز مؤشرين:** [مؤشران فقط — صف كل واحد في جملة تنتهي بمثال بسيط. التركيز على قيمة المؤشر نفسه (RSI={d['rsi']} أي محايد...) ليس على مستويات السعر]
 
 **📉 السيناريوهات (100%):**
    📈 صعود (X%): كسر {refs['above']}$ → الهدف ...

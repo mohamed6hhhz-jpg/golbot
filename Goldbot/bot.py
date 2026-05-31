@@ -159,7 +159,7 @@ def calc_adx(df, period: int = 14):
         dm_plus.append(up   if up > down and up > 0 else 0)
         dm_minus.append(down if down > up and down > 0 else 0)
     def wilder(arr, n):
-        res = [sum(arr[:n])]
+        res = [sum(arr[:n]) / n]   # ← متوسط لا مجموع (إصلاح خطأ ADX>100)
         for v in arr[n:]: res.append(res[-1] - res[-1]/n + v)
         return res
     atr_s  = wilder(tr_list, period)
@@ -169,7 +169,7 @@ def calc_adx(df, period: int = 14):
     di_m   = [100 * dim_s[i] / (atr_s[i] + 1e-9) for i in range(len(atr_s))]
     dx     = [100 * abs(di_p[i]-di_m[i]) / (di_p[i]+di_m[i]+1e-9) for i in range(len(atr_s))]
     adx_s  = wilder(dx, period)
-    return round(float(adx_s[-1]), 2), round(float(di_p[-1]), 2), round(float(di_m[-1]), 2)
+    return round(float(min(adx_s[-1], 100.0)), 2), round(float(di_p[-1]), 2), round(float(di_m[-1]), 2)
 
 
 def calc_cci(df, period: int = 20) -> float:
@@ -368,15 +368,23 @@ def calc_confluence(d: dict) -> dict:
 
 
 # ══════════════════════════════════════════════
-#  5. نقاط الدخول — SL أقصى 38$ — هدف مفتوح
+#  5. الصفقات الكاملة — فورية + آجلة + اختراق
 # ══════════════════════════════════════════════
-def calc_smart_entries(d: dict, bias: str) -> dict:
+TIGHT_SL  = 15.0   # وقف ضيق للفورية
+STD_SL    = MAX_SL_DISTANCE  # 38$ للآجلة
+
+def calc_all_entries(d: dict, bias: str) -> dict:
+    """
+    يعيد قاموساً يحتوي على:
+      - trades_dir: قائمة بصفقات الاتجاه (فوري + آجل)
+      - trades_break: قائمة بصفقات الاختراق (لو متذبذب)
+      - bias: الاتجاه
+    """
     gold       = d['gold']
-    atr        = d['atr']
-    swing_high = d['swing_high']
-    swing_low  = d['swing_low']
     s1, r1     = d['s1'], d['r1']
     s2, r2     = d['s2'], d['r2']
+    swing_high = d['swing_high']
+    swing_low  = d['swing_low']
     rn         = d['round_numbers']
 
     candidates_sup = [x for x in [swing_low, s1, rn['nearest_support']] if x and x < gold]
@@ -384,50 +392,35 @@ def calc_smart_entries(d: dict, bias: str) -> dict:
     candidates_res = [x for x in [swing_high, r1, rn['nearest_resistance']] if x and x > gold]
     nearest_res    = min(candidates_res) if candidates_res else r1
 
+    def make_buy(entry, sl_dist, label):
+        e  = round(entry, 2)
+        sl = round(e - sl_dist, 2)
+        return {"dir": "شراء 📗", "market": label, "entry": e,
+                "sl": sl, "risk": sl_dist, "target": "مفتوح"}
+
+    def make_sell(entry, sl_dist, label):
+        e  = round(entry, 2)
+        sl = round(e + sl_dist, 2)
+        return {"dir": "بيع 📕", "market": label, "entry": e,
+                "sl": sl, "risk": sl_dist, "target": "مفتوح"}
+
+    trades_dir   = []
+    trades_break = []
+    refs = {"above": round(nearest_res, 2), "below": round(nearest_sup, 2),
+            "r1": r1, "r2": r2, "s1": s1, "s2": s2}
+
     if bias == "bull":
-        entry      = round(nearest_sup, 2)
-        raw_sl     = round(min(swing_low or s2, s2) - 0.3 * atr, 2)
-        raw_risk   = entry - raw_sl
-        # تطبيق الحد الأقصى لوقف الخسارة (38$)
-        if raw_risk > MAX_SL_DISTANCE:
-            sl   = round(entry - MAX_SL_DISTANCE, 2)
-            risk = MAX_SL_DISTANCE
-            sl_note = f"محدود بالحد الأقصى {MAX_SL_DISTANCE}$"
-        else:
-            sl   = raw_sl
-            risk = round(raw_risk, 2)
-            sl_note = f"تحت أقوى دعم حقيقي"
-        # المستويات المرجعية للهدف المفتوح
-        ref1 = round(r1, 2)
-        ref2 = round(r2, 2)
-        ref3 = round(r3, 2) if 'r3' in d else round(r2 + (r2 - r1), 2)
-        return {"type": "شراء 📗", "entry": entry, "sl": sl, "risk": risk, "sl_note": sl_note,
-                "ref1": ref1, "ref2": ref2, "ref3": ref3, "open_target": True}
-
+        trades_dir.append(make_buy(nearest_sup, TIGHT_SL, "فوري (Spot)"))
+        trades_dir.append(make_buy(nearest_sup, STD_SL,   "آجل (Futures)"))
     elif bias == "bear":
-        entry      = round(nearest_res, 2)
-        raw_sl     = round(max(swing_high or r2, r2) + 0.3 * atr, 2)
-        raw_risk   = raw_sl - entry
-        if raw_risk > MAX_SL_DISTANCE:
-            sl   = round(entry + MAX_SL_DISTANCE, 2)
-            risk = MAX_SL_DISTANCE
-            sl_note = f"محدود بالحد الأقصى {MAX_SL_DISTANCE}$"
-        else:
-            sl   = raw_sl
-            risk = round(raw_risk, 2)
-            sl_note = f"فوق أقوى مقاومة حقيقية"
-        ref1 = round(s1, 2)
-        ref2 = round(s2, 2)
-        ref3 = round(s3, 2) if 's3' in d else round(s2 - (s1 - s2), 2)
-        return {"type": "بيع 📕", "entry": entry, "sl": sl, "risk": risk, "sl_note": sl_note,
-                "ref1": ref1, "ref2": ref2, "ref3": ref3, "open_target": True}
-
+        trades_dir.append(make_sell(nearest_res, TIGHT_SL, "فوري (Spot)"))
+        trades_dir.append(make_sell(nearest_res, STD_SL,   "آجل (Futures)"))
     else:
-        return {"type": "انتظار — سوق متذبذب ⚪", "entry": None,
-                "sl": None, "risk": None,
-                "sl_note": "لا توجد صفقة موصى بها حالياً",
-                "ref1": round(nearest_res, 2), "ref2": round(r1, 2), "ref3": round(r2, 2),
-                "open_target": False}
+        # متذبذب — صفقتا اختراق
+        trades_break.append(make_buy( nearest_res, STD_SL, "آجل (Futures) — اختراق صعودي"))
+        trades_break.append(make_sell(nearest_sup, STD_SL, "آجل (Futures) — اختراق هبوطي"))
+
+    return {"bias": bias, "trades_dir": trades_dir, "trades_break": trades_break, "refs": refs}
 
 
 # ══════════════════════════════════════════════
@@ -547,91 +540,130 @@ def get_full_market_data() -> dict | None:
     )
 
     d['confluence'] = calc_confluence(d)
-    d['entries']    = calc_smart_entries(d, d['confluence']['bias'])
+    d['entries']    = calc_all_entries(d, d['confluence']['bias'])
     return d
 
 
 # ══════════════════════════════════════════════
 #  7. بناء هيكل التقرير الثابت + تحليل الـ AI
 # ══════════════════════════════════════════════
-def _build_fixed_template(d: dict, header: str, is_morning: bool = False) -> tuple[str, str]:
-    """
-    يبني الجزء الثابت من التقرير (أرقام + جداول) في Python مباشرة.
-    يعيد (fixed_block, ai_instructions) — الـ AI يكتب التحليل فقط.
-    """
-    conf  = d['confluence']
-    ent   = d['entries']
-    ctx   = d['hist_ctx']
-    rn    = d['round_numbers']
-    fib   = d['fib']
+def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
+    conf     = d['confluence']
+    ent      = d['entries']
+    ctx      = d['hist_ctx']
+    rn       = d['round_numbers']
+    gold     = d['gold']
     date_now = cairo_now().strftime("%Y-%m-%d %H:%M قاهرة")
+    bias     = conf['bias']
+    bias_ar  = {"bull": "صعودي", "bear": "هبوطي", "neutral": "متذبذب"}.get(bias, "متذبذب")
 
-    # ── جدول Confluence ──
-    score_lines = [f"   {'🟢' if v>0 else ('🔴' if v<0 else '⚪')} {name}"
-                   for name, v in conf['scores'].items()]
-    score_table = "\n".join(score_lines)
+    # ── السعر الفوري والآجل ──
+    spot_str    = f"{d['gold_spot']:.2f}$" if d['gold_spot'] else "مغلق"
+    futures_str = f"{d['gold_futures']:.2f}$"
+    contango_str = (f" (+{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
+                    else f" ({d['contango']:.2f}$)" if d['contango'] else "")
 
-    # ── السياق التاريخي ──
-    hist_lines = []
-    if ctx.get('chg_1d')  is not None: hist_lines.append(f"   24 ساعة  : {ctx['chg_1d']:+.2f}$ ({ctx['pct_1d']:+.2f}%)")
-    if ctx.get('chg_7d')  is not None: hist_lines.append(f"   7 أيام   : {ctx['chg_7d']:+.2f}$ ({ctx['pct_7d']:+.2f}%)")
-    if ctx.get('chg_30d') is not None: hist_lines.append(f"   30 يوم   : {ctx['chg_30d']:+.2f}$ ({ctx['pct_30d']:+.2f}%)")
-    if ctx.get('high_52w'):             hist_lines.append(f"   قمة 52أ  : {ctx['high_52w']}$ | قاع: {ctx['low_52w']}$")
-    hist_block = "\n".join(hist_lines) if hist_lines else "   غير متاح"
-
-    # ── فيبوناتشي ──
-    fib_lines = [f"   {k:7s} ▸ {v}$" for k, v in fib.items()]
-    fib_block  = "\n".join(fib_lines)
-
-    # ── السعر الفوري vs الآجل ──
-    spot_str = f"{d['gold_spot']:.2f}$" if d['gold_spot'] else "غير متاح حالياً (مغلق)"
-    futures_str = f"{d['gold_futures']:.2f}$" if d['gold_futures'] else "غير متاح"
-    contango_str = (f"  (فارق: +{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
-                    else f"  (فارق: {d['contango']:.2f}$)" if d['contango'] else "")
-    
-    spot_line = (
-        f"   فوري  (XAU/USD Spot) : {spot_str}\n"
-        f"   آجل   (GC Futures)   : {futures_str}{contango_str}"
+    # ── جدول Confluence مضغوط ──
+    score_table = "  ".join(
+        f"{'🟢' if v>0 else ('🔴' if v<0 else '⚪')}{name.split()[0]}"
+        for name, v in conf['scores'].items()
     )
 
-    # ── الصفقة المقترحة ──
-    if ent['entry'] is not None:
-        trade_direction = "أعلى" if "بيع" in ent['type'] else "أدنى"
-        trade_block = (
-            f"   النوع       : {ent['type']}\n"
-            f"   الدخول      : {ent['entry']}$\n"
-            f"   وقف الخسارة : {ent['sl']}$  ← {trade_direction} الدخول بـ {ent['risk']}$  ({ent['sl_note']})\n"
-            f"   الهدف       : مفتوح — الخروج عند إشارة عكسية من المؤشرات\n"
-            f"   مستويات مرجعية: {ent['ref1']}$ | {ent['ref2']}$ | {ent['ref3']}$"
-        )
-    else:
-        trade_block = (
-            f"   النوع       : {ent['type']}\n"
-            f"   القرار      : {ent['sl_note']}\n"
-            f"   مستويات مرجعية للمراقبة: مقاومة {ent['ref1']}$ | دعم {ent['ref2']}$"
-        )
+    # ── حركة السعر ──
+    hist_parts = []
+    if ctx.get('chg_1d')  is not None: hist_parts.append(f"24h:{ctx['chg_1d']:+.1f}$({ctx['pct_1d']:+.1f}%)")
+    if ctx.get('chg_7d')  is not None: hist_parts.append(f"7d:{ctx['chg_7d']:+.1f}$({ctx['pct_7d']:+.1f}%)")
+    if ctx.get('chg_30d') is not None: hist_parts.append(f"30d:{ctx['chg_30d']:+.1f}$({ctx['pct_30d']:+.1f}%)")
+    hist_line = "  ".join(hist_parts) if hist_parts else "غير متاح"
 
-    # ══ الهيكل الثابت الكامل ══
-    fixed = f"""{header}
+    # ── بناء قسم الصفقات ──
+    trades_all = ent['trades_dir'] or ent['trades_break']
+    trade_label = "🎯 الصفقات المقترحة" if ent['trades_dir'] else "⚡ صفقات اختراق (سوق متذبذب)"
+    trade_lines = []
+    for t in trades_all:
+        trade_lines.append(
+            f"   {t['dir']} {t['market']}"
+            f"\n      دخول: {t['entry']}$ | وقف: {t['sl']}$ (فارق {t['risk']}$) | هدف: {t['target']}"
+        )
+    trade_block = "\n".join(trade_lines)
+
+    refs = ent['refs']
+
+    # ══ الهيكل الثابت المضغوط ══
+    fixed = f"""💰 {header}
 🕐 {date_now}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💰 أسعار الذهب
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{spot_line}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 أسعار الذهب الآن
+   فوري  (XAU/USD) : {spot_str}
+   آجل   (GC/F)    : {futures_str}{contango_str}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 حكم السوق: {conf['verdict']}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {score_table}
-   ─────────────────────────
-   المجموع : {conf['total']:+d} / ±{conf['n']}
-   شراء {conf['bullish']} | بيع {conf['bearish']} | محايد {conf['neutral']}
+   ∑ {conf['total']:+d}/±{conf['n']}  ▪ 🟢{conf['bullish']} 🔴{conf['bearish']} ⚪{conf['neutral']}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🕐 الإطارات الزمنية: {d['tf_label']}
+   📅 {d['tf_weekly']['bias']} | RSI={d['tf_weekly']['rsi']}
+   📆 {d['tf_daily']['bias']}  | RSI={d['tf_daily']['rsi']}
+   ⏱️ {d['tf_hourly'].get('bias','—')} | RSI={d['tf_hourly'].get('rsi','—')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📈 حركة السعر: {hist_line}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📡 الأسواق
+   DXY:{d['dxy']:.1f}({d['dxy_bias']}) | 10Y:{d['tnx']:.2f}%({d['bond_bias']}) | VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'})
+   🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
+   {d['real_yield_signal']}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧮 المؤشرات
+   RSI:{d['rsi']}({d['rsi_label'].split()[0]}) | StochK:{d['stoch_k']} | MACD:{d['macd_hist']}({d['macd_label'].split()[0]})
+   BB:{d['bb_upper']}/{d['bb_mid']}/{d['bb_lower']}({d['bb_label'].split()[0]}) | EMA:{d['ema_label']}
+   ADX:{d['adx']}(DI+{d['di_plus']}/DI-{d['di_minus']}) | CCI:{d['cci']} | W%R:{d['williams_r']}
+   OBV:{d['obv_trend']} | حجم:{d['rel_vol_label'].split('—')[0].strip()} | ATR:{d['atr']}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔢 المستويات
+   🟣 مقاومة نفسية:{rn['nearest_resistance']}$(↑{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(↓{rn['dist_to_support']}$)
+   📍 High:{d['swing_high']}$ / Low:{d['swing_low']}$
+   🔴 R1:{d['r1']}$ R2:{d['r2']}$ | Pivot:{d['pivot']}$ | 🟢 S1:{d['s1']}$ S2:{d['s2']}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+{trade_label}
+{trade_block}
+   مستويات المراقبة: ↑{refs['above']}$ | ↓{refs['below']}$"""
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 توافق الإطارات الزمنية
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   {d['tf_label']}
+    # ── تعليمات الـ AI ──
+    prob_floor = ("سيناريو الصعود لا يقل عن 50%" if bias == "bull"
+                  else "سيناريو الهبوط لا يقل عن 50%" if bias == "bear"
+                  else "سيناريو التذبذب لا يقل عن 40%")
+
+    trades_summary = ""
+    for t in trades_all:
+        trades_summary += f"\n   {t['dir']} {t['market']}: دخول {t['entry']}$ | وقف {t['sl']}$ | فارق {t['risk']}$"
+
+    ai_instructions = f"""أنت محلل ذهب كمي. اكتب قسم التحليل بالعربية الفصحى فقط. لا تعيد الأرقام المكتوبة بالفعل.
+
+⚠️ السعر الفعلي للذهب الآن: {gold:.2f}$ — استخدم هذا الرقم حرفياً في كل سيناريو. لا تستخدم أسعاراً أخرى.
+حكم السوق: {conf['verdict']} | الاتجاه: {bias_ar} | {prob_floor}
+الصفقات المحسوبة:{trades_summary}
+
+اكتب هذه الأقسام فقط بالترتيب:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 التحليل الكمي
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**📌 خلاصة:** [جملة واحدة — الاتجاه {bias_ar} + الاحتمالية]
+
+**🔍 الإطارات الزمنية:** [جملتان — هل متوافقة؟ ماذا تعني؟]
+
+**📊 أبرز مؤشرين:** [مؤشران فقط — كل واحد في جملة بمثال بسيط]
+
+**📉 السيناريوهات (100%):**
+   📈 صعود (X%): كسر {refs['above']}$ → الهدف ...
+   📉 هبوط (Y%): كسر {refs['below']}$ → الهدف ...
+   ⚡ تذبذب (Z%): النطاق والشرط
+
+**✅ القرار:** [جملتان — استخدم أسعار الصفقات المحسوبة أعلاه حرفياً]"""
+
+    return fixed, ai_instructions
+
    📅 أسبوعي : {d['tf_weekly']['bias']} | RSI={d['tf_weekly']['rsi']} | EMA={d['tf_weekly']['ema_align']}
    📆 يومي   : {d['tf_daily']['bias']}  | RSI={d['tf_daily']['rsi']}  | EMA={d['tf_daily']['ema_align']}
    ⏱️ ساعي   : {d['tf_hourly'].get('bias','غير متاح')} | RSI={d['tf_hourly'].get('rsi','-')}
@@ -757,11 +789,11 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
     if not client:
         return None
 
-    if is_morning:  header = "🌅 [نشرة الصباح — استراتيجية اليوم الكاملة]"
-    elif is_alert:  header = f"🚨 [تنبيه سعري — حركة {'+' if price_diff>0 else ''}{price_diff:.2f}$]"
-    else:           header = "📊 [نشرة التحليل الكمي الاستباقي للذهب]"
+    if is_morning:  header = "🌅 نشرة الصباح — استراتيجية اليوم"
+    elif is_alert:  header = f"🚨 تنبيه — حركة {'+' if price_diff>0 else ''}{price_diff:.2f}$"
+    else:           header = "📊 نشرة التحليل الكمي للذهب"
 
-    fixed_block, ai_instructions = _build_fixed_template(d, header, is_morning)
+    fixed_block, ai_instructions = _build_fixed_template(d, header)
 
     for model_name in GROQ_MODELS:
         try:
@@ -773,7 +805,7 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
                 ],
                 model=model_name,
                 temperature=0.07,
-                max_tokens=1000,
+                max_tokens=700,
             )
             ai_analysis = resp.choices[0].message.content
             log.info(f"✅ نجح الاتصال: {model_name}")
@@ -794,7 +826,7 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
 # ══════════════════════════════════════════════
 #  8. إرسال تيليجرام
 # ══════════════════════════════════════════════
-CHUNK_SIZE = 3800
+CHUNK_SIZE = 4090   # حد تيليجرام 4096 — نترك هامش 6 أحرف
 
 
 def _split_message(text: str) -> list:

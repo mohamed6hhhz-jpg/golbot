@@ -423,11 +423,11 @@ def calc_smart_entries(d: dict, bias: str) -> dict:
                 "ref1": ref1, "ref2": ref2, "ref3": ref3, "open_target": True}
 
     else:
-        return {"type": "انتظار — سوق متذبذب ⚪", "entry": gold,
-                "sl": round(nearest_sup - MAX_SL_DISTANCE, 2), "risk": MAX_SL_DISTANCE,
-                "sl_note": "لا صفقة موصى بها",
+        return {"type": "انتظار — سوق متذبذب ⚪", "entry": None,
+                "sl": None, "risk": None,
+                "sl_note": "لا توجد صفقة موصى بها حالياً",
                 "ref1": round(nearest_res, 2), "ref2": round(r1, 2), "ref3": round(r2, 2),
-                "open_target": True}
+                "open_target": False}
 
 
 # ══════════════════════════════════════════════
@@ -584,24 +584,32 @@ def _build_fixed_template(d: dict, header: str, is_morning: bool = False) -> tup
     fib_block  = "\n".join(fib_lines)
 
     # ── السعر الفوري vs الآجل ──
+    spot_str = f"{d['gold_spot']:.2f}$" if d['gold_spot'] else "غير متاح حالياً (مغلق)"
+    futures_str = f"{d['gold_futures']:.2f}$" if d['gold_futures'] else "غير متاح"
+    contango_str = (f"  (فارق: +{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
+                    else f"  (فارق: {d['contango']:.2f}$)" if d['contango'] else "")
+    
     spot_line = (
-        f"   فوري  (XAU/USD Spot) : {d['gold_spot']:.2f}$\n"
-        f"   آجل   (GC Futures)   : {d['gold_futures']:.2f}$"
-        + (f"  (فارق: +{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
-           else f"  (فارق: {d['contango']:.2f}$)" if d['contango'] else "")
-        if d['gold_spot'] else
-        f"   آجل (GC Futures): {d['gold_futures']:.2f}$"
+        f"   فوري  (XAU/USD Spot) : {spot_str}\n"
+        f"   آجل   (GC Futures)   : {futures_str}{contango_str}"
     )
 
     # ── الصفقة المقترحة ──
-    trade_direction = "أعلى" if "بيع" in ent['type'] else "أدنى"
-    trade_block = (
-        f"   النوع       : {ent['type']}\n"
-        f"   الدخول      : {ent['entry']}$\n"
-        f"   وقف الخسارة : {ent['sl']}$  ← {trade_direction} الدخول بـ {ent['risk']}$  ({ent['sl_note']})\n"
-        f"   الهدف       : مفتوح — الخروج عند إشارة عكسية من المؤشرات\n"
-        f"   مستويات مرجعية: {ent['ref1']}$ | {ent['ref2']}$ | {ent['ref3']}$"
-    )
+    if ent['entry'] is not None:
+        trade_direction = "أعلى" if "بيع" in ent['type'] else "أدنى"
+        trade_block = (
+            f"   النوع       : {ent['type']}\n"
+            f"   الدخول      : {ent['entry']}$\n"
+            f"   وقف الخسارة : {ent['sl']}$  ← {trade_direction} الدخول بـ {ent['risk']}$  ({ent['sl_note']})\n"
+            f"   الهدف       : مفتوح — الخروج عند إشارة عكسية من المؤشرات\n"
+            f"   مستويات مرجعية: {ent['ref1']}$ | {ent['ref2']}$ | {ent['ref3']}$"
+        )
+    else:
+        trade_block = (
+            f"   النوع       : {ent['type']}\n"
+            f"   القرار      : {ent['sl_note']}\n"
+            f"   مستويات مرجعية للمراقبة: مقاومة {ent['ref1']}$ | دعم {ent['ref2']}$"
+        )
 
     # ══ الهيكل الثابت الكامل ══
     fixed = f"""{header}
@@ -692,7 +700,9 @@ def _build_fixed_template(d: dict, header: str, is_morning: bool = False) -> tup
 
 حكم السوق النهائي: {conf['verdict']}
 الاتجاه الغالب: {bias_ar} — {prob_floor}
-وقف الخسارة: {ent['sl']}$ هو دائماً {'أدنى' if bias=='bull' else 'أعلى'} نقطة الدخول {ent['entry']}$ بفارق {ent['risk']}$ — استخدم هذه الأرقام حرفياً.
+"""
+    if ent['entry'] is not None:
+        ai_instructions += f"""وقف الخسارة: {ent['sl']}$ هو دائماً {'أدنى' if bias=='bull' else 'أعلى'} نقطة الدخول {ent['entry']}$ بفارق {ent['risk']}$ — استخدم هذه الأرقام حرفياً.
 
 اكتب هذه الأقسام بالترتيب (لا تضف عناوين غير هذه):
 
@@ -716,6 +726,28 @@ def _build_fixed_template(d: dict, header: str, is_morning: bool = False) -> tup
    وقف الخسارة عند {ent['sl']}$ — أي {ent['risk']}$ لكل أونصة ({ent['sl_note']})
    الهدف مفتوح — راقب المستويات {ent['ref1']}$ و{ent['ref2']}$ كمناطق مراجعة
    لو السعر كسر {ent['sl']}$ فالاتجاه تغير — اخرج فوراً"""
+    else:
+        ai_instructions += f"""
+اكتب هذه الأقسام بالترتيب (لا تضف عناوين غير هذه):
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 التحليل الكمي
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**📌 خلاصة:** [جملة واحدة — الاتجاه {bias_ar} + الاحتمالية]
+
+**🔍 قراءة الإطارات الزمنية:** [جملتان — هل متوافقة؟ ماذا تعني للحركة القادمة؟]
+
+**📊 أبرز 3 مؤشرات:** [كل مؤشر في جملة + مثال حياتي بسيط — لا تتجاوز 3 أسطر]
+
+**📉 السيناريوهات (المجموع 100%):**
+   📈 صعود (X%): الشرط — الهدف
+   📉 هبوط (Y%): الشرط — الهدف
+   ⚡ تذبذب (Z%): النطاق — شرط الانكسار
+
+**✅ القرار العملي:**
+   السوق حالياً متذبذب ولا توجد صفقة واضحة المعالم.
+   نوصي بالانتظار والمراقبة حتى تتضح الرؤية أو يتم كسر أحد المستويات المرجعية."""
 
     return fixed, ai_instructions
 

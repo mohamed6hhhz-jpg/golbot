@@ -460,14 +460,12 @@ def get_full_market_data() -> dict | None:
     gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
-    # الفوري: نجرب 1h أولاً للحصول على أحدث سعر متاح
+    # الفوري: نجرب بيانات ساعية أولاً للحصول على أحدث سعر متاح
     gold_spot_df = _fetch("XAUUSD=X", period="5d",  interval="1h");  time.sleep(0.7)
-    _spot_p, _   = _last_with_date(gold_spot_df)
-    if not _spot_p:   # لو فشل 1h نجرب 1d
+    _sp, _       = _last_with_date(gold_spot_df)
+    if not _sp:   # لو فشل 1h نجرب 1d بفترة أطول
         gold_spot_df = _fetch("XAUUSD=X", period="30d", interval="1d"); time.sleep(0.5)
-    _spot_p2, _  = _last_with_date(gold_spot_df)
-    if not _spot_p2: # لو فشل كلهم نستخدم GLD كبديل قريب من الفوري
-        gold_spot_df = _fetch("GLD",      period="5d",  interval="1d"); time.sleep(0.5)
+    # لو فشل كلهم → سيظل gold_spot_df كما هو ويُستخدم الآجل كبديل أدناه
 
     if gold_daily is None or gold_daily.empty:
         return None

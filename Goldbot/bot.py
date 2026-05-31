@@ -158,19 +158,25 @@ def calc_adx(df, period: int = 14):
         tr_list.append(tr)
         dm_plus.append(up   if up > down and up > 0 else 0)
         dm_minus.append(down if down > up and down > 0 else 0)
-    def wilder(arr, n):
-        res = [sum(arr[:n]) / n]
+    # Wilder smooth للقيم المطلقة (TR و DM)
+    def wilder_abs(arr, n):
+        res = [sum(arr[:n])]          # مجموع أول n قيمة
         for v in arr[n:]: res.append(res[-1] - res[-1]/n + v)
         return res
-    atr_s  = wilder(tr_list, period)
-    dip_s  = wilder(dm_plus,  period)
-    dim_s  = wilder(dm_minus, period)
-    # ← تقييد DI+/DI- بـ 100 حتى لا يتجاوز ADX النطاق
+    # Wilder smooth للنسب (DX→ADX) — الحالة الصحيحة: EMA بـ v/n
+    def wilder_ratio(arr, n):
+        res = [sum(arr[:n]) / n]      # متوسط أول n قيمة
+        for v in arr[n:]: res.append(res[-1] - res[-1]/n + v/n)
+        return res
+
+    atr_s  = wilder_abs(tr_list, period)
+    dip_s  = wilder_abs(dm_plus,  period)
+    dim_s  = wilder_abs(dm_minus, period)
     di_p   = [min(100.0, 100 * dip_s[i] / (atr_s[i] + 1e-9)) for i in range(len(atr_s))]
     di_m   = [min(100.0, 100 * dim_s[i] / (atr_s[i] + 1e-9)) for i in range(len(atr_s))]
     dx     = [100 * abs(di_p[i]-di_m[i]) / (di_p[i]+di_m[i]+1e-9) for i in range(len(atr_s))]
-    adx_s  = wilder(dx, period)
-    return round(float(min(adx_s[-1], 100.0)), 2), round(float(di_p[-1]), 2), round(float(di_m[-1]), 2)
+    adx_s  = wilder_ratio(dx, period)   # ← EMA صحيحة لـ DX
+    return round(float(adx_s[-1]), 2), round(float(di_p[-1]), 2), round(float(di_m[-1]), 2)
 
 
 def calc_cci(df, period: int = 20) -> float:

@@ -76,6 +76,22 @@ def _fetch(symbol: str, period: str = "90d", interval: str = "1d", max_retries: 
 def _last_close(df) -> float | None:
     return float(df['Close'].iloc[-1]) if df is not None and not df.empty else None
 
+def _last_with_date(df) -> tuple[float | None, str]:
+    """يرجع (آخر سعر, تاريخه كنص) — حتى لو السوق مغلق."""
+    if df is None or df.empty:
+        return None, ""
+    last_row = df.iloc[-1]
+    price    = float(last_row['Close'])
+    try:
+        ts = df.index[-1]
+        if hasattr(ts, 'strftime'):
+            label = ts.strftime("%d/%m %H:%M")
+        else:
+            label = str(ts)[:16]
+    except Exception:
+        label = "غير معروف"
+    return price, label
+
 
 # ══════════════════════════════════════════════
 #  2. المؤشرات الفنية
@@ -440,7 +456,10 @@ def get_full_market_data() -> dict | None:
     gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
-    gold_spot_df= _fetch("XAUUSD=X", period="5d",  interval="1d");  time.sleep(0.7)
+    # الفوري: نجرب 1h أولاً للحصول على أحدث سعر متاح
+    gold_spot_df= _fetch("XAUUSD=X", period="5d",  interval="1h");  time.sleep(0.7)
+    if gold_spot_df is None or gold_spot_df.empty:
+        gold_spot_df = _fetch("XAUUSD=X", period="5d", interval="1d"); time.sleep(0.5)
 
     if gold_daily is None or gold_daily.empty:
         return None
@@ -454,8 +473,8 @@ def get_full_market_data() -> dict | None:
     vix_df    = _fetch("^VIX",     period="60d"); time.sleep(0.6)
     sp500_df  = _fetch("^GSPC",    period="60d"); time.sleep(0.6)
 
-    gold_futures = _last_close(gold_daily)
-    gold_spot    = _last_close(gold_spot_df)
+    gold_futures, futures_date = _last_with_date(gold_daily)
+    gold_spot,    spot_date    = _last_with_date(gold_spot_df)
     silver = _last_close(silver_df)
     oil    = _last_close(oil_df)
     dxy    = _last_close(dxy_df)
@@ -526,7 +545,9 @@ def get_full_market_data() -> dict | None:
     contango    = round(gold_futures - gold_spot, 2) if gold_spot else None
 
     d = dict(
-        gold=gold, gold_futures=gold_futures, gold_spot=gold_spot, contango=contango,
+        gold=gold, gold_futures=gold_futures, gold_spot=gold_spot,
+        futures_date=futures_date, spot_date=spot_date,
+        contango=contango,
         silver=silver, oil=oil, dxy=dxy, tnx=tnx, vix=vix, sp500=sp500,
         rsi=rsi, rsi_label=rsi_label, stoch_k=stoch_k, stoch_d=stoch_d,
         macd=macd, macd_sig=macd_sig, macd_hist=macd_hist, macd_label=macd_label,
@@ -564,11 +585,14 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     bias     = conf['bias']
     bias_ar  = {"bull": "صعودي", "bear": "هبوطي", "neutral": "متذبذب"}.get(bias, "متذبذب")
 
-    # ── السعر الفوري والآجل ──
-    spot_str    = f"{d['gold_spot']:.2f}$" if d['gold_spot'] else "مغلق"
-    futures_str = f"{d['gold_futures']:.2f}$"
-    contango_str = (f" (+{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
-                    else f" ({d['contango']:.2f}$)" if d['contango'] else "")
+    # ── السعر الفوري والآجل مع توضيح مصدر البيانات ──
+    futures_label = f"{d['gold_futures']:.2f}$  ⏱ {d['futures_date']}"
+    if d['gold_spot']:
+        spot_label = f"{d['gold_spot']:.2f}$  ⏱ {d['spot_date']}"
+    else:
+        spot_label = f"غير متاح (آخر معلوم: راجع الآجل)"
+    contango_str = (f"  (+{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
+                    else f"  ({d['contango']:.2f}$)" if d['contango'] else "")
 
     # ── جدول Confluence مضغوط ──
     score_table = "  ".join(
@@ -600,9 +624,9 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     fixed = f"""💰 {header}
 🕐 {date_now}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 أسعار الذهب الآن
-   فوري  (XAU/USD) : {spot_str}
-   آجل   (GC/F)    : {futures_str}{contango_str}
+📍 أسعار الذهب
+   فوري  (XAU/USD) : {spot_label}
+   آجل   (GC=F)    : {futures_label}{contango_str}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 حكم السوق: {conf['verdict']}
 {score_table}

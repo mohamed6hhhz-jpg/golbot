@@ -961,9 +961,13 @@ def _split_message(text: str) -> list:
 
 
 async def _telethon_send(text: str) -> bool:
+    """MTProto بجلسة المستخدم الموجودة — يتجاوز حجب api.telegram.org تماماً"""
+    if not SESSION_STRING:
+        log.warning("⚠️ [Telethon] SESSION_STRING غير موجود.")
+        return False
     try:
-        client = TelegramClient(StringSession(), API_ID, API_HASH)
-        await client.start(bot_token=TELEGRAM_BOT_TOKEN)
+        client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+        await client.start()   # جلسة موجودة — بدون ImportBotAuthorizationRequest
         await client.send_message(TELEGRAM_CHAT_ID, text)
         await client.disconnect()
         return True
@@ -989,13 +993,8 @@ def _http_send(text: str) -> bool:
 
 
 def _send_single(text: str) -> bool:
-    """HTTP أولاً (أسرع وأموثق)، Telethon كخيار احتياطي أخير."""
-    # المحاولة الأولى: HTTP Bot API
-    if _http_send(text):
-        log.info("✅ [HTTP] تم الإرسال.")
-        return True
-    # الاحتياطي: Telethon (أبطأ بسبب إنشاء الجلسة)
-    log.warning("⚠️ [HTTP] فشل — جاري المحاولة عبر Telethon...")
+    """Telethon (MTProto) أولاً — يتجاوز الحجب. HTTP كاحتياطي أخير."""
+    # المحاولة الأولى: Telethon بجلسة المستخدم عبر MTProto
     try:
         ok = asyncio.run(_telethon_send(text))
         if ok:
@@ -1014,6 +1013,11 @@ def _send_single(text: str) -> bool:
             log.warning(f"⚠️ [Telethon loop] {e}")
     except Exception as e:
         log.warning(f"⚠️ [Telethon] {e}")
+    # الاحتياطي الأخير: HTTP Bot API
+    log.warning("⚠️ [Telethon] فشل — جاري المحاولة عبر HTTP...")
+    if _http_send(text):
+        log.info("✅ [HTTP] تم الإرسال.")
+        return True
     log.error("❌ فشل الإرسال من جميع الوسائل.")
     return False
 

@@ -451,33 +451,55 @@ def calc_divergence(df) -> str:
     return "⚪ لا يوجد تباين واضح"
 
 
-def calc_trade_confidence(d: dict, is_buy: bool) -> str:
-    """درجة ثقة الصفقة 1-5 نجوم بناءً على تقاطع الإشارات"""
+def calc_trade_confidence(d: dict, t: dict) -> tuple[str, str]:
+    """درجة ثقة الصفقة 1-5 نجوم لكل صفقة منفصلة مع سبب التقييم"""
     score = 0
-    rsi  = d.get('rsi', 50)
-    macd = d.get('macd_hist', 0)
-    adx  = d.get('adx', 0)
-    obv  = d.get('obv_trend', '')
-    tf_scores = [d.get('tf_weekly', {}).get('score', 0),
-                 d.get('tf_daily',  {}).get('score', 0),
-                 d.get('tf_hourly', {}).get('score', 0)]
-    # RSI
-    if is_buy  and rsi < 45: score += 1
-    elif not is_buy and rsi > 55: score += 1
-    # MACD
-    if is_buy  and macd > 0: score += 1
-    elif not is_buy and macd < 0: score += 1
-    # ADX (قوة الاتجاه)
-    if adx > 22: score += 1
-    # OBV
-    if is_buy  and 'صعودي' in obv: score += 1
-    elif not is_buy and 'هبوطي' in obv: score += 1
-    # توافق الإطارات
-    aligned = sum(1 for s in tf_scores if (s > 0) == is_buy)
-    if aligned >= 2: score += 1
+    reasons = []
+    is_buy = t['is_buy']
+    gold = d['gold']
+    
+    # 1. التوافق مع الترند العام
+    trend_bias = d['confluence']['bias']
+    if (is_buy and trend_bias == 'bull') or (not is_buy and trend_bias == 'bear'):
+        score += 1
+        reasons.append("مع الترند")
+    else:
+        reasons.append("عكس الترند")
+
+    # 2. العائد للمخاطرة (R:R) للهدف الأول
+    if t['rr1'] >= 2.5:
+        score += 1
+        reasons.append(f"عائد ضخم ({t['rr1']}x)")
+    elif t['rr1'] >= 1.5:
+        reasons.append(f"عائد جيد ({t['rr1']}x)")
+    else:
+        reasons.append("عائد ضعيف")
+
+    # 3. نوع الصفقة (محافظ / عدواني)
+    if "محافظ" in t['style']:
+        score += 2
+        reasons.append("مستوى آمن")
+    elif "معتدل" in t['style']:
+        score += 1
+        reasons.append("مستوى متوسط")
+    else:
+        reasons.append("دخول خطر")
+
+    # 4. البعد عن السعر الحالي (تجنب الضوضاء)
+    dist = abs(t['entry'] - gold)
+    atr = d.get('atr', 10)
+    if dist >= atr * 0.4:
+        score += 1
+        reasons.append("نقطة دخول ممتازة")
+
+    # تقييد النجوم بين 1 و 5
+    score = max(1, min(5, score))
     stars  = "⭐" * score + "☆" * (5 - score)
-    labels = {5:'ممتازة',4:'قوية',3:'جيدة',2:'ضعيفة',1:'ضعيفة جداً',0:'تجنب'}
-    return f"{stars} {labels.get(score,'')}"
+    
+    # تنسيق السبب النهائي بشكل مختصر وجميل
+    final_reason = "، ".join(reasons[:3]) # نكتفي بأهم 3 أسباب حتى لا يطول السطر
+    labels = {5:'ممتازة',4:'قوية',3:'جيدة',2:'ضعيفة',1:'خطرة'}
+    return f"{stars} {labels.get(score,'')}", final_reason
 
 
 def calc_all_entries(d: dict, bias: str) -> dict:
@@ -761,9 +783,10 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     def fmt_block(trades):
         lines=[]
         for i,t in enumerate(trades):
-            conf = calc_trade_confidence(d, t['is_buy'])
+            conf_str, reason = calc_trade_confidence(d, t)
             lines.append(
-                f"   {nums[i]} [{t['style']}] {t['market']} | {conf}\n"
+                f"   {nums[i]} [{t['style']}] {t['market']} | {conf_str}\n"
+                f"      💡 السبب: {reason}\n"
                 f"      دخول: {t['entry']}$ | وقف: {t['sl']}$ (خطر: {t['risk']}$)\n"
                 f"      T1:{t['t1']}$(R:{t['rr1']}x) | T2:{t['t2']}$(R:{t['rr2']}x) | T3:{t['t3']}$(R:{t['rr3']}x)"
             )

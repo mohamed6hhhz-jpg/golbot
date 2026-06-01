@@ -973,20 +973,29 @@ async def _telethon_send(text: str) -> bool:
 
 
 def _http_send(text: str) -> bool:
+    """الإرسال عبر HTTP Bot API — الوسيلة الأساسية."""
     url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": str(TELEGRAM_CHAT_ID), "text": text}
-    for attempt in range(3):
+    for attempt in range(4):
         try:
-            r = requests.post(url, json=payload, headers={"Connection": "close"}, timeout=(5, 20))
+            r = requests.post(url, json=payload, headers={"Connection": "close"}, timeout=(10, 30))
             r.raise_for_status()
             return True
         except Exception as e:
-            log.warning(f"⚠️ [HTTP] {attempt+1}/3 — {e}")
-            time.sleep(2 ** attempt)
+            wait = 2 ** attempt
+            log.warning(f"⚠️ [HTTP] {attempt+1}/4 — {e} — انتظار {wait}s")
+            time.sleep(wait)
     return False
 
 
 def _send_single(text: str) -> bool:
+    """HTTP أولاً (أسرع وأموثق)، Telethon كخيار احتياطي أخير."""
+    # المحاولة الأولى: HTTP Bot API
+    if _http_send(text):
+        log.info("✅ [HTTP] تم الإرسال.")
+        return True
+    # الاحتياطي: Telethon (أبطأ بسبب إنشاء الجلسة)
+    log.warning("⚠️ [HTTP] فشل — جاري المحاولة عبر Telethon...")
     try:
         ok = asyncio.run(_telethon_send(text))
         if ok:
@@ -999,13 +1008,14 @@ def _send_single(text: str) -> bool:
             ok = loop.run_until_complete(_telethon_send(text))
             loop.close()
             if ok:
-                log.info("✅ [Telethon new loop] تم الإرسال.")
+                log.info("✅ [Telethon loop] تم الإرسال.")
                 return True
         except Exception as e:
             log.warning(f"⚠️ [Telethon loop] {e}")
     except Exception as e:
         log.warning(f"⚠️ [Telethon] {e}")
-    return _http_send(text)
+    log.error("❌ فشل الإرسال من جميع الوسائل.")
+    return False
 
 
 def send_to_telegram(message: str) -> bool:

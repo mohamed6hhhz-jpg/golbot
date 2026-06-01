@@ -395,59 +395,102 @@ def calc_confluence(d: dict) -> dict:
 
 
 # ══════════════════════════════════════════════
-#  5. الصفقات الكاملة — فورية + آجلة + اختراق
+#  5. الصفقات — 3 شراء + 3 بيع + زخم + اتجاه + سيولة
 # ══════════════════════════════════════════════
-TIGHT_SL  = 15.0   # وقف ضيق للفورية
-STD_SL    = MAX_SL_DISTANCE  # 38$ للآجلة
+TIGHT_SL  = 15.0            # وقف الفورية (Spot)
+STD_SL    = MAX_SL_DISTANCE  # 38$ للآجلة  (Futures)
+
+def calc_momentum_signal(d: dict) -> str:
+    hist = d.get('macd_hist', 0) or 0
+    rsi  = d.get('rsi', 50)      or 50
+    adx  = d.get('adx', 0)       or 0
+    sfx  = " قوي" if adx > 25 else " معتدل"
+    if   hist > 0.3 and rsi > 52: return f"📈 زخم صاعد{sfx}"
+    elif hist < -0.3 and rsi < 48: return f"📉 زخم هابط{sfx}"
+    else:                          return "⚡ زخم محايد"
+
+def calc_trend_signal(d: dict) -> str:
+    ema = d.get('ema_label', '')
+    wk  = d.get('tf_weekly', {}).get('bias', '')
+    if '🟢' in ema and 'صعودي' in wk:   return "🟢 صعودي قوي"
+    elif '🔴' in ema and 'هبوطي' in wk: return "🔴 هبوطي قوي"
+    elif '🟢' in ema or  'صعودي' in wk: return "🟡 صعودي ضعيف"
+    elif '🔴' in ema or  'هبوطي' in wk: return "🟠 هبوطي ضعيف"
+    return "⚪ متذبذب"
+
+def calc_liquidity_signal(d: dict) -> str:
+    rv = d.get('rel_vol', 1.0) or 1.0
+    if rv >= 3.0:   return f"🔵 مرتفعة جداً ({rv:.1f}x)"
+    elif rv >= 1.5: return f"🟢 عالية ({rv:.1f}x)"
+    elif rv >= 0.8: return f"🟡 متوسطة ({rv:.1f}x)"
+    else:           return f"🔴 منخفضة ({rv:.1f}x)"
 
 def calc_all_entries(d: dict, bias: str) -> dict:
     """
-    يعيد قاموساً يحتوي على:
-      - trades_dir: قائمة بصفقات الاتجاه (فوري + آجل)
-      - trades_break: قائمة بصفقات الاختراق (لو متذبذب)
-      - bias: الاتجاه
+    3 صفقات شراء + 3 صفقات بيع مبنية على مستويات تقنية حقيقية.
+    القاعدة: الصفقة المعتدلة (2) دائماً Futures بـ 38$ — الأخريان Spot بـ 15$.
     """
-    gold       = d['gold']
-    s1, r1     = d['s1'], d['r1']
-    s2, r2     = d['s2'], d['r2']
-    swing_high = d['swing_high']
-    swing_low  = d['swing_low']
-    rn         = d['round_numbers']
+    gold   = d['gold']
+    s1, r1 = d['s1'], d['r1']
+    s2, r2 = d['s2'], d['r2']
+    s3, r3 = d['s3'], d['r3']
+    rn     = d['round_numbers']
 
-    candidates_sup = [x for x in [swing_low, s1, rn['nearest_support']] if x and x < gold]
-    nearest_sup    = max(candidates_sup) if candidates_sup else s1
-    candidates_res = [x for x in [swing_high, r1, rn['nearest_resistance']] if x and x > gold]
-    nearest_res    = min(candidates_res) if candidates_res else r1
+    def _buy_t(e):
+        pool = sorted([x for x in [r1,r2,r3,rn['nearest_resistance']] if x and x > e])
+        return (pool[0] if len(pool)>0 else round(e+25,2),
+                pool[1] if len(pool)>1 else round(e+60,2),
+                pool[2] if len(pool)>2 else round(e+100,2))
 
-    def make_buy(entry, sl_dist, label):
-        e  = round(entry, 2)
-        sl = round(e - sl_dist, 2)
-        return {"dir": "شراء 📗", "market": label, "entry": e,
-                "sl": sl, "risk": sl_dist, "target": "مفتوح"}
+    def _sell_t(e):
+        pool = sorted([x for x in [s1,s2,s3,rn['nearest_support']] if x and x < e], reverse=True)
+        return (pool[0] if len(pool)>0 else round(e-25,2),
+                pool[1] if len(pool)>1 else round(e-60,2),
+                pool[2] if len(pool)>2 else round(e-100,2))
 
-    def make_sell(entry, sl_dist, label):
-        e  = round(entry, 2)
-        sl = round(e + sl_dist, 2)
-        return {"dir": "بيع 📕", "market": label, "entry": e,
-                "sl": sl, "risk": sl_dist, "target": "مفتوح"}
+    def mb(entry, sl_d, mkt, style):
+        e=round(entry,2); t1,t2,t3=_buy_t(e)
+        return {"dir":"شراء 📗","market":mkt,"style":style,"entry":e,
+                "sl":round(e-sl_d,2),"risk":sl_d,"t1":t1,"t2":t2,"t3":t3}
 
-    trades_dir   = []
-    trades_break = []
-    refs = {"above": round(nearest_res, 2), "below": round(nearest_sup, 2),
-            "r1": r1, "r2": r2, "s1": s1, "s2": s2}
+    def ms(entry, sl_d, mkt, style):
+        e=round(entry,2); t1,t2,t3=_sell_t(e)
+        return {"dir":"بيع 📕","market":mkt,"style":style,"entry":e,
+                "sl":round(e+sl_d,2),"risk":sl_d,"t1":t1,"t2":t2,"t3":t3}
 
     if bias == "bull":
-        trades_dir.append(make_buy(nearest_sup, TIGHT_SL, "فوري (Spot)"))
-        trades_dir.append(make_buy(nearest_sup, STD_SL,   "آجل (Futures)"))
+        buys  = [mb(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — دخول فوري"),
+                 mb(s1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — عند S1"),
+                 mb(s2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — عند S2")]
+        sells = [ms(r1,   TIGHT_SL, "فوري (Spot)",   "🔴 بيع عند R1"),
+                 ms(r2,   STD_SL,   "آجل (Futures)", "🟡 بيع عند R2"),
+                 ms(r3,   TIGHT_SL, "فوري (Spot)",   "🟢 بيع عند R3")]
     elif bias == "bear":
-        trades_dir.append(make_sell(nearest_res, TIGHT_SL, "فوري (Spot)"))
-        trades_dir.append(make_sell(nearest_res, STD_SL,   "آجل (Futures)"))
-    else:
-        # متذبذب — صفقتا اختراق
-        trades_break.append(make_buy( nearest_res, STD_SL, "آجل (Futures) — اختراق صعودي"))
-        trades_break.append(make_sell(nearest_sup, STD_SL, "آجل (Futures) — اختراق هبوطي"))
+        sells = [ms(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — دخول فوري"),
+                 ms(r1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — عند R1"),
+                 ms(r2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — عند R2")]
+        buys  = [mb(s1,   TIGHT_SL, "فوري (Spot)",   "🔴 شراء عند S1"),
+                 mb(s2,   STD_SL,   "آجل (Futures)", "🟡 شراء عند S2"),
+                 mb(s3,   TIGHT_SL, "فوري (Spot)",   "🟢 شراء عند S3")]
+    else:  # neutral
+        buys  = [mb(rn['nearest_resistance'], TIGHT_SL, "فوري (Spot)",   "🔴 اختراق نفسي"),
+                 mb(r1,   STD_SL,   "آجل (Futures)", "🟡 اختراق R1"),
+                 mb(r2,   TIGHT_SL, "فوري (Spot)",   "🟢 اختراق R2")]
+        sells = [ms(rn['nearest_support'],   TIGHT_SL, "فوري (Spot)",   "🔴 كسر نفسي"),
+                 ms(s1,   STD_SL,   "آجل (Futures)", "🟡 كسر S1"),
+                 ms(s2,   TIGHT_SL, "فوري (Spot)",   "🟢 كسر S2")]
 
-    return {"bias": bias, "trades_dir": trades_dir, "trades_break": trades_break, "refs": refs}
+    refs = {
+        "above": round(min([x for x in [r1,rn['nearest_resistance']] if x and x>gold], default=r1), 2),
+        "below": round(max([x for x in [s1,rn['nearest_support']]    if x and x<gold], default=s1), 2),
+        "r1":r1,"r2":r2,"s1":s1,"s2":s2,
+    }
+    return {
+        "bias":bias, "buys":buys, "sells":sells, "refs":refs,
+        "momentum":  calc_momentum_signal(d),
+        "trend":     calc_trend_signal(d),
+        "liquidity": calc_liquidity_signal(d),
+    }
 
 
 # ══════════════════════════════════════════════
@@ -460,12 +503,15 @@ def get_full_market_data() -> dict | None:
     gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
-    # الفوري: نجرب بيانات ساعية أولاً للحصول على أحدث سعر متاح
-    gold_spot_df = _fetch("XAUUSD=X", period="5d",  interval="1h");  time.sleep(0.7)
+    # الفوري: 2m (لايف) ← 1h ← 1d — تسلسل تدريجي للحصول على أدق سعر
+    gold_spot_df = _fetch("XAUUSD=X", period="1d",  interval="2m"); time.sleep(0.5)
     _sp, _       = _last_with_date(gold_spot_df)
-    if not _sp:   # لو فشل 1h نجرب 1d بفترة أطول
+    if not _sp:
+        gold_spot_df = _fetch("XAUUSD=X", period="5d",  interval="1h"); time.sleep(0.5)
+        _sp, _   = _last_with_date(gold_spot_df)
+    if not _sp:
         gold_spot_df = _fetch("XAUUSD=X", period="30d", interval="1d"); time.sleep(0.5)
-    # لو فشل كلهم → سيظل gold_spot_df كما هو ويُستخدم الآجل كبديل أدناه
+    # لو فشل كلهم → يُستخدم GC=F كبديل في السطور أدناه
 
     if gold_daily is None or gold_daily.empty:
         return None
@@ -604,39 +650,47 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     contango_str = (f"  (+{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
                     else f"  ({d['contango']:.2f}$)" if d['contango'] else "")
 
-    # ── جدول Confluence مضغوط ──
     score_table = "  ".join(
         f"{'🟢' if v>0 else ('🔴' if v<0 else '⚪')}{name.split()[0]}"
         for name, v in conf['scores'].items()
     )
 
-    # ── حركة السعر ──
     hist_parts = []
     if ctx.get('chg_1d')  is not None: hist_parts.append(f"24h:{ctx['chg_1d']:+.1f}$({ctx['pct_1d']:+.1f}%)")
     if ctx.get('chg_7d')  is not None: hist_parts.append(f"7d:{ctx['chg_7d']:+.1f}$({ctx['pct_7d']:+.1f}%)")
     if ctx.get('chg_30d') is not None: hist_parts.append(f"30d:{ctx['chg_30d']:+.1f}$({ctx['pct_30d']:+.1f}%)")
     hist_line = "  ".join(hist_parts) if hist_parts else "غير متاح"
 
-    # ── بناء قسم الصفقات ──
-    trades_all = ent['trades_dir'] or ent['trades_break']
-    trade_label = "🎯 الصفقات المقترحة" if ent['trades_dir'] else "⚡ صفقات اختراق (سوق متذبذب)"
-    trade_lines = []
-    for t in trades_all:
-        trade_lines.append(
-            f"   {t['dir']} {t['market']}"
-            f"\n      دخول: {t['entry']}$ | وقف: {t['sl']}$ (فارق {t['risk']}$) | هدف: {t['target']}"
-        )
-    trade_block = "\n".join(trade_lines)
+    refs   = ent['refs']
+    nums   = ("1️⃣","2️⃣","3️⃣")
+    bias_section = {"bull":"🎯 صفقات الاتجاه الصعودي",
+                    "bear":"🎯 صفقات الاتجاه الهبوطي",
+                    "neutral":"⚡ صفقات الاختراق (سوق متذبذب)"}.get(ent['bias'],"🎯 الصفقات")
 
-    refs = ent['refs']
+    def fmt_block(trades):
+        lines=[]
+        for i,t in enumerate(trades):
+            lines.append(
+                f"   {nums[i]} [{t['style']}] {t['market']}\n"
+                f"      دخول: {t['entry']}$ | وقف: {t['sl']}$ ({t['risk']}$)\n"
+                f"      T1:{t['t1']}$ | T2:{t['t2']}$ | T3:{t['t3']}$"
+            )
+        return "\n".join(lines)
 
-    # ══ الهيكل الثابت المضغوط ══
+    buy_block  = fmt_block(ent['buys'])
+    sell_block = fmt_block(ent['sells'])
+
     fixed = f"""💰 {header}
 🕐 {date_now}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📍 أسعار الذهب
    فوري  (XAU/USD) : {spot_label}
    آجل   (GC=F)    : {futures_label}{contango_str}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 ملخص السوق
+   الزخم        : {ent['momentum']}
+   الاتجاه العام : {ent['trend']}
+   السيولة       : {ent['liquidity']}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 حكم السوق: {conf['verdict']}
 {score_table}
@@ -665,24 +719,35 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    📍 High:{d['swing_high']}$ / Low:{d['swing_low']}$
    🔴 R1:{d['r1']}$ R2:{d['r2']}$ | Pivot:{d['pivot']}$ | 🟢 S1:{d['s1']}$ S2:{d['s2']}$
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-{trade_label}
-{trade_block}
-   مستويات المراقبة: ↑{refs['above']}$ | ↓{refs['below']}$"""
+{bias_section}
+🛒 صفقات الشراء:
+{buy_block}
+━━
+📉 صفقات البيع:
+{sell_block}
+   ↑ مراقبة: {refs['above']}$ | ↓ مراقبة: {refs['below']}$"""
 
     # ── تعليمات الـ AI ──
     prob_floor = ("سيناريو الصعود لا يقل عن 50%" if bias == "bull"
                   else "سيناريو الهبوط لا يقل عن 50%" if bias == "bear"
                   else "سيناريو التذبذب لا يقل عن 40%")
 
-    trades_summary = ""
-    for t in trades_all:
-        trades_summary += f"\n   {t['dir']} {t['market']}: دخول {t['entry']}$ | وقف {t['sl']}$ | فارق {t['risk']}$"
+    def _fmt_ai(trades):
+        return "\n".join(
+            f"   [{t['style']}] {t['market']}: دخول {t['entry']}$ | وقف {t['sl']}$ ({t['risk']}$) | T1:{t['t1']}$ T2:{t['t2']}$ T3:{t['t3']}$"
+            for t in trades
+        )
 
-    ai_instructions = f"""أنت محلل ذهب كمي. اكتب قسم التحليل بالعربية الفصحى فقط. لا تعيد الأرقام المكتوبة بالفعل.
+    ai_instructions = f"""أنت محلل ذهب كمي. اكتب قسم التحليل بالعربية الفصحى فقط. لا تعيد الأرقام المكتوبة.
 
-⚠️ السعر الفعلي للذهب الآن: {gold:.2f}$ — استخدم هذا الرقم حرفياً في كل سيناريو. لا تستخدم أسعاراً أخرى.
-حكم السوق: {conf['verdict']} | الاتجاه: {bias_ar} | {prob_floor}
-الصفقات المحسوبة:{trades_summary}
+⚠️ سعر الذهب = {gold:.2f}$ | مؤشرات: RSI={d['rsi']} | ADX={d['adx']} | MACD={d['macd_hist']}
+الزخم: {ent['momentum']} | الاتجاه: {ent['trend']} | السيولة: {ent['liquidity']}
+حكم السوق: {conf['verdict']} | {prob_floor}
+
+صفقات الشراء:
+{_fmt_ai(ent['buys'])}
+صفقات البيع:
+{_fmt_ai(ent['sells'])}
 
 اكتب هذه الأقسام فقط بالترتيب:
 
@@ -690,18 +755,18 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 🤖 التحليل الكمي
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**📌 خلاصة:** [جملة واحدة — الاتجاه {bias_ar} + الاحتمالية]
+**📌 خلاصة:** [جملة واحدة — {bias_ar} + الاحتمالية]
 
-**🔍 الإطارات الزمنية:** [جملتان — هل متوافقة؟ ماذا تعني؟]
+**🔍 الإطارات الزمنية:** [جملتان — هل متوافقة؟ ماذا تعني للحركة القادمة؟]
 
-**📊 أبرز مؤشرين:** [مؤشران فقط — صف كل واحد في جملة تنتهي بمثال بسيط. التركيز على قيمة المؤشر نفسه (RSI={d['rsi']} أي محايد...) ليس على مستويات السعر]
+**📊 أبرز مؤشرين:** [RSI={d['rsi']} يعني... | ADX={d['adx']} يعني... لا تذكر أسعاراً]
 
 **📉 السيناريوهات (100%):**
-   📈 صعود (X%): كسر {refs['above']}$ → الهدف ...
-   📉 هبوط (Y%): كسر {refs['below']}$ → الهدف ...
+   📈 صعود (X%): كسر {refs['above']}$ → الهدف بالأرقام
+   📉 هبوط (Y%): كسر {refs['below']}$ → الهدف بالأرقام
    ⚡ تذبذب (Z%): النطاق والشرط
 
-**✅ القرار:** [جملتان — استخدم أسعار الصفقات المحسوبة أعلاه حرفياً]"""
+**✅ القرار:** اذكر كل صفقة باسمها (فوري/آجل) + الدخول + الوقف + الأهداف T1/T2/T3 حرفياً من الجدول أعلاه"""
 
     return fixed, ai_instructions
 

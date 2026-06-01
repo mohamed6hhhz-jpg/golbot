@@ -426,6 +426,60 @@ def calc_liquidity_signal(d: dict) -> str:
     elif rv >= 0.8: return f"🟡 متوسطة ({rv:.1f}x)"
     else:           return f"🔴 منخفضة ({rv:.1f}x)"
 
+
+def calc_divergence(df) -> str:
+    """كشف التباين بين RSI والسعر — صعودي / هبوطي"""
+    if df is None or len(df) < 35:
+        return "⚪ لا يوجد تباين واضح"
+    closes = df['Close'].values
+    # نحسب RSI على آخر 30 شمعة
+    rsi_vals = [calc_rsi(closes[max(0,i-20):i+1]) for i in range(len(closes)-30, len(closes))]
+    prices   = closes[-30:]
+    if len(rsi_vals) < 20:
+        return "⚪ لا يوجد تباين واضح"
+    mid = len(prices) // 2
+    p1_hi, p2_hi = np.max(prices[:mid]),  np.max(prices[mid:])
+    p1_lo, p2_lo = np.min(prices[:mid]),  np.min(prices[mid:])
+    r1_hi, r2_hi = np.max(rsi_vals[:mid]), np.max(rsi_vals[mid:])
+    r1_lo, r2_lo = np.min(rsi_vals[:mid]), np.min(rsi_vals[mid:])
+    # تباين هبوطي: سعر قمة أعلى + RSI قمة أدنى
+    if p2_hi > p1_hi * 1.001 and r2_hi < r1_hi * 0.985:
+        return "⚠️ تباين هبوطي — السعر يصنع قمة أعلى وRSI أدنى ⚠️"
+    # تباين صعودي: سعر قاع أدنى + RSI قاع أعلى
+    if p2_lo < p1_lo * 0.999 and r2_lo > r1_lo * 1.015:
+        return "💡 تباين صعودي — السعر يصنع قاعاً أدنى وRSI أعلى 💡"
+    return "⚪ لا يوجد تباين واضح"
+
+
+def calc_trade_confidence(d: dict, is_buy: bool) -> str:
+    """درجة ثقة الصفقة 1-5 نجوم بناءً على تقاطع الإشارات"""
+    score = 0
+    rsi  = d.get('rsi', 50)
+    macd = d.get('macd_hist', 0)
+    adx  = d.get('adx', 0)
+    obv  = d.get('obv_trend', '')
+    tf_scores = [d.get('tf_weekly', {}).get('score', 0),
+                 d.get('tf_daily',  {}).get('score', 0),
+                 d.get('tf_hourly', {}).get('score', 0)]
+    # RSI
+    if is_buy  and rsi < 45: score += 1
+    elif not is_buy and rsi > 55: score += 1
+    # MACD
+    if is_buy  and macd > 0: score += 1
+    elif not is_buy and macd < 0: score += 1
+    # ADX (قوة الاتجاه)
+    if adx > 22: score += 1
+    # OBV
+    if is_buy  and 'صعودي' in obv: score += 1
+    elif not is_buy and 'هبوطي' in obv: score += 1
+    # توافق الإطارات
+    aligned = sum(1 for s in tf_scores if (s > 0) == is_buy)
+    if aligned >= 2: score += 1
+    stars  = "⭐" * score + "☆" * (5 - score)
+    labels = {5:'ممتازة',4:'قوية',3:'جيدة',2:'ضعيفة',1:'ضعيفة جداً',0:'تجنب'}
+    return f"{stars} {labels.get(score,'')}"
+
+
 def calc_all_entries(d: dict, bias: str) -> dict:
     """
     3 صفقات شراء + 3 صفقات بيع مبنية على مستويات تقنية حقيقية.
@@ -467,13 +521,17 @@ def calc_all_entries(d: dict, bias: str) -> dict:
 
     def mb(entry, sl_d, mkt, style):
         e=round(entry,2); t1,t2,t3=_buy_t(e)
+        rr1=round((t1-e)/sl_d,1); rr2=round((t2-e)/sl_d,1); rr3=round((t3-e)/sl_d,1)
         return {"dir":"شراء 📗","market":mkt,"style":style,"entry":e,
-                "sl":round(e-sl_d,2),"risk":sl_d,"t1":t1,"t2":t2,"t3":t3}
+                "sl":round(e-sl_d,2),"risk":sl_d,"t1":t1,"t2":t2,"t3":t3,
+                "rr1":rr1,"rr2":rr2,"rr3":rr3,"is_buy":True}
 
     def ms(entry, sl_d, mkt, style):
         e=round(entry,2); t1,t2,t3=_sell_t(e)
+        rr1=round((e-t1)/sl_d,1); rr2=round((e-t2)/sl_d,1); rr3=round((e-t3)/sl_d,1)
         return {"dir":"بيع 📕","market":mkt,"style":style,"entry":e,
-                "sl":round(e+sl_d,2),"risk":sl_d,"t1":t1,"t2":t2,"t3":t3}
+                "sl":round(e+sl_d,2),"risk":sl_d,"t1":t1,"t2":t2,"t3":t3,
+                "rr1":rr1,"rr2":rr2,"rr3":rr3,"is_buy":False}
 
     if bias == "bull":
         buys  = [mb(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
@@ -598,6 +656,7 @@ def get_full_market_data() -> dict | None:
     atr                        = calc_atr(gold_daily)
     atr_reg                    = calc_atr_regime(gold_daily)
     fib                        = calc_fibonacci(closes)
+    divergence                 = calc_divergence(gold_daily)
     swing_high, swing_low      = find_swing_levels(gold_daily, lookback=20)
     hist_ctx                   = get_historical_context(gold_daily)
     round_numbers              = get_round_numbers(gold, step=50)
@@ -645,7 +704,7 @@ def get_full_market_data() -> dict | None:
         cci=cci, cci_label=cci_label, williams_r=williams_r, wr_label=wr_label,
         obv_val=obv_val, obv_trend=obv_trend,
         rel_vol=rel_vol, rel_vol_label=rel_vol_label,
-        atr=atr, atr_regime=atr_reg, fib=fib,
+        atr=atr, atr_regime=atr_reg, fib=fib, divergence=divergence,
         swing_high=swing_high, swing_low=swing_low,
         pivot=pivot, r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
         round_numbers=round_numbers, hist_ctx=hist_ctx,
@@ -702,15 +761,25 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     def fmt_block(trades):
         lines=[]
         for i,t in enumerate(trades):
+            conf = calc_trade_confidence(d, t['is_buy'])
             lines.append(
-                f"   {nums[i]} [{t['style']}] {t['market']}\n"
-                f"      دخول: {t['entry']}$ | وقف: {t['sl']}$ ({t['risk']}$)\n"
-                f"      T1:{t['t1']}$ | T2:{t['t2']}$ | T3:{t['t3']}$"
+                f"   {nums[i]} [{t['style']}] {t['market']} | {conf}\n"
+                f"      دخول: {t['entry']}$ | وقف: {t['sl']}$ (خطر: {t['risk']}$)\n"
+                f"      T1:{t['t1']}$(R:{t['rr1']}x) | T2:{t['t2']}$(R:{t['rr2']}x) | T3:{t['t3']}$(R:{t['rr3']}x)"
             )
         return "\n".join(lines)
 
     buy_block  = fmt_block(ent['buys'])
     sell_block = fmt_block(ent['sells'])
+
+    # مستويات فيبوناتشي الرئيسية
+    fib = d['fib']
+    fib_line = (f"فيبو: 78.6%={fib['78.6%']}$ | 61.8%={fib['61.8%']}$ | "
+                f"50.0%={fib['50.0%']}$ | 38.2%={fib['38.2%']}$ | 23.6%={fib['23.6%']}$")
+    # نطاق اليوم المتوقع من ATR
+    exp_low  = round(gold - d['atr'] * 0.65, 2)
+    exp_high = round(gold + d['atr'] * 0.65, 2)
+    range_line = f"نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$"
 
     fixed = f"""💰 {header}
 🕐 {date_now}
@@ -750,6 +819,9 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    🟣 مقاومة نفسية:{rn['nearest_resistance']}$(↑{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(↓{rn['dist_to_support']}$)
    📍 High:{d['swing_high']}$ / Low:{d['swing_low']}$
    🔴 R1:{d['r1']}$ R2:{d['r2']}$ | Pivot:{d['pivot']}$ | 🟢 S1:{d['s1']}$ S2:{d['s2']}$
+   🟠 {fib_line}
+   📊 {range_line}
+   🔍 التباين: {d['divergence']}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 {bias_section}
 🛒 صفقات الشراء:

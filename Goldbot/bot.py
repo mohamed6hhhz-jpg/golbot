@@ -475,19 +475,19 @@ def calc_all_entries(d: dict, bias: str) -> dict:
                 "sl":round(e+sl_d,2),"risk":sl_d,"t1":t1,"t2":t2,"t3":t3}
 
     if bias == "bull":
-        buys  = [mb(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — دخول فوري"),
-                 mb(s1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — عند S1"),
-                 mb(s2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — عند S2")]
-        sells = [ms(r1,   TIGHT_SL, "فوري (Spot)",   "🔴 بيع عند R1"),
-                 ms(r2,   STD_SL,   "آجل (Futures)", "🟡 بيع عند R2"),
-                 ms(r3,   TIGHT_SL, "فوري (Spot)",   "🟢 بيع عند R3")]
+        buys  = [mb(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
+                 mb(s1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — S1"),
+                 mb(s2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — S2")]
+        sells = [ms(r1,   TIGHT_SL, "فوري (Spot)",   "🔴 بيع R1"),
+                 ms(r2,   STD_SL,   "آجل (Futures)", "🟡 بيع R2"),
+                 ms(r3,   TIGHT_SL, "فوري (Spot)",   "🟢 بيع R3")]
     elif bias == "bear":
-        sells = [ms(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — دخول فوري"),
-                 ms(r1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — عند R1"),
-                 ms(r2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — عند R2")]
-        buys  = [mb(s1,   TIGHT_SL, "فوري (Spot)",   "🔴 شراء عند S1"),
-                 mb(s2,   STD_SL,   "آجل (Futures)", "🟡 شراء عند S2"),
-                 mb(s3,   TIGHT_SL, "فوري (Spot)",   "🟢 شراء عند S3")]
+        sells = [ms(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
+                 ms(r1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — R1"),
+                 ms(r2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — R2")]
+        buys  = [mb(s1,   TIGHT_SL, "فوري (Spot)",   "🔴 شراء S1"),
+                 mb(s2,   STD_SL,   "آجل (Futures)", "🟡 شراء S2"),
+                 mb(s3,   TIGHT_SL, "فوري (Spot)",   "🟢 شراء S3")]
     else:  # neutral
         buys  = [mb(rn['nearest_resistance'], TIGHT_SL, "فوري (Spot)",   "🔴 اختراق نفسي"),
                  mb(r1,   STD_SL,   "آجل (Futures)", "🟡 اختراق R1"),
@@ -495,6 +495,7 @@ def calc_all_entries(d: dict, bias: str) -> dict:
         sells = [ms(rn['nearest_support'],   TIGHT_SL, "فوري (Spot)",   "🔴 كسر نفسي"),
                  ms(s1,   STD_SL,   "آجل (Futures)", "🟡 كسر S1"),
                  ms(s2,   TIGHT_SL, "فوري (Spot)",   "🟢 كسر S2")]
+
 
     refs = {
         "above": round(min([x for x in [r1,rn['nearest_resistance']] if x and x>gold], default=r1), 2),
@@ -776,14 +777,14 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
 **🔍 الإطارات الزمنية:** [جملتان — هل متوافقة؟ ماذا تعني للحركة القادمة؟]
 
-**📊 أبرز مؤشرين:** [RSI={d['rsi']} يعني... | ADX={d['adx']} يعني... لا تذكر أسعاراً]
+**📊 أبرز مؤشرين:** [RSI={d['rsi']} يعني... | ADX={d['adx']} يعني... — اكتب الرقم حرفياً لا تذكر أسعار الدخول]
 
 **📉 السيناريوهات (100%):**
    📈 صعود (X%): كسر {refs['above']}$ → الهدف بالأرقام
    📉 هبوط (Y%): كسر {refs['below']}$ → الهدف بالأرقام
    ⚡ تذبذب (Z%): النطاق والشرط
 
-**✅ القرار:** اذكر كل صفقة باسمها (فوري/آجل) + الدخول + الوقف + الأهداف T1/T2/T3 حرفياً من الجدول أعلاه"""
+**✅ القرار:** [لكل صفقة سطر: النوع (فوري/آجل) + الدخول + الوقف + T1+T2+T3 حرفياً. لا تكتب كلمة فوري مرتين متتاليتين]"""
 
     return fixed, ai_instructions
 

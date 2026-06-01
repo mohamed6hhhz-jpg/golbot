@@ -572,16 +572,16 @@ def calc_all_entries(d: dict, bias: str) -> dict:
         sells = [ms(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
                  ms(r1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — R1"),
                  ms(r2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — R2")]
-        buys  = [mb(s1,   TIGHT_SL, "فوري (Spot)",   "🔴 شراء S1"),
-                 mb(s2,   STD_SL,   "آجل (Futures)", "🟡 شراء S2"),
-                 mb(s3,   TIGHT_SL, "فوري (Spot)",   "🟢 شراء S3")]
+        buys  = [mb(s1,   TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — S1"),
+                 mb(s2,   STD_SL,   "آجل (Futures)", "🟡 معتدل — S2"),
+                 mb(s3,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — S3")]
     else:  # neutral
         buys  = [mb(rn['nearest_resistance'], TIGHT_SL, "فوري (Spot)",   "🔴 اختراق نفسي"),
                  mb(r1,   STD_SL,   "آجل (Futures)", "🟡 اختراق R1"),
                  mb(r2,   TIGHT_SL, "فوري (Spot)",   "🟢 اختراق R2")]
-        sells = [ms(rn['nearest_support'],   TIGHT_SL, "فوري (Spot)",   "🔴 كسر نفسي"),
-                 ms(s1,   STD_SL,   "آجل (Futures)", "🟡 كسر S1"),
-                 ms(s2,   TIGHT_SL, "فوري (Spot)",   "🟢 كسر S2")]
+        sells = [ms(rn['nearest_support'],   TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — كسر"),
+                 ms(s1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — S1"),
+                 ms(s2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — S2")]
 
 
     refs = {

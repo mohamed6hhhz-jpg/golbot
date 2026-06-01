@@ -436,17 +436,33 @@ def calc_all_entries(d: dict, bias: str) -> dict:
     s3, r3 = d['s3'], d['r3']
     rn     = d['round_numbers']
 
+    MIN_GAP = 8.0  # حد أدنى للفرق بين الأهداف
+
     def _buy_t(e):
-        pool = sorted([x for x in [r1,r2,r3,rn['nearest_resistance']] if x and x > e])
-        return (pool[0] if len(pool)>0 else round(e+25,2),
-                pool[1] if len(pool)>1 else round(e+60,2),
-                pool[2] if len(pool)>2 else round(e+100,2))
+        """أهداف الشراء: تصاعدية خالصة مع فجوات كافية"""
+        raw  = sorted(set([x for x in [r1,r2,r3,rn['nearest_resistance']] if x and x > e]))
+        # ازل المستويات القريبة جداً من بعضها
+        pool = []
+        for x in raw:
+            if not pool or x - pool[-1] >= MIN_GAP:
+                pool.append(x)
+        t1 = pool[0] if len(pool)>0 else round(e+30,2)
+        t2 = pool[1] if len(pool)>1 else round(t1+50,2)
+        t3 = pool[2] if len(pool)>2 else round(t2+50,2)
+        return t1, t2, t3
 
     def _sell_t(e):
-        pool = sorted([x for x in [s1,s2,s3,rn['nearest_support']] if x and x < e], reverse=True)
-        return (pool[0] if len(pool)>0 else round(e-25,2),
-                pool[1] if len(pool)>1 else round(e-60,2),
-                pool[2] if len(pool)>2 else round(e-100,2))
+        """أهداف البيع: تنازلية خالصة مع فجوات كافية"""
+        raw  = sorted(set([x for x in [s1,s2,s3,rn['nearest_support']] if x and x < e]), reverse=True)
+        # ازل المستويات القريبة جداً من بعضها
+        pool = []
+        for x in raw:
+            if not pool or pool[-1] - x >= MIN_GAP:
+                pool.append(x)
+        t1 = pool[0] if len(pool)>0 else round(e-30,2)
+        t2 = pool[1] if len(pool)>1 else round(t1-50,2)
+        t3 = pool[2] if len(pool)>2 else round(t2-50,2)
+        return t1, t2, t3
 
     def mb(entry, sl_d, mkt, style):
         e=round(entry,2); t1,t2,t3=_buy_t(e)
@@ -503,15 +519,16 @@ def get_full_market_data() -> dict | None:
     gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
-    # الفوري: 2m (لايف) ← 1h ← 1d — تسلسل تدريجي للحصول على أدق سعر
+    # الفوري: نجرب 2m أولاً للحصول على سعر لايف — ثم fallback تدريجي
     gold_spot_df = _fetch("XAUUSD=X", period="1d",  interval="2m"); time.sleep(0.5)
     _sp, _       = _last_with_date(gold_spot_df)
     if not _sp:
         gold_spot_df = _fetch("XAUUSD=X", period="5d",  interval="1h"); time.sleep(0.5)
         _sp, _   = _last_with_date(gold_spot_df)
     if not _sp:
-        gold_spot_df = _fetch("XAUUSD=X", period="30d", interval="1d"); time.sleep(0.5)
-    # لو فشل كلهم → يُستخدم GC=F كبديل في السطور أدناه
+        # لو yfinance متعب: نستخدم GC=F بدقائق صغيرة (أحدث سعر متاح)
+        gold_spot_df = _fetch("GC=F",     period="2d",  interval="5m"); time.sleep(0.5)
+    # لو فشل كلهم → يُستخدم GC=F يومي كبديل تلقائياً
 
     if gold_daily is None or gold_daily.empty:
         return None

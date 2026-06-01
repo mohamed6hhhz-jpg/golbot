@@ -18,6 +18,7 @@ GROQ_MODELS = [
 ]
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ياهو المزعجة
 log = logging.getLogger(__name__)
 
 GROQ_API_KEY       = os.environ.get("GROQ_API_KEY")
@@ -526,10 +527,24 @@ def get_full_market_data() -> dict | None:
     if not _sp:
         gold_spot_df = _fetch("XAUUSD=X", period="5d",  interval="1h"); time.sleep(0.5)
         _sp, _   = _last_with_date(gold_spot_df)
-    if not _sp:
-        # لو yfinance متعب: نستخدم GC=F بدقائق صغيرة (أحدث سعر متاح)
+        
+    gold_spot, spot_date = _sp, _
+    
+    # إذا فشل ياهو تماماً في الفوري (غالبًا بيعمل Block لـ HuggingFace)، نستخدم Binance PAXG (توكن الذهب الفعلي 1:1) كبديل فوري حقيقي 24/7
+    if not gold_spot:
+        try:
+            resp = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", timeout=5)
+            if resp.status_code == 200:
+                gold_spot = float(resp.json()['price'])
+                spot_date = datetime.now().strftime("%d/%m %H:%M") + " (PAXG/Binance)"
+        except Exception:
+            pass
+
+    if not gold_spot:
+        # لو فشل حتى بينانس، نستخدم GC=F بدقائق صغيرة (أحدث سعر متاح)
         gold_spot_df = _fetch("GC=F",     period="2d",  interval="5m"); time.sleep(0.5)
-    # لو فشل كلهم → يُستخدم GC=F يومي كبديل تلقائياً
+        gold_spot, spot_date = _last_with_date(gold_spot_df)
+
 
     if gold_daily is None or gold_daily.empty:
         return None
@@ -544,7 +559,6 @@ def get_full_market_data() -> dict | None:
     sp500_df  = _fetch("^GSPC",    period="60d"); time.sleep(0.6)
 
     gold_futures, futures_date = _last_with_date(gold_daily)
-    gold_spot,    spot_date    = _last_with_date(gold_spot_df)
     # لو الفوري مش متاح نستخدم الآجل كمرجع (فارقهم صغير)
     if not gold_spot:
         gold_spot  = gold_futures

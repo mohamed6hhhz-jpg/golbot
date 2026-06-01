@@ -7,8 +7,14 @@ import os
 import logging
 import numpy as np
 import asyncio
+import threading
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+
+# ── كلايانت Telethon مشترك ودائم — يتصل مرة واحدة عند التشغيل ──
+_SHARED_CLIENT: TelegramClient | None = None
+_CLIENT_LOOP:   asyncio.AbstractEventLoop | None = None
+_CLIENT_LOCK  = threading.Lock()
 
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",

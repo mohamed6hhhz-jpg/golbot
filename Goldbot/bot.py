@@ -607,28 +607,22 @@ def get_full_market_data() -> dict | None:
     gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
-    # الفوري: نجرب 2m أولاً للحصول على سعر لايف — ثم fallback تدريجي
-    gold_spot_df = _fetch("XAUUSD=X", period="1d",  interval="2m"); time.sleep(0.5)
-    _sp, _       = _last_with_date(gold_spot_df)
-    if not _sp:
-        gold_spot_df = _fetch("XAUUSD=X", period="5d",  interval="1h"); time.sleep(0.5)
-        _sp, _   = _last_with_date(gold_spot_df)
-        
-    gold_spot, spot_date = _sp, _
-    
-    # إذا فشل ياهو تماماً في الفوري (غالبًا بيعمل Block لـ HuggingFace)، نستخدم Binance PAXG (توكن الذهب الفعلي 1:1) كبديل فوري حقيقي 24/7
-    if not gold_spot:
-        try:
-            resp = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", timeout=5)
-            if resp.status_code == 200:
-                gold_spot = float(resp.json()['price'])
-                spot_date = datetime.now().strftime("%d/%m %H:%M") + " (PAXG/Binance)"
-        except Exception:
-            pass
+    # ── الفوري: Binance PAXG أولاً (24/7 حقيقي) ثم Yahoo كـ fallback ──
+    gold_spot  = None
+    spot_date  = None
+    try:
+        resp = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", timeout=5)
+        if resp.status_code == 200:
+            gold_spot = float(resp.json()['price'])
+            spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " (Binance)"
+    except Exception:
+        pass
 
     if not gold_spot:
-        # لو فشل حتى بينانس، نستخدم GC=F بدقائق صغيرة (أحدث سعر متاح)
-        gold_spot_df = _fetch("GC=F",     period="2d",  interval="5m"); time.sleep(0.5)
+        gold_spot_df = _fetch("XAUUSD=X", period="1d", interval="2m"); time.sleep(0.5)
+        gold_spot, spot_date = _last_with_date(gold_spot_df)
+    if not gold_spot:
+        gold_spot_df = _fetch("XAUUSD=X", period="5d", interval="1h"); time.sleep(0.5)
         gold_spot, spot_date = _last_with_date(gold_spot_df)
 
 
@@ -756,7 +750,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     ctx      = d['hist_ctx']
     rn       = d['round_numbers']
     gold     = d['gold']
-    date_now = cairo_now().strftime("%Y-%m-%d %H:%M قاهرة")
+    date_now = cairo_now().strftime("%Y-%m-%d %H:%M القاهرة")
     bias     = conf['bias']
     bias_ar  = {"bull": "صعودي", "bear": "هبوطي", "neutral": "متذبذب"}.get(bias, "متذبذب")
 
@@ -907,8 +901,8 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 **🔍 الإطارات الزمنية:** [جملتان بالأرقام. الأولى: ما الذي يقوله الأسبوعي (RSI={d['tf_weekly']['rsi']}) مقارنة بالساعي؟ الثانية: ما المستوى المحدد الذي يجب كسره لتأكيد هذا الاتجاه؟]
 
 **📉 السيناريوهات (100%):**
-   📈 صعود (X%): كسر {refs['above']}$ → الهدف بالأرقام
-   📉 هبوط (Y%): كسر {refs['below']}$ → الهدف بالأرقام
+   📈 صعود (X%): كسر {refs['above']}$ → الهدف بالأرقام — حدد هل هي فوري أم آجل أو كليهم
+   📉 هبوط (Y%): كسر {refs['below']}$ → الهدف بالأرقام — حدد هل هي فوري أم آجل أو كليهم
    ⚡ تذبذب (Z%): النطاق والشرط — [X+Y+Z=100، كل واحد ≥ 15%]"""
 
     return fixed, ai_instructions

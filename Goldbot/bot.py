@@ -27,8 +27,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(na
 logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ياهو المزعجة
 log = logging.getLogger(__name__)
 
-GROQ_API_KEY       = os.environ.get("GROQ_API_KEY")
-TELEGRAM_BOT_TOKEN = "8678714877:AAE2v6jeeYzsNFYj_83rXK32RJEA7fszQew"
+GROQ_API_KEY        = os.environ.get("GROQ_API_KEY")
+TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
+TELEGRAM_BOT_TOKEN  = "8678714877:AAE2v6jeeYzsNFYj_83rXK32RJEA7fszQew"
 TELEGRAM_CHAT_ID   = -1003775201576
 
 API_ID   = 34105911
@@ -728,39 +729,38 @@ def get_full_market_data() -> dict | None:
     gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
-    # ── الفوري: مصادر متعددة ──
+    # ── الفوري: Twelve Data أولاً (ريل تايم 100%) ──
     gold_spot = None
     spot_date = None
 
-    # 1️⃣ metals.live — مصمم للسيرفرات (مجاني، بدون مفتاح)
+    # 1️⃣ Twelve Data — real-time XAU/USD بدون حجب
     try:
-        r = requests.get("https://api.metals.live/v1/spot/gold", timeout=5,
-                         headers={'User-Agent': 'Mozilla/5.0'})
-        if r.status_code == 200:
-            _j = r.json()
-            _p = _j.get('price') or _j.get('gold') or (_j[0].get('gold') if isinstance(_j, list) else None)
-            if _p and float(_p) > 1000:
-                gold_spot = round(float(_p), 2)
-                spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " live"
-    except Exception:
-        pass
+        _td_url = f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}"
+        _td_r   = requests.get(_td_url, timeout=6, headers={'User-Agent': 'Mozilla/5.0'})
+        if _td_r.status_code == 200:
+            _td_p = _td_r.json().get('price')
+            if _td_p and float(_td_p) > 1000:
+                gold_spot = round(float(_td_p), 2)
+                spot_date = datetime.now(CAIRO_TZ).strftime("%d/%m %H:%M") + " حي"
+                log.info(f"✅ [TwelveData] سعر الفوري: {gold_spot}$")
+    except Exception as _e:
+        log.warning(f"⚠️ [TwelveData] {_e}")
 
-    # 2️⃣ Yahoo Finance chart API مباشرة
+    # 2️⃣ metals.live — احتياطي
     if not gold_spot:
         try:
-            _yurl = "https://query2.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=1m&range=1d"
-            _yr = requests.get(_yurl, timeout=6,
-                               headers={'User-Agent': 'Mozilla/5.0',
-                                        'Accept': 'application/json'})
-            if _yr.status_code == 200:
-                _p = _yr.json()['chart']['result'][0]['meta'].get('regularMarketPrice')
+            r = requests.get("https://api.metals.live/v1/spot/gold", timeout=5,
+                             headers={'User-Agent': 'Mozilla/5.0'})
+            if r.status_code == 200:
+                _j = r.json()
+                _p = _j.get('price') or _j.get('gold') or (_j[0].get('gold') if isinstance(_j, list) else None)
                 if _p and float(_p) > 1000:
                     gold_spot = round(float(_p), 2)
-                    spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " live"
+                    spot_date = datetime.now(CAIRO_TZ).strftime("%d/%m %H:%M") + " حي"
         except Exception:
             pass
 
-    # 3️⃣ open.er-api (USD base → 1/XAU_rate = سعر الذهب)
+    # 3️⃣ open.er-api (1/XAU_rate)
     if not gold_spot:
         try:
             r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5)
@@ -770,7 +770,7 @@ def get_full_market_data() -> dict | None:
                     _p = round(1.0 / xau_r, 2)
                     if _p > 1000:
                         gold_spot = _p
-                        spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " (ER)"
+                        spot_date = datetime.now(CAIRO_TZ).strftime("%d/%m %H:%M") + " (تقديري)"
         except Exception:
             pass
 
@@ -783,11 +783,11 @@ def get_full_market_data() -> dict | None:
                 price = r.json()['items'][0].get('xauPrice')
                 if price and float(price) > 1000:
                     gold_spot = round(float(price), 2)
-                    spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " live"
+                    spot_date = datetime.now(CAIRO_TZ).strftime("%d/%m %H:%M") + " حي"
         except Exception:
             pass
 
-    # 5️⃣ XAUUSD=X yfinance مباشرة (محاولة واحدة)
+    # 5️⃣ XAUUSD=X yfinance (محاولة واحدة)
     if not gold_spot:
         try:
             import yfinance as _yf2
@@ -799,7 +799,6 @@ def get_full_market_data() -> dict | None:
                     spot_date = _gs.index[-1].strftime("%d/%m %H:%M") + " (Yahoo)"
         except Exception:
             pass
-
 
 
     if gold_daily is None or gold_daily.empty:

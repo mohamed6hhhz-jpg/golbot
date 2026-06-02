@@ -732,22 +732,49 @@ def get_full_market_data() -> dict | None:
     gold_spot = None
     spot_date = None
 
-    # 1️⃣ Yahoo Finance API مباشرة (بدون yfinance — بدون rate limit)
+    # 1️⃣ metals.live — مصمم للسيرفرات (مجاني، بدون مفتاح)
     try:
-        _yurl = "https://query2.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=1m&range=1d"
-        _yr = requests.get(_yurl, timeout=6,
-                           headers={'User-Agent': 'Mozilla/5.0',
-                                    'Accept': 'application/json'})
-        if _yr.status_code == 200:
-            _yd = _yr.json()
-            _p  = _yd['chart']['result'][0]['meta'].get('regularMarketPrice')
+        r = requests.get("https://api.metals.live/v1/spot/gold", timeout=5,
+                         headers={'User-Agent': 'Mozilla/5.0'})
+        if r.status_code == 200:
+            _j = r.json()
+            _p = _j.get('price') or _j.get('gold') or (_j[0].get('gold') if isinstance(_j, list) else None)
             if _p and float(_p) > 1000:
                 gold_spot = round(float(_p), 2)
                 spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " live"
     except Exception:
         pass
 
-    # 2️⃣ goldprice.org API
+    # 2️⃣ Yahoo Finance chart API مباشرة
+    if not gold_spot:
+        try:
+            _yurl = "https://query2.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=1m&range=1d"
+            _yr = requests.get(_yurl, timeout=6,
+                               headers={'User-Agent': 'Mozilla/5.0',
+                                        'Accept': 'application/json'})
+            if _yr.status_code == 200:
+                _p = _yr.json()['chart']['result'][0]['meta'].get('regularMarketPrice')
+                if _p and float(_p) > 1000:
+                    gold_spot = round(float(_p), 2)
+                    spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " live"
+        except Exception:
+            pass
+
+    # 3️⃣ open.er-api (USD base → 1/XAU_rate = سعر الذهب)
+    if not gold_spot:
+        try:
+            r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5)
+            if r.status_code == 200:
+                xau_r = r.json().get('rates', {}).get('XAU')
+                if xau_r and xau_r > 0:
+                    _p = round(1.0 / xau_r, 2)
+                    if _p > 1000:
+                        gold_spot = _p
+                        spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " (ER)"
+        except Exception:
+            pass
+
+    # 4️⃣ goldprice.org
     if not gold_spot:
         try:
             r = requests.get("https://data-asg.goldprice.org/dbXRates/USD",
@@ -760,7 +787,7 @@ def get_full_market_data() -> dict | None:
         except Exception:
             pass
 
-    # 3️⃣ XAUUSD=X يfinance مباشرة (محاولة واحدة)
+    # 5️⃣ XAUUSD=X yfinance مباشرة (محاولة واحدة)
     if not gold_spot:
         try:
             import yfinance as _yf2
@@ -772,6 +799,7 @@ def get_full_market_data() -> dict | None:
                     spot_date = _gs.index[-1].strftime("%d/%m %H:%M") + " (Yahoo)"
         except Exception:
             pass
+
 
 
     if gold_daily is None or gold_daily.empty:

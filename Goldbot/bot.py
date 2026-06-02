@@ -366,6 +366,27 @@ def get_tf_confluence_label(weekly, daily, hourly) -> str:
     return "⚪ تعارض بين الإطارات — حذر"
 
 
+def get_tf_4frame_label(tf_15m, tf_1h, tf_4h, tf_1d) -> str:
+    scores    = [tf_15m.get("score",0), tf_1h.get("score",0), tf_4h.get("score",0), tf_1d.get("score",0)]
+    positives = sum(1 for x in scores if x > 0)
+    negatives = sum(1 for x in scores if x < 0)
+    if positives == 4: return "🔥 توافق تام صعودي (4/4 إطارات)"
+    if negatives == 4: return "❄️ توافق تام هبوطي (4/4 إطارات)"
+    if positives >= 3: return "🟡 توافق صعودي قوي (3/4 إطارات)"
+    if negatives >= 3: return "🟠 توافق هبوطي قوي (3/4 إطارات)"
+    if positives == 2: return "🔵 توافق جزئي صعودي (2/4)"
+    if negatives == 2: return "🟤 توافق جزئي هبوطي (2/4)"
+    return "⚪ تعارض بين الإطارات — حذر"
+
+
+def tf_gold_impact(score: int) -> str:
+    if score >= 3:  return "↑↑ دعم صعودي قوي"
+    if score >= 1:  return "↑ دعم صعودي خفيف"
+    if score <= -3: return "↓↓ ضغط هبوطي قوي"
+    if score <= -1: return "↓ ضغط هبوطي خفيف"
+    return "↔ محايد"
+
+
 # ══════════════════════════════════════════════
 #  4. نظام نقاط التوافق (Confluence)
 # ══════════════════════════════════════════════
@@ -637,9 +658,14 @@ def get_full_market_data() -> dict | None:
     tip_df    = _fetch("TIP",      period="60d"); time.sleep(0.6)
     vix_df    = _fetch("^VIX",     period="60d"); time.sleep(0.6)
     sp500_df  = _fetch("^GSPC",    period="60d"); time.sleep(0.6)
+    # [8] 2Y Treasury Yield
+    twy_df    = _fetch("^TWOTM",   period="10d"); time.sleep(0.3)
+    if twy_df is None or twy_df.empty:
+        twy_df = _fetch("^IRX",    period="10d"); time.sleep(0.3)
+    # [11] 15m data for short-term trend
+    gold_15m  = _fetch("GC=F",     period="5d",  interval="15m"); time.sleep(0.5)
 
     gold_futures, futures_date = _last_with_date(gold_daily)
-    # لو الفوري مش متاح نستخدم الآجل كمرجع (فارقهم صغير)
     if not gold_spot:
         gold_spot  = gold_futures
         spot_date  = futures_date + " (آجل)"
@@ -647,19 +673,37 @@ def get_full_market_data() -> dict | None:
     oil    = _last_close(oil_df)
     dxy    = _last_close(dxy_df)
     tnx    = _last_close(tnx_df)
+    twy    = _last_close(twy_df)  # [8] 2Y yield
     vix    = _last_close(vix_df)
     sp500  = _last_close(sp500_df)
+    # [8] Yield Curve = 10Y - 2Y
+    yield_curve       = round(tnx - twy, 2) if (tnx and twy) else None
+    yield_curve_label = ("طبيعي ✅" if yield_curve and yield_curve > 0
+                         else "مقلوب ⚠️ خطر ركود" if yield_curve is not None
+                         else "غير متاح")
 
     if not all([gold_futures, dxy, tnx]):
         return None
 
     gold = gold_futures   # الأساس للحسابات هو الآجل
 
-    # ── تحليل الإطارات الزمنية ──
-    tf_weekly = analyze_timeframe(gold_weekly, "أسبوعي")
-    tf_daily  = analyze_timeframe(gold_daily,  "يومي")
-    tf_hourly = analyze_timeframe(gold_hourly, "ساعي")
-    tf_label  = get_tf_confluence_label(tf_weekly, tf_daily, tf_hourly)
+    # [11] تحليل 4 إطارات زمنية: 15m, 1h, 4h, 1d
+    import pandas as pd
+    gold_4h = None
+    if gold_hourly is not None and len(gold_hourly) >= 16:
+        try:
+            gold_4h = gold_hourly.resample('4h').agg(
+                {'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}
+            ).dropna()
+        except Exception:
+            gold_4h = None
+
+    tf_15m    = analyze_timeframe(gold_15m,    "⋆ 15 دقيقة")
+    tf_hourly = analyze_timeframe(gold_hourly, "⏱️ ساعي")
+    tf_4h     = analyze_timeframe(gold_4h,     "⏰ 4 ساعات")
+    tf_daily  = analyze_timeframe(gold_daily,  "📅 يومي")
+    tf_weekly = analyze_timeframe(gold_weekly, "📆 أسبوعي")
+    tf_label  = get_tf_4frame_label(tf_15m, tf_hourly, tf_4h, tf_daily)
 
     # ── المؤشرات على البيانات اليومية ──
     closes = gold_daily['Close'].values
@@ -717,7 +761,8 @@ def get_full_market_data() -> dict | None:
         gold=gold, gold_futures=gold_futures, gold_spot=gold_spot,
         futures_date=futures_date, spot_date=spot_date,
         contango=contango,
-        silver=silver, oil=oil, dxy=dxy, tnx=tnx, vix=vix, sp500=sp500,
+        silver=silver, oil=oil, dxy=dxy, tnx=tnx, twy=twy, vix=vix, sp500=sp500,
+        yield_curve=yield_curve, yield_curve_label=yield_curve_label,
         rsi=rsi, rsi_label=rsi_label, stoch_k=stoch_k, stoch_d=stoch_d,
         macd=macd, macd_sig=macd_sig, macd_hist=macd_hist, macd_label=macd_label,
         bb_upper=bb_upper, bb_mid=bb_mid, bb_lower=bb_lower, bb_label=bb_label,
@@ -731,7 +776,8 @@ def get_full_market_data() -> dict | None:
         pivot=pivot, r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
         round_numbers=round_numbers, hist_ctx=hist_ctx,
         real_yield_signal=real_yield_signal,
-        tf_weekly=tf_weekly, tf_daily=tf_daily, tf_hourly=tf_hourly, tf_label=tf_label,
+        tf_weekly=tf_weekly, tf_daily=tf_daily, tf_hourly=tf_hourly,
+        tf_4h=tf_4h, tf_15m=tf_15m, tf_label=tf_label,
         gs_ratio=gs_ratio, dxy_bias=dxy_bias, bond_bias=bond_bias,
         gold_pressure=gold_pres, vix_label=vix_label,
     )
@@ -812,24 +858,26 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    آجل   (GC=F)    : {futures_label}{contango_str}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 ملخص السوق
-   الزخم        : {ent['momentum']}
-   الاتجاه العام : {ent['trend']}
-   السيولة       : {ent['liquidity']}
+   الزخم        : {ent['momentum']} {'→ تسارع بيع، الذهب عرضة للهبوط' if 'هابط' in ent['momentum'] else '→ تسارع شراء، الذهب في دعم' if 'صاعد' in ent['momentum'] else '→ حركة غير محددة'}
+   الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ الاتجاه غير محدد'}
+   السيولة       : {ent['liquidity']} {'→ الحركات موثوقة ✅' if 'مرتفعة' in ent['liquidity'] else '→ انتبه: حركات وهمية محتملة ⚠️'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 حكم السوق: {conf['verdict']}
 {score_table}
    ∑ {conf['total']:+d}/±{conf['n']}  ▪ 🟢{conf['bullish']} 🔴{conf['bearish']} ⚪{conf['neutral']}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 الإطارات الزمنية: {d['tf_label']}
-   📅 {d['tf_weekly']['bias']} | RSI={d['tf_weekly']['rsi']}
-   📆 {d['tf_daily']['bias']}  | RSI={d['tf_daily']['rsi']}
-   ⏱️ {d['tf_hourly'].get('bias','—')} | RSI={d['tf_hourly'].get('rsi','—')}
+🕐 الاتجاه العام (متعدد الإطارات): {d['tf_label']}
+   ⚡ {d['tf_15m'].get('bias','—')} | RSI={d['tf_15m'].get('rsi','—')} | {tf_gold_impact(d['tf_15m'].get('score',0))} [15د]
+   ⏱️ {d['tf_hourly'].get('bias','—')} | RSI={d['tf_hourly'].get('rsi','—')} | {tf_gold_impact(d['tf_hourly'].get('score',0))} [1س]
+   ⏰ {d['tf_4h'].get('bias','—')} | RSI={d['tf_4h'].get('rsi','—')} | {tf_gold_impact(d['tf_4h'].get('score',0))} [4س]
+   📅 {d['tf_daily'].get('bias','—')} | RSI={d['tf_daily'].get('rsi','—')} | {tf_gold_impact(d['tf_daily'].get('score',0))} [1ي]
+   📆 {d['tf_weekly'].get('bias','—')} | RSI={d['tf_weekly'].get('rsi','—')} | {tf_gold_impact(d['tf_weekly'].get('score',0))} [أسبوعي]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📈 حركة السعر: {hist_line}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📡 الأسواق
-   DXY:{d['dxy']:.1f}({d['dxy_bias']}) | 10Y:{d['tnx']:.2f}%({d['bond_bias']}) | VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'})
-   🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
+   DXY:{d['dxy']:.1f}({d['dxy_bias']}) | 10Y:{d['tnx']:.2f}% | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | Spread:{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
+   VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'}) | 🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
    {d['real_yield_signal']}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧮 المؤشرات

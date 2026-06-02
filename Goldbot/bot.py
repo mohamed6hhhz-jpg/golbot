@@ -339,34 +339,34 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
 
     # ── يومية ──
     sl_d = round(atr * 0.4, 2)
-    if bias == 'bull':
+    if bias in ('bull', 'neutral'):
         trades['daily_buy']  = dict(entry=round(pivot,2), sl=round(pivot-sl_d,2), risk=sl_d,
             t1=round(r1,2), t2=round(r2,2), t3=round(r2+atr*0.3,2),
             market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='buy')
-    elif bias == 'bear':
+    if bias in ('bear', 'neutral'):
         trades['daily_sell'] = dict(entry=round(pivot,2), sl=round(pivot+sl_d,2), risk=sl_d,
             t1=round(s1,2), t2=round(s2,2), t3=round(s2-atr*0.3,2),
             market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='sell')
 
     # ── أسبوعية ──
-    if bias == 'bull':
+    if bias in ('bull', 'neutral'):
         sl_w = round(s1 - (pw_l - 5), 2)
         trades['weekly_buy']  = dict(entry=round(s1,2), sl=round(pw_l-5,2), risk=max(sl_w,10),
             t1=round(r1,2), t2=round(r2,2), t3=round(pw_h,2),
             market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='buy')
-    elif bias == 'bear':
+    if bias in ('bear', 'neutral'):
         sl_w = round((pw_h + 5) - r1, 2)
         trades['weekly_sell'] = dict(entry=round(r1,2), sl=round(pw_h+5,2), risk=max(sl_w,10),
             t1=round(s1,2), t2=round(s2,2), t3=round(pw_l,2),
             market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='sell')
 
     # ── شهرية ──
-    if bias == 'bull':
+    if bias in ('bull', 'neutral'):
         sl_m = round(s2 - (pm_l - 10), 2)
         trades['monthly_buy']  = dict(entry=round(s2,2), sl=round(pm_l-10,2), risk=max(sl_m,20),
             t1=round(r2,2), t2=round(pm_h*0.5+r2*0.5,2), t3=round(pm_h,2),
             market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='buy')
-    elif bias == 'bear':
+    if bias in ('bear', 'neutral'):
         sl_m = round((pm_h + 10) - r2, 2)
         trades['monthly_sell'] = dict(entry=round(r2,2), sl=round(pm_h+10,2), risk=max(sl_m,20),
             t1=round(s2,2), t2=round(pm_l*0.5+s2*0.5,2), t3=round(pm_l,2),
@@ -1077,10 +1077,10 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    {d['real_yield_signal']}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧮 المؤشرات
-   RSI:{d['rsi']}({d['rsi_label'].split()[0]}) | StochK:{d['stoch_k']} | MACD:{d['macd_hist']}({d['macd_label'].split()[0]})
-   BB:{d['bb_upper']}/{d['bb_mid']}/{d['bb_lower']}({d['bb_label'].split()[0]}) | EMA:{d['ema_label']}
-   ADX:{d['adx']}(DI+{d['di_plus']}/DI-{d['di_minus']}) | CCI:{d['cci']} | W%R:{d['williams_r']}
-   OBV:{d['obv_trend']} | حجم:{d['rel_vol_label'].split('—')[0].strip()} | ATR:{d['atr']}$
+   RSI:{d['rsi']}({d['rsi_label'].split()[0]}){d['ind_rsi_i']} | StochK:{d['stoch_k']} | MACD:{d['macd_hist']}{d['ind_macd_i']}
+   BB:{d['bb_upper']}/{d['bb_mid']}/{d['bb_lower']}({d['bb_label'].split()[0]}){d['ind_bb_i']} | EMA:{d['ema_label']}{d['ind_ema_i']}
+   ADX:{d['adx']}({d['ind_adx_i']}) DI+{d['di_plus']}/DI-{d['di_minus']} | CCI:{d['cci']}{d['ind_cci_i']} | W%R:{d['williams_r']}
+   OBV:{d['obv_trend']}{d['ind_obv_i']} | حجم:{d['rel_vol_label'].split('—')[0].strip()} | ATR:{d['atr']}$
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔢 المستويات
    🟣 مقاومة نفسية:{rn['nearest_resistance']}$(+{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(-{rn['dist_to_support']}$)

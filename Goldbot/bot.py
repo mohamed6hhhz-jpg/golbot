@@ -769,10 +769,28 @@ def get_full_market_data() -> dict | None:
     tip_df    = _fetch("TIP",      period="60d"); time.sleep(0.6)
     vix_df    = _fetch("^VIX",     period="60d"); time.sleep(0.6)
     sp500_df  = _fetch("^GSPC",    period="60d"); time.sleep(0.6)
-    # [8] 2Y Treasury Yield
-    twy_df    = _fetch("^TWOTM",   period="10d"); time.sleep(0.3)
-    if twy_df is None or twy_df.empty:
-        twy_df = _fetch("^IRX",    period="10d"); time.sleep(0.3)
+    # [8] 2Y Treasury Yield — US Treasury API الرسمية (مفيش rate limit)
+    twy = None
+    try:
+        _turl = ("https://api.fiscaldata.treasury.gov/services/api/v1/accounting/od/"
+                 "avg_interest_rates?fields=record_date,security_desc,avg_interest_rate_amt"
+                 "&filter=security_desc:eq:2-Year Treasury Note"
+                 "&sort=-record_date&page%5Bsize%5D=1")
+        _tr = requests.get(_turl, timeout=7, headers={'User-Agent': 'Mozilla/5.0'})
+        if _tr.status_code == 200:
+            _data = _tr.json().get('data', [])
+            if _data:
+                twy = round(float(_data[0]['avg_interest_rate_amt']), 2)
+    except Exception:
+        pass
+    # fallback: ^IRX (13-week T-bill — نفس الاتجاه)
+    if twy is None:
+        try:
+            _irx = _fetch("^IRX", period="5d")
+            twy  = _last_close(_irx)
+        except Exception:
+            pass
+
     # [11] 15m data for short-term trend
     gold_15m  = _fetch("GC=F",     period="5d",  interval="15m"); time.sleep(0.5)
 
@@ -784,7 +802,8 @@ def get_full_market_data() -> dict | None:
     oil    = _last_close(oil_df)
     dxy    = _last_close(dxy_df)
     tnx    = _last_close(tnx_df)
-    twy    = _last_close(twy_df)  # [8] 2Y yield
+    # twy حُسب مسبقاً من Treasury API أو ^IRX
+
     vix    = _last_close(vix_df)
     sp500  = _last_close(sp500_df)
     # [8] Yield Curve = 10Y - 2Y

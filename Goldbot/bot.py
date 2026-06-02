@@ -238,7 +238,7 @@ def calc_obv(df) -> tuple:
         else:
             obv_series.append(obv_series[-1])
     obv_arr = np.array(obv_series)
-    trend   = "صعودي 🟢" if obv_arr[-1] > np.mean(obv_arr[-20:]) else "هبوطي 🔴"
+    trend   = "صعودي" if obv_arr[-1] > np.mean(obv_arr[-20:]) else "هبوطي"
     return round(float(obv_arr[-1]), 0), trend
 
 
@@ -728,23 +728,39 @@ def get_full_market_data() -> dict | None:
     gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
-    # ── الفوري: مصدران فقط بدون retry loop ──
+    # ── الفوري: مصادر متعددة ──
     gold_spot = None
     spot_date = None
 
-    # 1️⃣ goldprice.org — محاولة واحدة، timeout قصير
+    # 1️⃣ Yahoo Finance API مباشرة (بدون yfinance — بدون rate limit)
     try:
-        r = requests.get("https://data-asg.goldprice.org/dbXRates/USD",
-                         headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-        if r.status_code == 200:
-            price = r.json()['items'][0].get('xauPrice')
-            if price and float(price) > 1000:
-                gold_spot = round(float(price), 2)
+        _yurl = "https://query2.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=1m&range=1d"
+        _yr = requests.get(_yurl, timeout=6,
+                           headers={'User-Agent': 'Mozilla/5.0',
+                                    'Accept': 'application/json'})
+        if _yr.status_code == 200:
+            _yd = _yr.json()
+            _p  = _yd['chart']['result'][0]['meta'].get('regularMarketPrice')
+            if _p and float(_p) > 1000:
+                gold_spot = round(float(_p), 2)
                 spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " live"
     except Exception:
         pass
 
-    # 2️⃣ XAUUSD=X — محاولة واحدة مباشرة بدون _fetch (بدون retries)
+    # 2️⃣ goldprice.org API
+    if not gold_spot:
+        try:
+            r = requests.get("https://data-asg.goldprice.org/dbXRates/USD",
+                             headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            if r.status_code == 200:
+                price = r.json()['items'][0].get('xauPrice')
+                if price and float(price) > 1000:
+                    gold_spot = round(float(price), 2)
+                    spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " live"
+        except Exception:
+            pass
+
+    # 3️⃣ XAUUSD=X يfinance مباشرة (محاولة واحدة)
     if not gold_spot:
         try:
             import yfinance as _yf2

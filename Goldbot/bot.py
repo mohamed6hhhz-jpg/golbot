@@ -727,14 +727,97 @@ def get_full_market_data() -> dict | None:
     hist_ctx                   = get_historical_context(gold_daily)
     round_numbers              = get_round_numbers(gold, step=50)
 
-    # ── العائد الحقيقي (TIP ETF) ──
+    # ── [7] العائد الحقيقي — تحليل معمّق (الأهم عند العميل) ──
+    inflation_est     = 2.3   # تقدير التضخم السنوي (%)
+    real_yield_val    = round(tnx - inflation_est, 2) if tnx else None
     real_yield_signal = "غير متاح"
     if tip_df is not None and not tip_df.empty and len(tip_df) >= 10:
         tip_closes = tip_df['Close'].values
         tip_trend  = tip_closes[-1] - np.mean(tip_closes[-10:])
-        real_yield_signal = ("🟢 العائد الحقيقي ينخفض — بيئة موات للذهب"
-                             if tip_trend > 0 else
-                             "🔴 العائد الحقيقي يرتفع — ضغط على الذهب")
+        tip_dir    = "ينخفض ↓" if tip_trend > 0 else "يرتفع ↑"
+        gold_dir   = "🟢 بيئة مواتية للذهب" if tip_trend > 0 else "🔴 ضغط على الذهب"
+        impact     = "الذهب يصبح أكثر جاذبية ← صعودي" if tip_trend > 0 else "السندات تنافس الذهب ← هبوطي"
+        real_yield_signal = (
+            f"🔍 العائد الحقيقي {tip_dir} ({gold_dir})\n"
+            f"   📊 العائد الاسمي(10Y):{tnx:.2f}% - تضخم≈{inflation_est}% = عائد حقيقي≈{real_yield_val:+.2f}%\n"
+            f"   📖 المعنى: ما يكسبه المستثمر فعلياً بعد خصم التضخم\n"
+            f"   🎯 {impact}"
+        )
+
+    # ── [4] مستويات محسّنة: VWAP + سابق أسبوع/شهر + مناطق الطلب/عرض ──
+    # VWAP (سعر مرجح بالحجم) من بيانات الساعي
+    vwap = None
+    if gold_hourly is not None and len(gold_hourly) > 0:
+        try:
+            h = gold_hourly.copy()
+            h['tp']     = (h['High'] + h['Low'] + h['Close']) / 3
+            h['tp_vol'] = h['tp'] * h['Volume']
+            total_vol   = h['Volume'].sum()
+            vwap = round(float(h['tp_vol'].sum() / total_vol), 2) if total_vol > 0 else None
+        except Exception:
+            vwap = None
+
+    # سابق الأسبوع High/Low
+    prev_wk_high = prev_wk_low = None
+    if gold_weekly is not None and len(gold_weekly) >= 2:
+        try:
+            prev_wk_high = round(float(gold_weekly['High'].iloc[-2]), 2)
+            prev_wk_low  = round(float(gold_weekly['Low'].iloc[-2]),  2)
+        except Exception:
+            pass
+
+    # سابق الشهر High/Low (من اليومي)
+    prev_mo_high = prev_mo_low = None
+    if gold_daily is not None and len(gold_daily) >= 45:
+        try:
+            prev_mo_high = round(float(gold_daily['High'].iloc[-44:-22].max()), 2)
+            prev_mo_low  = round(float(gold_daily['Low'].iloc[-44:-22].min()),  2)
+        except Exception:
+            pass
+
+    # مناطق طلب (حجم عالي مع شمعة صعودية) وعرض (حجم عالي مع شمعة هبوطية)
+    sd_demand = sd_supply = None
+    if gold_daily is not None and len(gold_daily) >= 20:
+        try:
+            recent   = gold_daily.tail(20).copy()
+            avg_vol  = recent['Volume'].mean()
+            hv_bars  = recent[recent['Volume'] > avg_vol * 1.5]
+            demand_bars = hv_bars[hv_bars['Close'] > hv_bars['Open']]
+            supply_bars = hv_bars[hv_bars['Close'] < hv_bars['Open']]
+            if not demand_bars.empty:
+                sd_demand = round(float(demand_bars['Low'].iloc[-1]), 2)
+            if not supply_bars.empty:
+                sd_supply = round(float(supply_bars['High'].iloc[-1]), 2)
+        except Exception:
+            pass
+
+    # ── [6] نسبة Put/Call لـ GLD Options ──
+    gld_pcr = None
+    try:
+        import yfinance as _yf
+        gld_tk = _yf.Ticker("GLD")
+        opts   = gld_tk.options
+        if opts:
+            chain     = gld_tk.option_chain(opts[0])
+            tot_calls = chain.calls['openInterest'].sum()
+            tot_puts  = chain.puts['openInterest'].sum()
+            gld_pcr   = round(tot_puts / tot_calls, 2) if tot_calls > 0 else None
+    except Exception:
+        gld_pcr = None
+
+    # ── [5] ملخص تأثير المؤشرات على الذهب ──
+    def _ind_impact(label: str, bullish_kw: str, bearish_kw: str, value=None) -> str:
+        if bullish_kw and bullish_kw in label: return "🟢↑"
+        if bearish_kw and bearish_kw in label: return "🔴↓"
+        return "⚪↔"
+    ind_rsi_i  = _ind_impact(rsi_label,  "تشبع بيع", "تشبع شراء")
+    ind_macd_i = "🟢↑" if macd_hist > 0 else "🔴↓"
+    ind_ema_i  = "🟢↑" if ema20 > ema50 > ema200 else ("🔴↓" if ema20 < ema50 < ema200 else "⚪↔")
+    ind_adx_i  = ("✅ترند" if adx > 25 else "⚠️ضعيف")
+    ind_obv_i  = "🟢↑" if "صعودي" in obv_trend else "🔴↓"
+    ind_cci_i  = _ind_impact(cci_label, "تشبع بيع", "تشبع شراء")
+    ind_bb_i   = "🟢↑" if "قاع" in bb_label else ("🔴↓" if "سقف" in bb_label else "⚪↔")
+
 
     # ── Pivot Points ──
     ph, pl, pc = float(gold_daily['High'].iloc[-2]), float(gold_daily['Low'].iloc[-2]), float(gold_daily['Close'].iloc[-2])
@@ -780,6 +863,15 @@ def get_full_market_data() -> dict | None:
         tf_4h=tf_4h, tf_15m=tf_15m, tf_label=tf_label,
         gs_ratio=gs_ratio, dxy_bias=dxy_bias, bond_bias=bond_bias,
         gold_pressure=gold_pres, vix_label=vix_label,
+        # [4] مستويات محسّنة
+        vwap=vwap, prev_wk_high=prev_wk_high, prev_wk_low=prev_wk_low,
+        prev_mo_high=prev_mo_high, prev_mo_low=prev_mo_low,
+        sd_demand=sd_demand, sd_supply=sd_supply,
+        # [6] الأوبشن
+        gld_pcr=gld_pcr,
+        # [5] تأثير المؤشرات
+        ind_rsi_i=ind_rsi_i, ind_macd_i=ind_macd_i, ind_ema_i=ind_ema_i,
+        ind_adx_i=ind_adx_i, ind_obv_i=ind_obv_i, ind_cci_i=ind_cci_i, ind_bb_i=ind_bb_i,
     )
 
     d['confluence'] = calc_confluence(d)
@@ -876,8 +968,9 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 📈 حركة السعر: {hist_line}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📡 الأسواق
-   DXY:{d['dxy']:.1f}({d['dxy_bias']}) | 10Y:{d['tnx']:.2f}% | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | Spread:{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
-   VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'}) | 🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
+   DXY:{d['dxy']:.1f}({d['dxy_bias']}) {'→🟢دعم ذهب' if d['dxy']<101 else '→🔴ضغط' if d['dxy']>104 else '→⚪محايد'} | 10Y:{d['tnx']:.2f}% | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | Spread:{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
+   VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'}) {'→🟢خوف=طلب ملاذء' if d['vix'] and d['vix']>25 else '→🔴هدوء=تراجع ملاذء' if d['vix'] else ''} | 🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
+   🎯 GLD أوبشن P/C:{f"{d['gld_pcr']}" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
    {d['real_yield_signal']}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧮 المؤشرات
@@ -887,12 +980,13 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    OBV:{d['obv_trend']} | حجم:{d['rel_vol_label'].split('—')[0].strip()} | ATR:{d['atr']}$
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔢 المستويات
-   🟣 مقاومة نفسية:{rn['nearest_resistance']}$(↑{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(↓{rn['dist_to_support']}$)
-   📍 High:{d['swing_high']}$ / Low:{d['swing_low']}$
+   🟣 مقاومة نفسية:{rn['nearest_resistance']}$(+{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(-{rn['dist_to_support']}$)
+   📍 Swing H:{d['swing_high']}$ / L:{d['swing_low']}$ | VWAP:{f"{d['vwap']}$" if d['vwap'] else '—'}
+   📅 PrevWk H:{f"{d['prev_wk_high']}$" if d['prev_wk_high'] else '—'} / L:{f"{d['prev_wk_low']}$" if d['prev_wk_low'] else '—'} | PrevMo H:{f"{d['prev_mo_high']}$" if d['prev_mo_high'] else '—'} / L:{f"{d['prev_mo_low']}$" if d['prev_mo_low'] else '—'}
    🔴 R1:{d['r1']}$ R2:{d['r2']}$ | Pivot:{d['pivot']}$ | 🟢 S1:{d['s1']}$ S2:{d['s2']}$
-   🟠 {fib_line}
+   🟡 {fib_line}
    📊 {range_line}
-   🔍 التباين: {d['divergence']}
+   🔍 تباين:{d['divergence']} | طلب:{f"{d['sd_demand']}$" if d['sd_demand'] else '—'} | عرض:{f"{d['sd_supply']}$" if d['sd_supply'] else '—'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 {bias_section}
 🛒 صفقات الشراء:

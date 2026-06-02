@@ -295,6 +295,107 @@ def find_swing_levels(df, lookback: int = 20):
            round(float(np.min(df['Low'].values[-lookback:])), 2)
 
 
+def calc_price_prediction(gold: float, atr: float, tf_15m: dict, tf_hourly: dict) -> dict:
+    """توقع السعر بعد 15 دقيقة وساعة — ATR Projection + اتجاه الزخم"""
+    atr_15m   = round(atr * (15/390) ** 0.5, 2)
+    atr_1h    = round(atr * (60/390) ** 0.5, 2)
+    sc_15m    = tf_15m.get('score', 0)
+    sc_1h     = tf_hourly.get('score', 0)
+    dir_15m   = (1 if sc_15m > 0 else -1 if sc_15m < 0 else 0)
+    dir_1h    = (1 if sc_1h  > 0 else -1 if sc_1h  < 0 else 0)
+    c15 = round(gold + dir_15m * atr_15m * 0.4, 2)
+    c1h = round(gold + dir_1h  * atr_1h  * 0.6, 2)
+    return {
+        '15m': {'center': c15, 'low': round(c15 - atr_15m*0.5, 2), 'high': round(c15 + atr_15m*0.5, 2)},
+        '1h':  {'center': c1h, 'low': round(c1h - atr_1h *0.5, 2), 'high': round(c1h + atr_1h *0.5, 2)},
+    }
+
+
+def calc_advanced_trades(d: dict, bias: str) -> dict:
+    """6 أنواع صفقات متقدمة: سكالبينج | يومية | أسبوعية | شهرية | سوينج | انعكاس"""
+    gold   = d['gold'];  atr = d['atr']
+    s1, s2 = d['s1'], d['s2']
+    r1, r2 = d['r1'], d['r2']
+    pivot  = d['pivot']
+    sw_h   = d['swing_high'] or r2
+    sw_l   = d['swing_low']  or s2
+    pw_h   = d.get('prev_wk_high') or r2
+    pw_l   = d.get('prev_wk_low')  or s2
+    pm_h   = d.get('prev_mo_high') or round(r2 + atr, 2)
+    pm_l   = d.get('prev_mo_low')  or round(s2 - atr, 2)
+    rsi    = d['rsi'];  div = d.get('divergence', '')
+    trades = {}
+
+    # ── سكالبينج (15 دقيقة) ──
+    sl_sc = 8.0
+    if bias in ('bull', 'neutral'):
+        trades['scalp_buy']  = dict(entry=round(s1,2), sl=round(s1-sl_sc,2), risk=sl_sc,
+            t1=round(s1+15,2), t2=round(s1+28,2), t3=round(s1+45,2),
+            market='آجل (Futures)', tf='15د', typ='سكالبينج 🏹', dir='buy')
+    if bias in ('bear', 'neutral'):
+        trades['scalp_sell'] = dict(entry=round(r1,2), sl=round(r1+sl_sc,2), risk=sl_sc,
+            t1=round(r1-15,2), t2=round(r1-28,2), t3=round(r1-45,2),
+            market='آجل (Futures)', tf='15د', typ='سكالبينج 🏹', dir='sell')
+
+    # ── يومية ──
+    sl_d = round(atr * 0.4, 2)
+    if bias == 'bull':
+        trades['daily_buy']  = dict(entry=round(pivot,2), sl=round(pivot-sl_d,2), risk=sl_d,
+            t1=round(r1,2), t2=round(r2,2), t3=round(r2+atr*0.3,2),
+            market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='buy')
+    elif bias == 'bear':
+        trades['daily_sell'] = dict(entry=round(pivot,2), sl=round(pivot+sl_d,2), risk=sl_d,
+            t1=round(s1,2), t2=round(s2,2), t3=round(s2-atr*0.3,2),
+            market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='sell')
+
+    # ── أسبوعية ──
+    if bias == 'bull':
+        sl_w = round(s1 - (pw_l - 5), 2)
+        trades['weekly_buy']  = dict(entry=round(s1,2), sl=round(pw_l-5,2), risk=max(sl_w,10),
+            t1=round(r1,2), t2=round(r2,2), t3=round(pw_h,2),
+            market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='buy')
+    elif bias == 'bear':
+        sl_w = round((pw_h + 5) - r1, 2)
+        trades['weekly_sell'] = dict(entry=round(r1,2), sl=round(pw_h+5,2), risk=max(sl_w,10),
+            t1=round(s1,2), t2=round(s2,2), t3=round(pw_l,2),
+            market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='sell')
+
+    # ── شهرية ──
+    if bias == 'bull':
+        sl_m = round(s2 - (pm_l - 10), 2)
+        trades['monthly_buy']  = dict(entry=round(s2,2), sl=round(pm_l-10,2), risk=max(sl_m,20),
+            t1=round(r2,2), t2=round(pm_h*0.5+r2*0.5,2), t3=round(pm_h,2),
+            market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='buy')
+    elif bias == 'bear':
+        sl_m = round((pm_h + 10) - r2, 2)
+        trades['monthly_sell'] = dict(entry=round(r2,2), sl=round(pm_h+10,2), risk=max(sl_m,20),
+            t1=round(s2,2), t2=round(pm_l*0.5+s2*0.5,2), t3=round(pm_l,2),
+            market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='sell')
+
+    # ── سوينج ──
+    sl_sw = round(atr * 0.35, 2)
+    mid   = round((sw_h + sw_l) / 2, 2)
+    trades['swing_buy']  = dict(entry=round(sw_l,2), sl=round(sw_l-sl_sw,2), risk=sl_sw,
+        t1=mid, t2=round(sw_h,2), t3=round(sw_h+atr*0.4,2),
+        market='آجل (Futures)', tf='أسابيع', typ='سوينج 🌊', dir='buy')
+    trades['swing_sell'] = dict(entry=round(sw_h,2), sl=round(sw_h+sl_sw,2), risk=sl_sw,
+        t1=mid, t2=round(sw_l,2), t3=round(sw_l-atr*0.4,2),
+        market='آجل (Futures)', tf='أسابيع', typ='سوينج 🌊', dir='sell')
+
+    # ── انعكاس (Counter-trend) — فقط عند توفر الشروط ──
+    has_div  = '💡' in div or '⚠️' in div
+    sl_rev   = round(atr * 0.28, 2)
+    if (has_div or rsi < 35) and bias != 'bull':
+        trades['rev_buy']  = dict(entry=round(gold,2), sl=round(gold-sl_rev,2), risk=sl_rev,
+            t1=round(pivot,2), t2=round(r1,2), t3=round(r2,2),
+            market='فوري (Spot)', tf='1-4س', typ='انعكاس 🔄', dir='buy')
+    if (has_div or rsi > 65) and bias != 'bear':
+        trades['rev_sell'] = dict(entry=round(gold,2), sl=round(gold+sl_rev,2), risk=sl_rev,
+            t1=round(pivot,2), t2=round(s1,2), t3=round(s2,2),
+            market='فوري (Spot)', tf='1-4س', typ='انعكاس 🔄', dir='sell')
+    return trades
+
+
 def get_round_numbers(price: float, step: int = 50) -> dict:
     lower = (price // step) * step
     upper = lower + step
@@ -874,8 +975,10 @@ def get_full_market_data() -> dict | None:
         ind_adx_i=ind_adx_i, ind_obv_i=ind_obv_i, ind_cci_i=ind_cci_i, ind_bb_i=ind_bb_i,
     )
 
-    d['confluence'] = calc_confluence(d)
-    d['entries']    = calc_all_entries(d, d['confluence']['bias'])
+    d['confluence']      = calc_confluence(d)
+    d['entries']         = calc_all_entries(d, d['confluence']['bias'])
+    d['adv_trades']      = calc_advanced_trades(d, d['confluence']['bias'])
+    d['price_pred']      = calc_price_prediction(d['gold'], d['atr'], d['tf_15m'], d['tf_hourly'])
     return d
 
 
@@ -996,7 +1099,42 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 {sell_block}
    ↑ مراقبة: {refs['above']}$ | ↓ مراقبة: {refs['below']}$"""
 
-    # ── تعليمات الـ AI ──
+    # ── الجزء الثاني: توقعات + صفقات متقدمة ──
+    adv  = d['adv_trades']
+    pred = d['price_pred']
+
+    def _fmt_adv(t: dict) -> str:
+        arr  = "🛒" if t['dir'] == 'buy' else "📉"
+        gain = abs(t['t1'] - t['entry'])
+        rr   = round(gain / t['risk'], 1) if t['risk'] > 0 else 0
+        return (f"   {arr} [{t['typ']}] {t['market']} | {t['tf']}\n"
+                f"      دخول:{t['entry']}$ | وقف:{t['sl']}$ | خطر:{t['risk']}$\n"
+                f"      T1:{t['t1']}$ | T2:{t['t2']}$ | T3:{t['t3']}$ | R:{rr}x")
+
+    adv_lines = []
+    order = ['scalp_buy','scalp_sell','daily_buy','daily_sell',
+             'weekly_buy','weekly_sell','monthly_buy','monthly_sell',
+             'swing_buy','swing_sell','rev_buy','rev_sell']
+    for k in order:
+        if k in adv:
+            adv_lines.append(_fmt_adv(adv[k]))
+
+    adv_block = "\n".join(adv_lines) if adv_lines else "   لا توجد صفقات متقدمة متاحة"
+
+    part2 = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏰ توقع السعر (ATR Projection)
+   بعد 15 دقيقة: {pred['15m']['low']}$ ↔ {pred['15m']['high']}$ | الأرجح: {pred['15m']['center']}$
+   بعد ساعة:     {pred['1h']['low']}$ ↔ {pred['1h']['high']}$ | الأرجح: {pred['1h']['center']}$
+   📌 مبني على: ATR={d['atr']}$ × جذر الزمن + اتجاه الزخم
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 صفقات متقدمة (آجل وفوري)
+{adv_block}
+━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+
+    fixed = fixed + part2
+
+
     prob_floor = ("سيناريو الصعود لا يقل عن 50%" if bias == "bull"
                   else "سيناريو الهبوط لا يقل عن 50%" if bias == "bear"
                   else "سيناريو التذبذب لا يقل عن 40%")

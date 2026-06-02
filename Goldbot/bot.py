@@ -906,19 +906,6 @@ def get_full_market_data() -> dict | None:
     except Exception:
         gld_pcr = None
 
-    # ── [5] ملخص تأثير المؤشرات على الذهب ──
-    def _ind_impact(label: str, bullish_kw: str, bearish_kw: str, value=None) -> str:
-        if bullish_kw and bullish_kw in label: return "🟢↑"
-        if bearish_kw and bearish_kw in label: return "🔴↓"
-        return "⚪↔"
-    ind_rsi_i  = _ind_impact(rsi_label,  "تشبع بيع", "تشبع شراء")
-    ind_macd_i = "🟢↑" if macd_hist > 0 else "🔴↓"
-    ind_ema_i  = "🟢↑" if ema20 > ema50 > ema200 else ("🔴↓" if ema20 < ema50 < ema200 else "⚪↔")
-    ind_adx_i  = ("✅ترند" if adx > 25 else "⚠️ضعيف")
-    ind_obv_i  = "🟢↑" if "صعودي" in obv_trend else "🔴↓"
-    ind_cci_i  = _ind_impact(cci_label, "تشبع بيع", "تشبع شراء")
-    ind_bb_i   = "🟢↑" if "قاع" in bb_label else ("🔴↓" if "سقف" in bb_label else "⚪↔")
-
 
     # ── Pivot Points ──
     ph, pl, pc = float(gold_daily['High'].iloc[-2]), float(gold_daily['Low'].iloc[-2]), float(gold_daily['Close'].iloc[-2])
@@ -938,6 +925,19 @@ def get_full_market_data() -> dict | None:
     dxy_bias    = "قوي" if dxy > 104 else ("محايد" if dxy > 101 else "ضعيف")
     bond_bias   = "مرتفعة" if tnx > 4.3 else ("معتدلة" if tnx > 3.8 else "منخفضة")
     gold_pres   = "ضغط هبوطي" if (dxy > 104 or tnx > 4.5) else "زخم صعودي"
+
+    # ── [5] تأثير المؤشرات — بعد تعريف التسميات ──
+    def _ind_impact(label: str, bullish_kw: str, bearish_kw: str) -> str:
+        if bullish_kw and bullish_kw in label: return "🟢↑"
+        if bearish_kw and bearish_kw in label: return "🔴↓"
+        return "⚪↔"
+    ind_rsi_i  = _ind_impact(rsi_label,  "تشبع بيع", "تشبع شراء")
+    ind_macd_i = "🟢↑" if macd_hist > 0 else "🔴↓"
+    ind_ema_i  = "🟢↑" if ema20 > ema50 > ema200 else ("🔴↓" if ema20 < ema50 < ema200 else "⚪↔")
+    ind_adx_i  = "✅ترند" if adx > 25 else "⚠️ضعيف"
+    ind_obv_i  = "🟢↑" if "صعودي" in obv_trend else "🔴↓"
+    ind_cci_i  = _ind_impact(cci_label, "تشبع بيع", "تشبع شراء")
+    ind_bb_i   = "🟢↑" if "قاع" in bb_label else ("🔴↓" if "سقف" in bb_label else "⚪↔")
     gs_ratio    = round(gold / silver, 1) if silver else None
     contango    = round(gold_futures - gold_spot, 2) if gold_spot else None
 

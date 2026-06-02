@@ -728,47 +728,32 @@ def get_full_market_data() -> dict | None:
     gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
-    # ── الفوري: مصادر متعددة بترتيب الدقة ──
+    # ── الفوري: مصدران فقط بدون retry loop ──
     gold_spot = None
     spot_date = None
 
-    # 1️⃣ goldprice.org — عدل أسواق حقيقي بدون مفتاح
+    # 1️⃣ goldprice.org — محاولة واحدة، timeout قصير
     try:
         r = requests.get("https://data-asg.goldprice.org/dbXRates/USD",
-                         headers={'User-Agent': 'Mozilla/5.0'}, timeout=6)
+                         headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
         if r.status_code == 200:
             price = r.json()['items'][0].get('xauPrice')
             if price and float(price) > 1000:
                 gold_spot = round(float(price), 2)
-                spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " (Goldprice.org)"
+                spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " live"
     except Exception:
         pass
 
-    # 2️⃣ XAUUSD=X من yfinance — بيانات فورية بدقيقتين
-    if not gold_spot:
-        for _interval, _period in [("2m","1d"),("5m","5d"),("15m","5d"),("1h","5d")]:
-            try:
-                gs_df = _fetch("XAUUSD=X", period=_period, interval=_interval)
-                if gs_df is not None and not gs_df.empty:
-                    p, d = _last_with_date(gs_df)
-                    if p and p > 1000:
-                        gold_spot = round(p, 2)
-                        spot_date = d + " (Yahoo Spot)"
-                        break
-            except Exception:
-                pass
-            time.sleep(0.3)
-
-    # 3️⃣ Binance PAXG — احتياطي أخير (24/7 لكن قد يتتأخر)
+    # 2️⃣ XAUUSD=X — محاولة واحدة مباشرة بدون _fetch (بدون retries)
     if not gold_spot:
         try:
-            resp = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT",
-                                timeout=5)
-            if resp.status_code == 200:
-                p = float(resp.json()['price'])
+            import yfinance as _yf2
+            _gs = _yf2.Ticker("XAUUSD=X").history(period="1d", interval="5m")
+            if not _gs.empty:
+                p = round(float(_gs['Close'].iloc[-1]), 2)
                 if p > 1000:
-                    gold_spot = round(p, 2)
-                    spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " (Binance PAXG)"
+                    gold_spot = p
+                    spot_date = _gs.index[-1].strftime("%d/%m %H:%M") + " (Yahoo)"
         except Exception:
             pass
 

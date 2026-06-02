@@ -728,23 +728,49 @@ def get_full_market_data() -> dict | None:
     gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
-    # ── الفوري: Binance PAXG أولاً (24/7 حقيقي) ثم Yahoo كـ fallback ──
-    gold_spot  = None
-    spot_date  = None
+    # ── الفوري: مصادر متعددة بترتيب الدقة ──
+    gold_spot = None
+    spot_date = None
+
+    # 1️⃣ goldprice.org — عدل أسواق حقيقي بدون مفتاح
     try:
-        resp = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", timeout=5)
-        if resp.status_code == 200:
-            gold_spot = float(resp.json()['price'])
-            spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " (Binance)"
+        r = requests.get("https://data-asg.goldprice.org/dbXRates/USD",
+                         headers={'User-Agent': 'Mozilla/5.0'}, timeout=6)
+        if r.status_code == 200:
+            price = r.json()['items'][0].get('xauPrice')
+            if price and float(price) > 1000:
+                gold_spot = round(float(price), 2)
+                spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " (Goldprice.org)"
     except Exception:
         pass
 
+    # 2️⃣ XAUUSD=X من yfinance — بيانات فورية بدقيقتين
     if not gold_spot:
-        gold_spot_df = _fetch("XAUUSD=X", period="1d", interval="2m"); time.sleep(0.5)
-        gold_spot, spot_date = _last_with_date(gold_spot_df)
+        for _interval, _period in [("2m","1d"),("5m","5d"),("15m","5d"),("1h","5d")]:
+            try:
+                gs_df = _fetch("XAUUSD=X", period=_period, interval=_interval)
+                if gs_df is not None and not gs_df.empty:
+                    p, d = _last_with_date(gs_df)
+                    if p and p > 1000:
+                        gold_spot = round(p, 2)
+                        spot_date = d + " (Yahoo Spot)"
+                        break
+            except Exception:
+                pass
+            time.sleep(0.3)
+
+    # 3️⃣ Binance PAXG — احتياطي أخير (24/7 لكن قد يتتأخر)
     if not gold_spot:
-        gold_spot_df = _fetch("XAUUSD=X", period="5d", interval="1h"); time.sleep(0.5)
-        gold_spot, spot_date = _last_with_date(gold_spot_df)
+        try:
+            resp = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT",
+                                timeout=5)
+            if resp.status_code == 200:
+                p = float(resp.json()['price'])
+                if p > 1000:
+                    gold_spot = round(p, 2)
+                    spot_date = datetime.now(timezone.utc).strftime("%d/%m %H:%M") + " (Binance PAXG)"
+        except Exception:
+            pass
 
 
     if gold_daily is None or gold_daily.empty:
@@ -891,8 +917,10 @@ def get_full_market_data() -> dict | None:
         except Exception:
             pass
 
-    # ── [6] نسبة Put/Call لـ GLD Options ──
+    # ── [6] نسبة Put/Call ──
+    # أولاً: GLD options من yfinance (بقتو الأول)
     gld_pcr = None
+    pcr_source = None
     try:
         import yfinance as _yf
         gld_tk = _yf.Ticker("GLD")
@@ -901,9 +929,28 @@ def get_full_market_data() -> dict | None:
             chain     = gld_tk.option_chain(opts[0])
             tot_calls = chain.calls['openInterest'].sum()
             tot_puts  = chain.puts['openInterest'].sum()
-            gld_pcr   = round(tot_puts / tot_calls, 2) if tot_calls > 0 else None
+            if tot_calls > 0:
+                gld_pcr    = round(tot_puts / tot_calls, 2)
+                pcr_source = "GLD"
     except Exception:
-        gld_pcr = None
+        pass
+
+    # ثانياً: CBOE Equity PCR — بيانات رسمية 100% (متاح علناً)
+    if gld_pcr is None:
+        try:
+            cboe_url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/PCR-EQUITYVOL_Data.csv"
+            cr = requests.get(cboe_url, timeout=8, headers={'User-Agent': 'Mozilla/5.0'})
+            if cr.status_code == 200:
+                lines = cr.text.strip().split('\n')
+                # آخر سطر بيانات
+                last = [x.strip() for x in lines[-1].split(',')]
+                if len(last) >= 2:
+                    pcr_val = float(last[1])
+                    if 0.2 < pcr_val < 5.0:
+                        gld_pcr    = round(pcr_val, 2)
+                        pcr_source = "CBOE Equity"
+        except Exception:
+            pass
 
 
     # ── Pivot Points ──
@@ -968,7 +1015,7 @@ def get_full_market_data() -> dict | None:
         prev_mo_high=prev_mo_high, prev_mo_low=prev_mo_low,
         sd_demand=sd_demand, sd_supply=sd_supply,
         # [6] الأوبشن
-        gld_pcr=gld_pcr,
+        gld_pcr=gld_pcr, pcr_source=pcr_source,
         # [5] تأثير المؤشرات
         ind_rsi_i=ind_rsi_i, ind_macd_i=ind_macd_i, ind_ema_i=ind_ema_i,
         ind_adx_i=ind_adx_i, ind_obv_i=ind_obv_i, ind_cci_i=ind_cci_i, ind_bb_i=ind_bb_i,
@@ -1072,7 +1119,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 📡 الأسواق
    DXY:{d['dxy']:.1f}({d['dxy_bias']}) {'→🟢دعم ذهب' if d['dxy']<101 else '→🔴ضغط' if d['dxy']>104 else '→⚪محايد'} | 10Y:{d['tnx']:.2f}% | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | Spread:{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
    VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'}) {'→🟢خوف=طلب ملاذء' if d['vix'] and d['vix']>25 else '→🔴هدوء=تراجع ملاذء' if d['vix'] else ''} | 🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
-   🎯 GLD أوبشن P/C:{f"{d['gld_pcr']}" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
+   🎯 نسبة P/C:{f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
    {d['real_yield_signal']}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧮 المؤشرات

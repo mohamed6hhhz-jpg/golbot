@@ -3,6 +3,7 @@ import threading
 import sys
 import os
 import importlib
+import requests
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
@@ -22,6 +23,12 @@ start_telethon_bot = auto_copy_bot.start_telethon_bot
 @app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {"status": "ok", "message": "All bots are running smoothly! 🚀"}
+
+
+@app.api_route("/health", methods=["GET", "HEAD"])
+async def health():
+    """Lightweight health check — returns 200 instantly. Use this for UptimeRobot."""
+    return {"status": "ok"}
 
 
 @app.get("/test_gold")
@@ -104,6 +111,21 @@ async def startup_event():
     print("[Orchestrator] Auto_Sheets_Bot Telethon bot task created.")
 
     print("[Orchestrator] All background bots are running. FastAPI is ready to accept requests.")
+
+    # 4. Keep-alive self-ping to prevent HuggingFace from sleeping the Space
+    space_url = os.environ.get("SPACE_URL", "https://mohameddd52-my-all-bots.hf.space")
+    def _keep_alive():
+        import time as _time
+        while True:
+            _time.sleep(4 * 60)  # ping every 4 minutes
+            try:
+                requests.get(f"{space_url}/health", timeout=10)
+                print("[KeepAlive] ✅ ping ok")
+            except Exception as e:
+                print(f"[KeepAlive] ⚠️ ping failed: {e}")
+    ka_thread = threading.Thread(target=_keep_alive, daemon=True)
+    ka_thread.start()
+    print("[Orchestrator] Keep-alive thread started (ping every 4 min).")
 
 
 if __name__ == "__main__":

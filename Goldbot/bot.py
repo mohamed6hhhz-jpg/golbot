@@ -360,16 +360,15 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
             t1=round(s1,2), t2=round(s2,2), t3=round(pw_l,2),
             market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='sell')
 
-    # ── شهرية ──
+    # ── شهرية (وقف خسارة يعتمد على ATR وليس prev_mo_low الذي قد يكون أعلى من الدخول) ──
+    sl_m = round(atr * 1.5, 2)   # 1.5 × ATR كوقف خسارة للصفقة الشهرية
     if bias in ('bull', 'neutral'):
-        sl_m = round(s2 - (pm_l - 10), 2)
-        trades['monthly_buy']  = dict(entry=round(s2,2), sl=round(pm_l-10,2), risk=max(sl_m,20),
-            t1=round(r2,2), t2=round(pm_h*0.5+r2*0.5,2), t3=round(pm_h,2),
+        trades['monthly_buy']  = dict(entry=round(s2,2), sl=round(s2 - sl_m, 2), risk=sl_m,
+            t1=round(r2,2), t2=round((pm_h+r2)/2,2), t3=round(pm_h,2),
             market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='buy')
     if bias in ('bear', 'neutral'):
-        sl_m = round((pm_h + 10) - r2, 2)
-        trades['monthly_sell'] = dict(entry=round(r2,2), sl=round(pm_h+10,2), risk=max(sl_m,20),
-            t1=round(s2,2), t2=round(pm_l*0.5+s2*0.5,2), t3=round(pm_l,2),
+        trades['monthly_sell'] = dict(entry=round(r2,2), sl=round(r2 + sl_m, 2), risk=sl_m,
+            t1=round(s2,2), t2=round((pm_l+s2)/2,2), t3=round(pm_l,2),
             market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='sell')
 
     # ── سوينج ──

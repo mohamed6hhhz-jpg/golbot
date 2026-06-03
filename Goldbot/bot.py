@@ -1311,7 +1311,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 6. لا تكرر اي جملة او فكرة — كل جملة تضيف معلومة جديدة بالارقام
 7. اذكر مستويات سعرية محددة ($) في كل قسم — ممنوع الكلام العام بدون ارقام
 8. قاموس RSI: اقل من 30=تشبع بيع | 30-40=ضغط بيع | 40-50=محايد مع ميل هبوطي | 50-60=محايد مع ميل صعودي | 60-70=ضغط شراء | اكثر من 70=تشبع شراء
-9. الاحتمالية في الخلاصة يجب ان تكون نفس احتمالية السيناريو الرئيسي — ممنوع كتابة رقمين مختلفين: اذا السيناريو الرئيسي هبوط(55%) اكتب في الخلاصة 55% وليس 80%
+9. في الخلاصة لا تذكر الاحتمالية مرتين — اكتب الاحتمالية مرة واحدة فقط وتطابق السيناريو الرئيسي: اذا هبوط(55%) في السيناريوهات اكتب في الخلاصة "احتمالية هبوط 55%" فقط
 
 بيانات السوق:
 سعر الذهب = {gold:.2f}$ | RSI={d['rsi']} | ADX={d['adx']} | MACD={d['macd_hist']}
@@ -1393,14 +1393,31 @@ CHUNK_SIZE = 4090   # حد تيليجرام 4096 — نترك هامش 6 أحر�
 def _split_message(text: str) -> list:
     if len(text) <= CHUNK_SIZE:
         return [text]
-    chunks, current = [], ""
-    for line in text.split("\n"):
-        if len(current) + len(line) + 1 > CHUNK_SIZE:
-            if current: chunks.append(current.strip())
+
+    SEPARATOR = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    lines = text.split("\n")
+    chunks = []
+    current = ""
+
+    for i, line in enumerate(lines):
+        new_block = (current + "\n" + line) if current else line
+        if len(new_block) > CHUNK_SIZE:
+            # حاول تقسيم عند خط فاصل أقرب ممكن قبل الحد
+            if current:
+                chunks.append(current.strip())
             current = line
         else:
-            current = (current + "\n" + line) if current else line
-    if current: chunks.append(current.strip())
+            current = new_block
+
+        # لو السطر التالي فاصل والجزء الحالي فوق 70% من الحد → اقطع هنا
+        next_line = lines[i+1] if i+1 < len(lines) else ""
+        if (next_line.startswith(SEPARATOR) and
+                len(current) > CHUNK_SIZE * 0.70):
+            chunks.append(current.strip())
+            current = ""
+
+    if current:
+        chunks.append(current.strip())
     return chunks
 
 

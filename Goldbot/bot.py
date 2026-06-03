@@ -385,14 +385,14 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     # ── انعكاس (Counter-trend) — فقط عند توفر الشروط ──
     has_div  = '💡' in div or '⚠️' in div
     sl_rev   = round(atr * 0.28, 2)
-    if (has_div or rsi < 35) and bias != 'bull':
+    if (has_div or rsi < 38) and bias != 'bull':
         trades['rev_buy']  = dict(entry=round(gold,2), sl=round(gold-sl_rev,2), risk=sl_rev,
             t1=round(pivot,2), t2=round(r1,2), t3=round(r2,2),
-            market='فوري (Spot)', tf='1-4س', typ='انعكاس 🔄', dir='buy')
-    if (has_div or rsi > 65) and bias != 'bear':
+            market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
+    if (has_div or rsi > 62) and bias != 'bear':
         trades['rev_sell'] = dict(entry=round(gold,2), sl=round(gold+sl_rev,2), risk=sl_rev,
             t1=round(pivot,2), t2=round(s1,2), t3=round(s2,2),
-            market='فوري (Spot)', tf='1-4س', typ='انعكاس 🔄', dir='sell')
+            market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
     return trades
 
 
@@ -481,11 +481,40 @@ def get_tf_4frame_label(tf_15m, tf_1h, tf_4h, tf_1d) -> str:
 
 
 def tf_gold_impact(score: int) -> str:
-    if score >= 3:  return "↑↑ دعم صعودي قوي"
-    if score >= 1:  return "↑ دعم صعودي خفيف"
-    if score <= -3: return "↓↓ ضغط هبوطي قوي"
-    if score <= -1: return "↓ ضغط هبوطي خفيف"
-    return "↔ محايد"
+    if score >= 3:  return "↑↑ دعم صعودي قوي → الذهب مرشح للصعود"
+    if score >= 1:  return "↑ دعم صعودي خفيف → ميل إيجابي للذهب"
+    if score <= -3: return "↓↓ ضغط هبوطي قوي → الذهب مرشح للهبوط"
+    if score <= -1: return "↓ ضغط هبوطي خفيف → ميل سلبي للذهب"
+    return "↔ محايد — لا تأثير واضح على الذهب"
+
+
+def _rsi_gold_impact(rsi: float) -> str:
+    if rsi < 30:   return "🟢 تشبع بيع → الذهب مرشح لارتداد صعودًا"
+    elif rsi > 70: return "🔴 تشبع شراء → الذهب مرشح لتصحيح هبوطًا"
+    elif rsi < 45: return "🔴 ضغط هبوطي → الذهب تحت ضغط بائع"
+    elif rsi > 55: return "🟢 دعم صعودي → الذهب يجد زخماً للأعلى"
+    return "⚪ محايد → لا دعم ولا ضغط على الذهب"
+
+
+def _macd_gold_impact(macd_hist: float) -> str:
+    if macd_hist > 0.5:   return "🟢 زخم صعودي → يدفع الذهب للأعلى"
+    elif macd_hist < -0.5: return "🔴 زخم هبوطي → يضغط الذهب للأسفل"
+    return "⚪ زخم ضعيف → لا تأثير واضح على الذهب"
+
+
+def _obv_gold_impact(obv_trend: str) -> str:
+    if 'صعودي' in obv_trend: return "🟢 تراكم مؤسسي → المؤسسات تشتري الذهب"
+    elif 'هبوطي' in obv_trend: return "🔴 توزيع مؤسسي → المؤسسات تبيع الذهب"
+    return "⚪ OBV غير محدد"
+
+
+def _adx_gold_impact(adx: float, di_p: float, di_m: float) -> str:
+    if adx < 20:   return "⚪ ترند ضعيف → الذهب يتحرك بلا زخم حقيقي"
+    elif adx > 25:
+        if di_p > di_m: return "🟢 ترند قوي صعودي → قوة شرائية جدية على الذهب"
+        return "🔴 ترند قوي هبوطي → ضغط بيع جدي على الذهب"
+    return "⚪ ترند متوسط → اتجاه غير متأكد للذهب"
+
 
 
 # ══════════════════════════════════════════════
@@ -1200,11 +1229,13 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    🎯 نسبة P/C:{f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
    {d['real_yield_signal']}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧮 المؤشرات
-   RSI:{d['rsi']}({d['rsi_label'].split()[0]}){d['ind_rsi_i']} | StochK:{d['stoch_k']} | MACD:{d['macd_hist']}{d['ind_macd_i']}
-   BB:{d['bb_upper']}/{d['bb_mid']}/{d['bb_lower']}({d['bb_label'].split()[0]}){d['ind_bb_i']} | EMA:{d['ema_label']}{d['ind_ema_i']}
-   ADX:{d['adx']}({d['ind_adx_i']}) DI+{d['di_plus']}/DI-{d['di_minus']} | CCI:{d['cci']}{d['ind_cci_i']} | W%R:{d['williams_r']}
-   OBV:{d['obv_trend']}{d['ind_obv_i']} | حجم:{d['rel_vol_label'].split('—')[0].strip()} | ATR:{d['atr']}$
+🧮 المؤشرات وتأثيرها على الذهب
+   RSI:{d['rsi']}({d['rsi_label'].split()[0]}) | {_rsi_gold_impact(d['rsi'])}
+   MACD:{d['macd_hist']} | {_macd_gold_impact(d['macd_hist'])}
+   StochK:{d['stoch_k']} | BB:{d['bb_label'].split()[0]}{d['ind_bb_i']} | EMA:{d['ema_label']}{d['ind_ema_i']}
+   ADX:{d['adx']}(DI+{d['di_plus']}/DI-{d['di_minus']}) | {_adx_gold_impact(d['adx'],d['di_plus'],d['di_minus'])}
+   OBV:{d['obv_trend']} | {_obv_gold_impact(d['obv_trend'])}
+   CCI:{d['cci']}({d['cci_label'].split()[0]}) | W%R:{d['williams_r']} | ATR:{d['atr']}$
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔢 المستويات
    🟣 مقاومة نفسية:{rn['nearest_resistance']}$(+{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(-{rn['dist_to_support']}$)

@@ -978,7 +978,7 @@ def get_full_market_data() -> dict | None:
         )
         real_yield_brief = (
             f"{'🟢' if is_bullish else '🔴'} العائد الحقيقي {tip_dir} — "
-            f"{'بيئة موات للذهب' if is_bullish else ('ضغط قوي على الذهب' if ryv > 2.0 else 'ضغط معتدل على الذهب')}"
+            f"{'يدعم صعود الذهب' if is_bullish else ('يضغط الذهب للهبوط بقوة' if ryv > 2.0 else 'يضغط الذهب للهبوط')}"
         )
 
 

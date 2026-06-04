@@ -933,6 +933,7 @@ def get_full_market_data() -> dict | None:
     inflation_est     = 2.3   # تقدير التضخم السنوي (%)
     real_yield_val    = round(tnx - inflation_est, 2) if tnx else None
     real_yield_signal = "غير متاح"
+    real_yield_brief  = "⚪ العائد الحقيقي — بيانات غير متاحة"
     if tip_df is not None and not tip_df.empty and len(tip_df) >= 10:
         tip_closes = tip_df['Close'].values
         tip_trend  = tip_closes[-1] - np.mean(tip_closes[-10:])
@@ -974,6 +975,10 @@ def get_full_market_data() -> dict | None:
             f"   💡 ماذا يعني ذلك؟ {trend_text}\n"
             f"   📌 القاعدة التاريخية: عائد حقيقي سالب = ذهب يصعد دائماً تقريباً (2008، 2020)\n"
             f"   🎯 الحكم الآن: {gold_signal} {'← الذهب الملاذ الأفضل حالياً' if is_bullish else '← السندات تنافس الذهب'}"
+        )
+        real_yield_brief = (
+            f"{'🟢' if is_bullish else '🔴'} العائد الحقيقي {tip_dir} — "
+            f"{'بيئة موات للذهب' if is_bullish else ('ضغط قوي على الذهب' if ryv > 2.0 else 'ضغط معتدل على الذهب')}"
         )
 
 
@@ -1113,6 +1118,7 @@ def get_full_market_data() -> dict | None:
         pivot=pivot, r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
         round_numbers=round_numbers, hist_ctx=hist_ctx,
         real_yield_signal=real_yield_signal,
+        real_yield_brief=real_yield_brief,
         tf_weekly=tf_weekly, tf_daily=tf_daily, tf_hourly=tf_hourly,
         tf_4h=tf_4h, tf_15m=tf_15m, tf_label=tf_label,
         gs_ratio=gs_ratio, dxy_bias=dxy_bias, bond_bias=bond_bias,
@@ -1227,7 +1233,8 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    DXY:{d['dxy']:.1f}({d['dxy_bias']}) {'→🟢دعم ذهب' if d['dxy']<101 else '→🔴ضغط' if d['dxy']>104 else '→⚪محايد'} | 10Y:{d['tnx']:.2f}% | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | Spread:{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
    VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'}) {'→🟢خوف=طلب ملاذء' if d['vix'] and d['vix']>25 else '→🔴هدوء=تراجع ملاذء' if d['vix'] else ''} | 🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
    🎯 نسبة P/C:{f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
-   {d['real_yield_signal']}
+   {d['real_yield_brief']}
+{d['real_yield_signal']}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧮 المؤشرات وتأثيرها على الذهب
    RSI:{d['rsi']}({d['rsi_label'].split()[0]}) | {_rsi_gold_impact(d['rsi'])}

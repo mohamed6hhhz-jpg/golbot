@@ -600,12 +600,12 @@ def calc_divergence(df) -> str:
     r1_hi, r2_hi = np.max(rsi_vals[:mid]), np.max(rsi_vals[mid:])
     r1_lo, r2_lo = np.min(rsi_vals[:mid]), np.min(rsi_vals[mid:])
     # تباين هبوطي: سعر قمة أعلى + RSI قمة أدنى
-    if p2_hi > p1_hi * 1.001 and r2_hi < r1_hi * 0.985:
+    if p2_hi > p1_hi and r2_hi < r1_hi * 0.99:
         return "⚠️ تباين هبوطي — السعر يصنع قمة أعلى وRSI أدنى ⚠️"
     # تباين صعودي: سعر قاع أدنى + RSI قاع أعلى
-    if p2_lo < p1_lo * 0.999 and r2_lo > r1_lo * 1.015:
+    if p2_lo < p1_lo and r2_lo > r1_lo * 1.01:
         return "💡 تباين صعودي — السعر يصنع قاعاً أدنى وRSI أعلى 💡"
-    return "⚪ لا يوجد تباين واضح"
+    return "⚪ لا يوجد تباين في الوقت الحالي"
 
 
 def calc_trade_confidence(d: dict, t: dict) -> tuple[str, str]:
@@ -1017,17 +1017,29 @@ def get_full_market_data() -> dict | None:
     sd_demand = sd_supply = None
     if gold_daily is not None and len(gold_daily) >= 20:
         try:
-            recent   = gold_daily.tail(20).copy()
+            lookback = min(60, len(gold_daily))
+            recent   = gold_daily.tail(lookback).copy()
             avg_vol  = recent['Volume'].mean()
-            hv_bars  = recent[recent['Volume'] > avg_vol * 1.5]
+            hv_bars  = recent[recent['Volume'] > avg_vol * 1.2]
             demand_bars = hv_bars[hv_bars['Close'] > hv_bars['Open']]
             supply_bars = hv_bars[hv_bars['Close'] < hv_bars['Open']]
             if not demand_bars.empty:
                 sd_demand = round(float(demand_bars['Low'].iloc[-1]), 2)
             if not supply_bars.empty:
                 sd_supply = round(float(supply_bars['High'].iloc[-1]), 2)
+            # Fallback عرض: أعلى high للشمعات الهبوطية في آخر 20 شمعة
+            if sd_supply is None:
+                bearish = recent[recent['Close'] < recent['Open']].tail(20)
+                if not bearish.empty:
+                    sd_supply = round(float(bearish['High'].max()), 2)
+            # Fallback طلب: أدنى low للشمعات الصعودية في آخر 20 شمعة
+            if sd_demand is None:
+                bullish = recent[recent['Close'] > recent['Open']].tail(20)
+                if not bullish.empty:
+                    sd_demand = round(float(bullish['Low'].min()), 2)
         except Exception:
             pass
+
 
     # ── [6] نسبة Put/Call ──
     # أولاً: GLD options من yfinance (بقتو الأول)

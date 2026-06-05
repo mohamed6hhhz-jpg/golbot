@@ -867,9 +867,10 @@ def get_full_market_data() -> dict | None:
     gold_15m  = _fetch("GC=F",     period="5d",  interval="15m"); time.sleep(0.5)
 
     gold_futures, futures_date = _last_with_date(gold_daily)
+    # لو كل مصادر الفوري فشلت — اعرض غير متاح (لا نستبدل بالآجل عشان يكونوا مختلفين دائماً)
     if not gold_spot:
-        gold_spot  = gold_futures
-        spot_date  = futures_date + " (آجل)"
+        gold_spot = None
+        spot_date = None
     silver = _last_close(silver_df)
     oil    = _last_close(oil_df)
     dxy    = _last_close(dxy_df)
@@ -929,9 +930,42 @@ def get_full_market_data() -> dict | None:
     hist_ctx                   = get_historical_context(gold_daily)
     round_numbers              = get_round_numbers(gold, step=50)
 
-    # ── [7] العائد الحقيقي — تحليل معمّق (الأهم عند العميل) ──
-    inflation_est     = 2.3   # تقدير التضخم السنوي (%)
-    real_yield_val    = round(tnx - inflation_est, 2) if tnx else None
+    # ── [7] العائد الحقيقي — جلب التضخم الحي من FRED ──
+    inflation_live = None
+    # محاولة 1: T10YIE = معدل التعادل للتضخم لمدة 10 سنوات (مباشر من السوق)
+    try:
+        _fred_url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=T10YIE"
+        _fr = requests.get(_fred_url, timeout=8, headers={'User-Agent': 'Mozilla/5.0'})
+        if _fr.status_code == 200:
+            _lines = _fr.text.strip().split('\n')
+            for _line in reversed(_lines[1:]):
+                _parts = _line.split(',')
+                if len(_parts) == 2 and _parts[1].strip() not in ('.', '', 'NA'):
+                    try:
+                        inflation_live = round(float(_parts[1].strip()), 2)
+                        break
+                    except Exception:
+                        continue
+    except Exception:
+        pass
+    # محاولة 2: CPI YoY من FRED (CPIAUCSL)
+    if inflation_live is None:
+        try:
+            _cpi_url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=CPIAUCSL"
+            _cr = requests.get(_cpi_url, timeout=8, headers={'User-Agent': 'Mozilla/5.0'})
+            if _cr.status_code == 200:
+                _cpi_data = []
+                for _line in _cr.text.strip().split('\n')[1:]:
+                    _p = _line.split(',')
+                    if len(_p) == 2 and _p[1].strip() not in ('.', '', 'NA'):
+                        try: _cpi_data.append(float(_p[1].strip()))
+                        except Exception: pass
+                if len(_cpi_data) >= 13:
+                    inflation_live = round((_cpi_data[-1] - _cpi_data[-13]) / _cpi_data[-13] * 100, 2)
+        except Exception:
+            pass
+    inflation_est  = inflation_live if inflation_live else 2.3
+    real_yield_val = round(tnx - inflation_est, 2) if tnx else None
     real_yield_signal = "غير متاح"
     real_yield_brief  = "⚪ العائد الحقيقي — بيانات غير متاحة"
     if tip_df is not None and not tip_df.empty and len(tip_df) >= 10:
@@ -1027,16 +1061,12 @@ def get_full_market_data() -> dict | None:
                 sd_demand = round(float(demand_bars['Low'].iloc[-1]), 2)
             if not supply_bars.empty:
                 sd_supply = round(float(supply_bars['High'].iloc[-1]), 2)
-            # Fallback عرض: أعلى high للشمعات الهبوطية في آخر 20 شمعة
-            if sd_supply is None:
-                bearish = recent[recent['Close'] < recent['Open']].tail(20)
-                if not bearish.empty:
-                    sd_supply = round(float(bearish['High'].max()), 2)
-            # Fallback طلب: أدنى low للشمعات الصعودية في آخر 20 شمعة
+            # Fallback طلب فقط: أدنى low للشمعات الصعودية في آخر 20 شمعة
             if sd_demand is None:
                 bullish = recent[recent['Close'] > recent['Open']].tail(20)
                 if not bullish.empty:
                     sd_demand = round(float(bullish['Low'].min()), 2)
+            # العرض: لو مفيش بيانات كافية نبقى صادقين ونخلي None (مش نعطي رقم مضلل)
         except Exception:
             pass
 

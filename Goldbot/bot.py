@@ -931,13 +931,31 @@ def get_full_market_data() -> dict | None:
     hist_ctx                   = get_historical_context(gold_daily)
     round_numbers              = get_round_numbers(gold, step=50)
 
-    # ── [7] العائد الحقيقي — جلب من DFII10 (TIPS 10Y) عبر yfinance ──
-    dfii10     = _last_close(dfii10_df)   # العائد الحقيقي للسندات المحمية من التضخم
+    # ── [7] العائد الحقيقي — جلب التضخم الحي من BLS (مكتب إحصاء العمل الأمريكي) ──
     inflation_live = None
-    if dfii10 and tnx:
-        # تضخم التعادل (Breakeven) = عائد اسمي − عائد TIPS
-        inflation_live = round(tnx - dfii10, 2)
-    # Fallback 1: FRED T10YIE
+    # محاولة 1: BLS API — CPI-U All Items (لا يحتاج API key)
+    try:
+        import json as _json
+        _bls_url     = "https://api.bls.gov/publicAPI/v1/timeseries/data/"
+        _bls_payload = _json.dumps({"seriesid": ["CUUR0000SA0"], "startyear": "2024", "endyear": "2025"})
+        _bls_r       = requests.post(_bls_url, data=_bls_payload,
+                                     headers={'Content-Type': 'application/json',
+                                              'User-Agent': 'Mozilla/5.0'},
+                                     timeout=9)
+        if _bls_r.status_code == 200:
+            _bls_series = _bls_r.json().get('Results', {}).get('series', [])
+            if _bls_series:
+                _bls_data = sorted(
+                    _bls_series[0].get('data', []),
+                    key=lambda x: (x.get('year', ''), x.get('period', ''))
+                )
+                if len(_bls_data) >= 13:
+                    _latest   = float(_bls_data[-1]['value'])
+                    _year_ago = float(_bls_data[-13]['value'])
+                    inflation_live = round((_latest - _year_ago) / _year_ago * 100, 2)
+    except Exception:
+        pass
+    # محاولة 2: FRED T10YIE (breakeven inflation من سوق السندات)
     if inflation_live is None:
         try:
             _fred_url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=T10YIE"

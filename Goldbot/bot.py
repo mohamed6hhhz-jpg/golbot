@@ -1059,18 +1059,23 @@ def get_full_market_data() -> dict | None:
             recent   = gold_daily.tail(lookback).copy()
             avg_vol  = recent['Volume'].mean()
             hv_bars  = recent[recent['Volume'] > avg_vol * 1.2]
-            demand_bars = hv_bars[hv_bars['Close'] > hv_bars['Open']]
-            supply_bars = hv_bars[hv_bars['Close'] < hv_bars['Open']]
+            
+            # الطلب: الشموع الصعودية ذات الحجم العالي، والتي يكون قاعها (Low) تحت السعر الحالي
+            demand_bars = hv_bars[(hv_bars['Close'] > hv_bars['Open']) & (hv_bars['Low'] < gold)]
+            # العرض: الشموع الهبوطية ذات الحجم العالي، والتي يكون افتتاحها (Open) فوق السعر الحالي
+            supply_bars = hv_bars[(hv_bars['Close'] < hv_bars['Open']) & (hv_bars['Open'] > gold)]
+            
             if not demand_bars.empty:
                 sd_demand = round(float(demand_bars['Low'].iloc[-1]), 2)
             if not supply_bars.empty:
-                sd_supply = round(float(supply_bars['High'].iloc[-1]), 2)
-            # Fallback طلب فقط: أدنى low للشمعات الصعودية في آخر 20 شمعة
+                # العميل اشتكى إن العرض عالي جداً، فبدل ما ناخد الـ High (ذيل الشمعة) هناخد الـ Open (بداية الجسم الهبوطي القوي)
+                sd_supply = round(float(supply_bars['Open'].iloc[-1]), 2)
+                
+            # Fallback للطلب لو مفيش (لأن العميل قال الطلب تمام)
             if sd_demand is None:
-                bullish = recent[recent['Close'] > recent['Open']].tail(20)
+                bullish = recent[(recent['Close'] > recent['Open']) & (recent['Low'] < gold)].tail(20)
                 if not bullish.empty:
                     sd_demand = round(float(bullish['Low'].min()), 2)
-            # العرض: لو مفيش بيانات كافية نبقى صادقين ونخلي None (مش نعطي رقم مضلل)
         except Exception:
             pass
 

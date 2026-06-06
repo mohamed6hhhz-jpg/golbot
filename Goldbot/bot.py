@@ -1575,6 +1575,7 @@ def run_bot():
     all_models_notified  = False
     last_report_date     = None
     consec_failures      = 0
+    market_closed_notified = False   # يُبعت إشعار الإغلاق مرة واحدة فقط
     day_names = ["اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت","أحد"]
 
     while True:
@@ -1590,10 +1591,51 @@ def run_bot():
             all_models_notified  = False
 
         if not is_market_open():
+            # — إرسال إشعار "سوق مغلق" مرة واحدة فقط لكل فترة إغلاق —
+            if not market_closed_notified:
+                now_c    = cairo_now()
+                wday     = now_c.weekday()
+                hr       = now_c.hour
+
+                # تحديد السبب
+                if wday == 5:                               # السبت
+                    reason   = "عطلة نهاية الأسبوع (السبت)"
+                    reopen   = "الاثنين 01:00 بتوقيت القاهرة"
+                    details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
+                elif wday == 6:                             # الأحد
+                    reason   = "عطلة نهاية الأسبوع (الأحد)"
+                    reopen   = "الاثنين 01:00 بتوقيت القاهرة"
+                    details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
+                elif wday == 0 and hr < MARKET_OPEN_HOUR:  # الاثنين قبل الفتح
+                    reason   = "ما زلنا في ساعات الإغلاق (الاثنين قبل الفتح)"
+                    reopen   = f"الاثنين {MARKET_OPEN_HOUR:02d}:00 بتوقيت القاهرة"
+                    details  = "أسواق الذهب تبدأ جلستها الأسبوعية يوم الاثنين فجراً."
+                else:
+                    reason   = "السوق خارج ساعات التداول"
+                    reopen   = "قريباً"
+                    details  = "تُتداول أسواق الذهب من الاثنين حتى الجمعة."
+
+                closed_msg = (
+                    f"🛌 سوق الذهب مغلق حالياً\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📅 السبب: {reason}\n"
+                    f"📖 التفاصيل: {details}\n"
+                    f"⏰ موعد الفتح: {reopen}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🕐 {now_c.strftime('%Y-%m-%d %H:%M')} بتوقيت القاهرة\n"
+                    f"✅ البوت يعمل وسيُرسل التقرير فور فتح السوق."
+                )
+                send_to_telegram(closed_msg)
+                market_closed_notified = True
+                log.info("📢 تم إرسال إشعار إغلاق السوق للقناة.")
+
             log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
             last_gold_price = None
             time.sleep(30 * 60)
             continue
+
+        # السوق مفتوح — نعيد تهيئة الفلاج عشان الإغلاق الجاي يبعت إشعار تاني
+        market_closed_notified = False
 
         data = get_full_market_data()
 

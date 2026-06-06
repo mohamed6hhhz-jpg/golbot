@@ -838,6 +838,7 @@ def get_full_market_data() -> dict | None:
     oil_df     = _fetch("CL=F",     period="60d"); time.sleep(0.6)
     dxy_df     = _fetch("DX-Y.NYB", period="60d"); time.sleep(0.6)
     tnx_df     = _fetch("^TNX",     period="60d"); time.sleep(0.6)
+    tty_df     = _fetch("^TYX",     period="60d"); time.sleep(0.6)  # 30Y Treasury Yield
     dfii10_df  = _fetch("^DFII10",  period="60d"); time.sleep(0.6)  # TIPS 10Y Real Yield
     tip_df    = _fetch("TIP",      period="60d"); time.sleep(0.6)
     vix_df    = _fetch("^VIX",     period="60d"); time.sleep(0.6)
@@ -876,6 +877,7 @@ def get_full_market_data() -> dict | None:
     oil    = _last_close(oil_df)
     dxy    = _last_close(dxy_df)
     tnx    = _last_close(tnx_df)
+    tty    = _last_close(tty_df)   # 30Y Treasury Yield
     # twy حُسب مسبقاً من Treasury API أو ^IRX
 
     vix    = _last_close(vix_df)
@@ -1002,9 +1004,13 @@ def get_full_market_data() -> dict | None:
         gold_signal = "🟢 صعودي للذهب" if is_bullish else "🔴 هبوطي للذهب"
         arrow = "←" if is_bullish else "←"
 
+        # منحنى عوائد كامل: 2Y → 10Y → 30Y
+        _twy_str = f"{twy:.2f}%" if twy else "—"
+        _tty_str = f"{tty:.2f}%" if tty else "—"
         real_yield_signal = (
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📐 تحليل العائد الحقيقي (أهم مؤشر للذهب)\n"
+            f"   📈 منحنى العوائد: 2سنة:{_twy_str} | 10سنوات:{tnx:.2f}% | 30سنة:{_tty_str}\n"
             f"   🔢 الحساب: عائد اسمي(10Y) {tnx:.2f}% − تضخم {inflation_est}% = عائد حقيقي {ryv:+.2f}%\n"
             f"   📊 المستوى: {ry_level}\n"
             f"   📖 ما هو؟ هو العائد الفعلي الذي يكسبه المستثمر من السندات بعد خصم التضخم\n"
@@ -1154,7 +1160,7 @@ def get_full_market_data() -> dict | None:
         gold=gold, gold_futures=gold_futures, gold_spot=gold_spot,
         futures_date=futures_date, spot_date=spot_date,
         contango=contango,
-        silver=silver, oil=oil, dxy=dxy, tnx=tnx, twy=twy, vix=vix, sp500=sp500,
+        silver=silver, oil=oil, dxy=dxy, tnx=tnx, twy=twy, tty=tty, vix=vix, sp500=sp500,
         yield_curve=yield_curve, yield_curve_label=yield_curve_label,
         rsi=rsi, rsi_label=rsi_label, stoch_k=stoch_k, stoch_d=stoch_d,
         macd=macd, macd_sig=macd_sig, macd_hist=macd_hist, macd_label=macd_label,
@@ -1281,7 +1287,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 📈 حركة السعر: {hist_line}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📡 الأسواق
-   DXY:{d['dxy']:.1f}({d['dxy_bias']}) {'→🟢دعم ذهب' if d['dxy']<101 else '→🔴ضغط' if d['dxy']>104 else '→⚪محايد'} | 10Y:{d['tnx']:.2f}% | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | Spread:{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
+   DXY:{d['dxy']:.1f}({d['dxy_bias']}) {'→🟢دعم ذهب' if d['dxy']<101 else '→🔴ضغط' if d['dxy']>104 else '→⚪محايد'} | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | 10Y:{d['tnx']:.2f}% | 30Y:{f"{d['tty']:.2f}%" if d['tty'] else '—'} | Spread(10Y-2Y):{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
    VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'}) {'→🟢خوف=طلب ملاذء' if d['vix'] and d['vix']>25 else '→🔴هدوء=تراجع ملاذء' if d['vix'] else ''} | 🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
    🎯 نسبة P/C:{f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
    {d['real_yield_brief']}

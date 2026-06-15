@@ -1386,10 +1386,14 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
         lines = []
         for i, t in enumerate(trades):
             pct, lbl, reason = calc_trade_confidence(d, t)
-            threshold = 65 if "محافظ" in t['style'] else 70 if "معتدل" in t['style'] else 75
-            entry_rule = (f"✅ يمكن الدخول — الثقة فوق {threshold}%"
-                          if pct >= threshold else
-                          f"⛔ لا تدخل — الثقة {pct}% أقل من {threshold}% المطلوبة")
+            if pct >= 75:
+                entry_rule = f"✅ ادخل بثقة — (فرصة قوية مدعومة بالترند والسيولة)"
+            elif pct >= 60:
+                entry_rule = f"⚠️ دخول بحذر (نصف عقد) — (مخاطرة متوسطة، يُفضل الانتظار لتأكيد الاتجاه)"
+            elif pct >= 45:
+                entry_rule = f"⛔ لا تدخل — (السوق متضارب والعائد لا يبرر المخاطرة الحالية)"
+            else:
+                entry_rule = f"❌ تجاهل الصفقة — (خطر عالي جداً وعكس تيار السوق)"
             lines.append(
                 f"\n   ─────────────────────────\n"
                 f"   {nums[i]} {t['dir']}  ·  {t['style']}\n"

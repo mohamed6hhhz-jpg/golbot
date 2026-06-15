@@ -748,36 +748,27 @@ def calc_all_entries(d: dict, bias: str) -> dict:
     s3, r3 = d['s3'], d['r3']
     rn     = d['round_numbers']
 
-    # ── مستويات مُصفّاة: مضمون أن المقاومة فوق السعر والدعم تحته ──
-    def _valid_res(levels):
-        """أقرب مستوى مقاومة صحيح فوق السعر الحالي"""
-        v = sorted([x for x in levels if x and x > gold])
-        return v[0] if v else round(gold + 50, 2)
+    # ── مستويات مُصفّاة: مضمون أن المقاومة فوق السعر والدعم تحته ولا تتكرر ──
+    def _valid_res(levels, exclude=None):
+        exclude = exclude or []
+        v = sorted([x for x in levels if x and x > gold and x not in exclude and all(abs(x - e) > 8 for e in exclude)])
+        return v[0] if v else round((exclude[-1] if exclude else gold) + 40, 2)
 
-    def _valid_res2(levels, first):
-        """ثاني مستوى مقاومة فوق السعر (مختلف عن الأول)"""
-        v = sorted([x for x in levels if x and x > gold and abs(x - first) > 8])
-        return v[0] if v else round(first + 40, 2)
-
-    def _valid_sup(levels):
-        """أقرب مستوى دعم صحيح تحت السعر الحالي"""
-        v = sorted([x for x in levels if x and x < gold], reverse=True)
-        return v[0] if v else round(gold - 50, 2)
-
-    def _valid_sup2(levels, first):
-        """ثاني مستوى دعم تحت السعر (مختلف عن الأول)"""
-        v = sorted([x for x in levels if x and x < gold and abs(x - first) > 8], reverse=True)
-        return v[0] if v else round(first - 40, 2)
+    def _valid_sup(levels, exclude=None):
+        exclude = exclude or []
+        v = sorted([x for x in levels if x and x < gold and x not in exclude and all(abs(x - e) > 8 for e in exclude)], reverse=True)
+        return v[0] if v else round((exclude[-1] if exclude else gold) - 40, 2)
 
     all_res = [r1, r2, r3, rn['nearest_resistance']]
     all_sup = [s1, s2, s3, rn['nearest_support']]
 
-    r_near = _valid_res(all_res)                    # أقرب مقاومة فوق السعر
-    r_far  = _valid_res2(all_res, r_near)           # ثاني مقاومة
-    r_far2 = _valid_res2(all_res + [r_far + 30], r_far)  # ثالث مقاومة
-    s_near = _valid_sup(all_sup)                    # أقرب دعم تحت السعر
-    s_far  = _valid_sup2(all_sup, s_near)           # ثاني دعم
-    s_far2 = _valid_sup2(all_sup + [s_far - 30], s_far)  # ثالث دعم
+    r_near = _valid_res(all_res)
+    r_far  = _valid_res(all_res, exclude=[r_near])
+    r_far2 = _valid_res(all_res + [r_far + 30], exclude=[r_near, r_far])
+    
+    s_near = _valid_sup(all_sup)
+    s_far  = _valid_sup(all_sup, exclude=[s_near])
+    s_far2 = _valid_sup(all_sup + [s_far - 30], exclude=[s_near, s_far])
 
     MIN_GAP = 8.0
 
@@ -1074,7 +1065,8 @@ def get_full_market_data() -> dict | None:
     divergence                 = calc_divergence(gold_daily)
     swing_high, swing_low      = find_swing_levels(gold_daily, lookback=20)
     hist_ctx                   = get_historical_context(gold_daily)
-    round_numbers              = get_round_numbers(gold, step=50)
+    # استخدام السعر الفوري (أو الآجل كبديل) كمرجع للمستويات النفسية
+    round_numbers              = get_round_numbers(gold_spot if gold_spot else gold, step=50)
 
     # ── [7] العائد الحقيقي — جلب التضخم الحي من BLS (مكتب إحصاء العمل الأمريكي) ──
     inflation_live = None

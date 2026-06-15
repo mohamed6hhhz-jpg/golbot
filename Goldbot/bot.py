@@ -608,55 +608,87 @@ def calc_divergence(df) -> str:
     return "⚪ لا يوجد تباين في الوقت الحالي"
 
 
-def calc_trade_confidence(d: dict, t: dict) -> tuple[str, str]:
-    """درجة ثقة الصفقة 1-5 نجوم لكل صفقة منفصلة مع سبب التقييم"""
-    score = 0
-    reasons = []
-    is_buy = t['is_buy']
-    gold = d['gold']
-    
-    # 1. التوافق مع الترند العام
+def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
+    """
+    ثقة الصفقة 0-100% بناءً على 6 معايير احترافية مرجحة.
+    يعيد: (pct: int, label: str, reason: str)
+    """
+    score     = 0
+    max_score = 100
+    reasons   = []
+    is_buy    = t['is_buy']
+    gold      = d['gold']
+
+    # ── 1. التوافق مع الترند العام (25 نقطة) ──
     trend_bias = d['confluence']['bias']
     if (is_buy and trend_bias == 'bull') or (not is_buy and trend_bias == 'bear'):
-        score += 1
+        score += 25
         reasons.append("مع الترند")
+    elif trend_bias == 'neutral':
+        score += 10
+        reasons.append("سوق متذبذب")
     else:
-        reasons.append("عكس الترند")
+        reasons.append("عكس الترند ⚠️")
 
-    # 2. العائد للمخاطرة (R:R) للهدف الأول
-    if t['rr1'] >= 2.5:
-        score += 1
-        reasons.append(f"عائد ضخم ({t['rr1']}x)")
-    elif t['rr1'] >= 1.5:
-        reasons.append(f"عائد جيد ({t['rr1']}x)")
+    # ── 2. العائد للمخاطرة R:R للهدف الأول (20 نقطة) ──
+    rr = t['rr1']
+    if rr >= 3.0:
+        score += 20; reasons.append(f"عائد ممتاز {rr}x")
+    elif rr >= 2.0:
+        score += 15; reasons.append(f"عائد قوي {rr}x")
+    elif rr >= 1.5:
+        score += 8;  reasons.append(f"عائد معقول {rr}x")
     else:
-        reasons.append("عائد ضعيف")
+        reasons.append(f"عائد ضعيف {rr}x ❌")
 
-    # 3. نوع الصفقة (محافظ / عدواني)
+    # ── 3. نوع الصفقة — محافظ/معتدل/عدواني (15 نقطة) ──
     if "محافظ" in t['style']:
-        score += 2
-        reasons.append("مستوى آمن")
+        score += 15; reasons.append("مستوى آمن")
     elif "معتدل" in t['style']:
-        score += 1
-        reasons.append("مستوى متوسط")
+        score += 9;  reasons.append("مستوى متوسط")
     else:
-        reasons.append("دخول خطر")
+        score += 3;  reasons.append("دخول خطر ❌")
 
-    # 4. البعد عن السعر الحالي (تجنب الضوضاء)
-    dist = abs(t['entry'] - gold)
-    atr = d.get('atr', 10)
-    if dist >= atr * 0.4:
-        score += 1
-        reasons.append("نقطة دخول ممتازة")
+    # ── 4. توافق متعدد الإطارات (20 نقطة) ──
+    tf_scores = [
+        d['tf_daily'].get('score', 0),
+        d['tf_hourly'].get('score', 0),
+        d['tf_4h'].get('score', 0),
+    ]
+    bull_tfs = sum(1 for s in tf_scores if s > 0)
+    bear_tfs = sum(1 for s in tf_scores if s < 0)
+    if (is_buy and bull_tfs >= 3) or (not is_buy and bear_tfs >= 3):
+        score += 20; reasons.append("توافق 3/3 إطارات")
+    elif (is_buy and bull_tfs == 2) or (not is_buy and bear_tfs == 2):
+        score += 13; reasons.append("توافق 2/3 إطارات")
+    elif (is_buy and bull_tfs == 1) or (not is_buy and bear_tfs == 1):
+        score += 5
 
-    # تقييد النجوم بين 1 و 5
-    score = max(1, min(5, score))
-    stars  = "⭐" * score + "☆" * (5 - score)
-    
-    # تنسيق السبب النهائي بشكل مختصر وجميل
-    final_reason = "، ".join(reasons[:3]) # نكتفي بأهم 3 أسباب حتى لا يطول السطر
-    labels = {5:'ممتازة',4:'قوية',3:'جيدة',2:'ضعيفة',1:'خطرة'}
-    return f"{stars} {labels.get(score,'')}", final_reason
+    # ── 5. موقع RSI (10 نقطة) ──
+    rsi = float(d['rsi'])
+    if is_buy and rsi < 32:
+        score += 10; reasons.append("RSI تشبع بيع")
+    elif is_buy and rsi < 45:
+        score += 5
+    elif not is_buy and rsi > 68:
+        score += 10; reasons.append("RSI تشبع شراء")
+    elif not is_buy and rsi > 55:
+        score += 5
+
+    # ── 6. اتجاه MACD (10 نقطة) ──
+    macd = float(d['macd_hist'])
+    if (is_buy and macd > 0) or (not is_buy and macd < 0):
+        score += 10; reasons.append("MACD مؤيد")
+    elif abs(macd) < 2:
+        score += 4
+
+    pct   = max(15, min(95, round(score)))
+    label = ("🟢 ممتازة" if pct >= 80 else
+             "🟡 قوية"   if pct >= 65 else
+             "🟠 مقبولة" if pct >= 50 else
+             "🔴 ضعيفة")
+    reason_str = "، ".join(reasons[:3])
+    return pct, label, reason_str
 
 
 def calc_all_entries(d: dict, bias: str) -> dict:
@@ -745,6 +777,37 @@ def calc_all_entries(d: dict, bias: str) -> dict:
         "momentum":  calc_momentum_signal(d),
         "trend":     calc_trend_signal(d),
         "liquidity": calc_liquidity_signal(d),
+    }
+
+
+# ══════════════════════════════════════════════
+#  5.5 توقعات الإغلاق / القمة / القاع — متعدد الإطارات
+# ══════════════════════════════════════════════
+def _calc_price_forecasts(gold: float, atr: float, bias: str, tf_data: dict) -> dict:
+    """
+    توقع الإغلاق والقمة والقاع باستخدام ATR × جذر(n) مع تعديل الاتجاه.
+    الإطارات: 1h, 4h, 1d, 1w, 1mo
+    """
+    # معامل الاتجاه: صعودي +1 / هبوطي -1 / محايد 0
+    dir_factor = 1.0 if bias == "bull" else -1.0 if bias == "bear" else 0.0
+
+    # ATR اليومي = المدخل. نشتق منه مضاعفات ATR لكل إطار.
+    # القاعدة: ATR(n_bars) ≈ ATR_daily × sqrt(n/bars_per_day)
+    # بافتراض 24 شمعة في اليوم للساعي
+    def _fc(n_hours: float):
+        """يحسب التوقع لعدد ساعات معيّن من الآن"""
+        scaled_atr = atr * (n_hours / 24.0) ** 0.5   # ATR مُعدَّل للإطار
+        center     = round(gold + dir_factor * scaled_atr * 0.25, 2)
+        high       = round(center + scaled_atr * 0.55, 2)
+        low        = round(center - scaled_atr * 0.55, 2)
+        return {"close": center, "high": high, "low": low}
+
+    return {
+        "1h"  : _fc(1),
+        "4h"  : _fc(4),
+        "1d"  : _fc(24),
+        "1w"  : _fc(24 * 5),    # أسبوع تداول = 5 أيام
+        "1mo" : _fc(24 * 22),   # شهر تداول ≈ 22 يوم
     }
 
 
@@ -1195,6 +1258,7 @@ def get_full_market_data() -> dict | None:
     d['entries']         = calc_all_entries(d, d['confluence']['bias'])
     d['adv_trades']      = calc_advanced_trades(d, d['confluence']['bias'])
     d['price_pred']      = calc_price_prediction(d['gold'], d['atr'], d['tf_15m'], d['tf_hourly'])
+    d['tf_forecasts']    = _calc_price_forecasts(d['gold'], d['atr'], d['confluence']['bias'], d)
     return d
 
 
@@ -1238,14 +1302,27 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
                     "neutral":"⚡ صفقات الاختراق (سوق متذبذب)"}.get(ent['bias'],"🎯 الصفقات")
 
     def fmt_block(trades):
-        lines=[]
-        for i,t in enumerate(trades):
-            conf_str, reason = calc_trade_confidence(d, t)
+        lines = []
+        for i, t in enumerate(trades):
+            pct, lbl, reason = calc_trade_confidence(d, t)
+            threshold = 65 if "محافظ" in t['style'] else 70 if "معتدل" in t['style'] else 75
+            entry_rule = (f"✅ يمكن الدخول — الثقة فوق {threshold}%"
+                          if pct >= threshold else
+                          f"⛔ لا تدخل — الثقة {pct}% أقل من {threshold}% المطلوبة")
             lines.append(
-                f"   {nums[i]} [{t['style']}] {t['market']} | {conf_str}\n"
-                f"      💡 السبب: {reason}\n"
-                f"      دخول: {t['entry']}$ | وقف: {t['sl']}$ (خطر: {t['risk']}$)\n"
-                f"      T1:{t['t1']}$(R:{t['rr1']}x) | T2:{t['t2']}$(R:{t['rr2']}x) | T3:{t['t3']}$(R:{t['rr3']}x)"
+                f"\n   ─────────────────────────\n"
+                f"   {nums[i]} {t['dir']}  ·  {t['style']}\n"
+                f"   🏪 السوق  : {t['market']}\n"
+                f"   📊 الثقة  : {pct}%  {lbl}\n"
+                f"   🔔 القرار : {entry_rule}\n"
+                f"   💡 السبب  : {reason}\n"
+                f"   ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─\n"
+                f"   📍 دخول   : {t['entry']}$\n"
+                f"   🛡️  وقف   : {t['sl']}$  (خطر: {t['risk']}$)\n"
+                f"   🎯 الأهداف:\n"
+                f"      T1 ← {t['t1']}$  (R: {t['rr1']}x)\n"
+                f"      T2 ← {t['t2']}$  (R: {t['rr2']}x)\n"
+                f"      T3 ← {t['t3']}$  (R: {t['rr3']}x)"
             )
         return "\n".join(lines)
 
@@ -1342,10 +1419,14 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
     part2 = f"""
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-⏰ توقع السعر (ATR Projection)
-   بعد 15 دقيقة: {pred['15m']['low']}$ ↔ {pred['15m']['high']}$ | الأرجح: {pred['15m']['center']}$
-   بعد ساعة:     {pred['1h']['low']}$ ↔ {pred['1h']['high']}$ | الأرجح: {pred['1h']['center']}$
-   📌 مبني على: ATR={d['atr']}$ × جذر الزمن + اتجاه الزخم
+📈 توقعات السعر (إغلاق · قمة · قاع)
+   📌 مبني على: ATR={d['atr']}$ × √زمن مُعدَّل بالاتجاه
+   ─────────────────────────
+   ⏱️ ساعة   │ إغلاق: {d['tf_forecasts']['1h']['close']}$  │  قمة: {d['tf_forecasts']['1h']['high']}$  │  قاع: {d['tf_forecasts']['1h']['low']}$
+   ⏰ 4 ساعات│ إغلاق: {d['tf_forecasts']['4h']['close']}$  │  قمة: {d['tf_forecasts']['4h']['high']}$  │  قاع: {d['tf_forecasts']['4h']['low']}$
+   📅 يوم    │ إغلاق: {d['tf_forecasts']['1d']['close']}$  │  قمة: {d['tf_forecasts']['1d']['high']}$  │  قاع: {d['tf_forecasts']['1d']['low']}$
+   📆 أسبوع  │ إغلاق: {d['tf_forecasts']['1w']['close']}$  │  قمة: {d['tf_forecasts']['1w']['high']}$  │  قاع: {d['tf_forecasts']['1w']['low']}$
+   🗓️ شهر    │ إغلاق: {d['tf_forecasts']['1mo']['close']}$ │  قمة: {d['tf_forecasts']['1mo']['high']}$ │  قاع: {d['tf_forecasts']['1mo']['low']}$
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 صفقات متقدمة (آجل وفوري)
 {adv_block}

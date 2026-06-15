@@ -1684,10 +1684,45 @@ def _http_send(text: str) -> bool:
     return False
 
 
+async def _telethon_bot_send(text: str) -> bool:
+    """MTProto باستخدام توكن البوت — يتجاوز حجب HTTP نهائياً ولا يتعارض مع جلسات المستخدم"""
+    try:
+        from telethon.sessions import StringSession
+        # جلسة وهمية في الذاكرة، يتم تسجيل الدخول كبوت لتجنب تعارض AuthKeyDuplicatedError
+        client = TelegramClient(StringSession(), API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN)
+        await client.send_message(TELEGRAM_CHAT_ID, text)
+        await client.disconnect()
+        return True
+    except Exception as e:
+        log.warning(f"⚠️ [Telethon Bot] {e}")
+        return False
+
+
 def _send_single(text: str) -> bool:
-    """إرسال عبر HTTP Bot API. (تم إلغاء Telethon هنا لمنع تعارض الجلسات AuthKeyDuplicatedError مع البوتات الأخرى)"""
+    """إرسال عبر MTProto (Bot) أولاً للهروب من مشاكل Timeout، والـ HTTP كاحتياطي."""
+    try:
+        ok = asyncio.run(_telethon_bot_send(text))
+        if ok:
+            log.info("✅ [Telethon Bot] تم الإرسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot_send(text))
+            loop.close()
+            if ok:
+                log.info("✅ [Telethon Bot] تم الإرسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"⚠️ [Telethon Bot loop] {e}")
+    except Exception as e:
+        log.warning(f"⚠️ [Telethon Bot] {e}")
+
+    log.warning("⚠️ [Telethon Bot] فشل — جاري المحاولة عبر HTTP...")
     if _http_send(text):
-        log.info("✅ [HTTP] تم الإرسال.")
+        log.info("✅ [HTTP] تم الإرسال بنجاح.")
         return True
     log.error("❌ فشل الإرسال من جميع الوسائل.")
     return False

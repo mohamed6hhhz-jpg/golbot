@@ -1627,7 +1627,7 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
 # ══════════════════════════════════════════════
 #  8. إرسال تيليجرام
 # ══════════════════════════════════════════════
-CHUNK_SIZE = 3800   # أقل من 4096 (حد تيليجرام بـ UTF-16) — هامش أمان للإيموجي
+CHUNK_SIZE = 1000   # تصغير الحجم لتخطي مشكلة الـ HTTP Timeout في HuggingFace
 
 def _tg_len(text: str) -> int:
     """طول النص بحسب UTF-16 code units — الطريقة التي يحسب بها تيليجرام الأحرف"""

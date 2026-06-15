@@ -1611,22 +1611,25 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
 # ══════════════════════════════════════════════
 #  8. إرسال تيليجرام
 # ══════════════════════════════════════════════
-CHUNK_SIZE = 4090   # حد تيليجرام 4096 — نترك هامش 6 أحرف
+CHUNK_SIZE = 3800   # أقل من 4096 (حد تيليجرام بـ UTF-16) — هامش أمان للإيموجي
+
+def _tg_len(text: str) -> int:
+    """طول النص بحسب UTF-16 code units — الطريقة التي يحسب بها تيليجرام الأحرف"""
+    return sum(2 if ord(c) > 0xFFFF else 1 for c in text)
 
 
 def _split_message(text: str) -> list:
-    if len(text) <= CHUNK_SIZE:
+    if _tg_len(text) <= CHUNK_SIZE:
         return [text]
 
     SEPARATOR = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    lines = text.split("\n")
-    chunks = []
+    lines   = text.split("\n")
+    chunks  = []
     current = ""
 
     for i, line in enumerate(lines):
         new_block = (current + "\n" + line) if current else line
-        if len(new_block) > CHUNK_SIZE:
-            # حاول تقسيم عند خط فاصل أقرب ممكن قبل الحد
+        if _tg_len(new_block) > CHUNK_SIZE:
             if current:
                 chunks.append(current.strip())
             current = line
@@ -1634,9 +1637,9 @@ def _split_message(text: str) -> list:
             current = new_block
 
         # لو السطر التالي فاصل والجزء الحالي فوق 70% من الحد → اقطع هنا
-        next_line = lines[i+1] if i+1 < len(lines) else ""
+        next_line = lines[i + 1] if i + 1 < len(lines) else ""
         if (next_line.startswith(SEPARATOR) and
-                len(current) > CHUNK_SIZE * 0.70):
+                _tg_len(current) > CHUNK_SIZE * 0.70):
             chunks.append(current.strip())
             current = ""
 

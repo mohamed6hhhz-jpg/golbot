@@ -1668,9 +1668,13 @@ def _http_send(text: str) -> bool:
     """الإرسال عبر HTTP Bot API — الوسيلة الأساسية."""
     url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": str(TELEGRAM_CHAT_ID), "text": text}
+    headers = {
+        "Connection": "close",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
     for attempt in range(4):
         try:
-            r = requests.post(url, json=payload, headers={"Connection": "close"}, timeout=(10, 30))
+            r = requests.post(url, json=payload, headers=headers, timeout=45)
             r.raise_for_status()
             return True
         except Exception as e:
@@ -1681,28 +1685,7 @@ def _http_send(text: str) -> bool:
 
 
 def _send_single(text: str) -> bool:
-    """Telethon (MTProto) أولاً — يتجاوز الحجب. HTTP كاحتياطي أخير."""
-    # المحاولة الأولى: Telethon بجلسة المستخدم عبر MTProto
-    try:
-        ok = asyncio.run(_telethon_send(text))
-        if ok:
-            log.info("✅ [Telethon] تم الإرسال.")
-            return True
-    except RuntimeError:
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            ok = loop.run_until_complete(_telethon_send(text))
-            loop.close()
-            if ok:
-                log.info("✅ [Telethon loop] تم الإرسال.")
-                return True
-        except Exception as e:
-            log.warning(f"⚠️ [Telethon loop] {e}")
-    except Exception as e:
-        log.warning(f"⚠️ [Telethon] {e}")
-    # الاحتياطي الأخير: HTTP Bot API
-    log.warning("⚠️ [Telethon] فشل — جاري المحاولة عبر HTTP...")
+    """إرسال عبر HTTP Bot API. (تم إلغاء Telethon هنا لمنع تعارض الجلسات AuthKeyDuplicatedError مع البوتات الأخرى)"""
     if _http_send(text):
         log.info("✅ [HTTP] تم الإرسال.")
         return True

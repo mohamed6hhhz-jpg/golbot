@@ -327,72 +327,118 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     rsi    = d['rsi'];  div = d.get('divergence', '')
     trades = {}
 
+    # ── مستويات مُصفّاة للصفقات المتقدمة ──
+    def _va(levels):  # أقرب مقاومة فوق السعر
+        v = sorted([x for x in levels if x and x > gold])
+        return v[0] if v else round(gold + 50, 2)
+    def _va2(levels, f):  # ثاني مقاومة
+        v = sorted([x for x in levels if x and x > gold and abs(x - f) > 8])
+        return v[0] if v else round(f + 40, 2)
+    def _vb(levels):  # أقرب دعم تحت السعر
+        v = sorted([x for x in levels if x and x < gold], reverse=True)
+        return v[0] if v else round(gold - 50, 2)
+    def _vb2(levels, f):  # ثاني دعم
+        v = sorted([x for x in levels if x and x < gold and abs(x - f) > 8], reverse=True)
+        return v[0] if v else round(f - 40, 2)
+
+    all_r = [r1, r2, pw_h, sw_h]
+    all_s = [s1, s2, pw_l, sw_l]
+    r_n = _va(all_r);  r_f = _va2(all_r, r_n)
+    s_n = _vb(all_s);  s_f = _vb2(all_s, s_n)
+
+    def _rr(gain, risk): return round(gain / risk, 1) if risk > 0 else 0
+    MIN_RR = 1.2   # حد أدنى للعائد/المخاطرة عند T1 — أي صفقة أقل تُحذف
+
     # ── سكالبينج (15 دقيقة) ──
     sl_sc = 8.0
-    if bias in ('bull', 'neutral'):
-        trades['scalp_buy']  = dict(entry=round(s1,2), sl=round(s1-sl_sc,2), risk=sl_sc,
-            t1=round(s1+15,2), t2=round(s1+28,2), t3=round(s1+45,2),
-            market='آجل (Futures)', tf='15د', typ='سكالبينج 🏹', dir='buy')
-    if bias in ('bear', 'neutral'):
-        trades['scalp_sell'] = dict(entry=round(r1,2), sl=round(r1+sl_sc,2), risk=sl_sc,
-            t1=round(r1-15,2), t2=round(r1-28,2), t3=round(r1-45,2),
-            market='آجل (Futures)', tf='15د', typ='سكالبينج 🏹', dir='sell')
+    t = dict(entry=round(s_n, 2), sl=round(s_n - sl_sc, 2), risk=sl_sc,
+             t1=round(s_n + 15, 2), t2=round(s_n + 28, 2), t3=round(s_n + 45, 2),
+             market='آجل (Futures)', tf='15د', typ='سكالبينج 🏹', dir='buy')
+    if bias in ('bull', 'neutral') and _rr(15, sl_sc) >= MIN_RR:
+        trades['scalp_buy'] = t
+    t = dict(entry=round(r_n, 2), sl=round(r_n + sl_sc, 2), risk=sl_sc,
+             t1=round(r_n - 15, 2), t2=round(r_n - 28, 2), t3=round(r_n - 45, 2),
+             market='آجل (Futures)', tf='15د', typ='سكالبينج 🏹', dir='sell')
+    if bias in ('bear', 'neutral') and _rr(15, sl_sc) >= MIN_RR:
+        trades['scalp_sell'] = t
 
-    # ── يومية ──
+    # ── يومية ── (الدخول من Pivot فقط لو بين الدعم والمقاومة)
     sl_d = round(atr * 0.4, 2)
-    if bias in ('bull', 'neutral'):
-        trades['daily_buy']  = dict(entry=round(pivot,2), sl=round(pivot-sl_d,2), risk=sl_d,
-            t1=round(r1,2), t2=round(r2,2), t3=round(r2+atr*0.3,2),
-            market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='buy')
-    if bias in ('bear', 'neutral'):
-        trades['daily_sell'] = dict(entry=round(pivot,2), sl=round(pivot+sl_d,2), risk=sl_d,
-            t1=round(s1,2), t2=round(s2,2), t3=round(s2-atr*0.3,2),
-            market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='sell')
+    # pivot قد يكون بعيداً عن السعر — نستخدمه فقط لو منطقي
+    piv_valid = s_n < pivot < r_n
+    buy_entry_d  = round(pivot if piv_valid else s_n, 2)
+    sell_entry_d = round(pivot if piv_valid else r_n, 2)
+    t = dict(entry=buy_entry_d, sl=round(buy_entry_d - sl_d, 2), risk=sl_d,
+             t1=r_n, t2=r_f, t3=round(r_f + atr * 0.3, 2),
+             market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='buy')
+    if bias in ('bull', 'neutral') and _rr(r_n - buy_entry_d, sl_d) >= MIN_RR:
+        trades['daily_buy'] = t
+    t = dict(entry=sell_entry_d, sl=round(sell_entry_d + sl_d, 2), risk=sl_d,
+             t1=s_n, t2=s_f, t3=round(s_f - atr * 0.3, 2),
+             market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='sell')
+    if bias in ('bear', 'neutral') and _rr(sell_entry_d - s_n, sl_d) >= MIN_RR:
+        trades['daily_sell'] = t
 
     # ── أسبوعية ──
-    if bias in ('bull', 'neutral'):
-        sl_w = round(s1 - (pw_l - 5), 2)
-        trades['weekly_buy']  = dict(entry=round(s1,2), sl=round(pw_l-5,2), risk=max(sl_w,10),
-            t1=round(r1,2), t2=round(r2,2), t3=round(pw_h,2),
-            market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='buy')
-    if bias in ('bear', 'neutral'):
-        sl_w = round((pw_h + 5) - r1, 2)
-        trades['weekly_sell'] = dict(entry=round(r1,2), sl=round(pw_h+5,2), risk=max(sl_w,10),
-            t1=round(s1,2), t2=round(s2,2), t3=round(pw_l,2),
-            market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='sell')
+    sl_w_b = round(s_n - (pw_l - 5), 2) if pw_l else round(atr * 1.0, 2)
+    sl_w_s = round((pw_h + 5) - r_n, 2) if pw_h else round(atr * 1.0, 2)
+    t = dict(entry=round(s_n, 2), sl=round(pw_l - 5 if pw_l else s_n - atr, 2),
+             risk=max(abs(sl_w_b), 10),
+             t1=r_n, t2=r_f, t3=round(pw_h if pw_h else r_f + atr * 0.5, 2),
+             market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='buy')
+    if bias in ('bull', 'neutral') and _rr(r_n - s_n, max(abs(sl_w_b), 10)) >= MIN_RR:
+        trades['weekly_buy'] = t
+    t = dict(entry=round(r_n, 2), sl=round(pw_h + 5 if pw_h else r_n + atr, 2),
+             risk=max(abs(sl_w_s), 10),
+             t1=s_n, t2=s_f, t3=round(pw_l if pw_l else s_f - atr * 0.5, 2),
+             market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='sell')
+    if bias in ('bear', 'neutral') and _rr(r_n - s_n, max(abs(sl_w_s), 10)) >= MIN_RR:
+        trades['weekly_sell'] = t
 
-    # ── شهرية (وقف خسارة يعتمد على ATR وليس prev_mo_low الذي قد يكون أعلى من الدخول) ──
-    sl_m = round(atr * 1.5, 2)   # 1.5 × ATR كوقف خسارة للصفقة الشهرية
-    if bias in ('bull', 'neutral'):
-        trades['monthly_buy']  = dict(entry=round(s2,2), sl=round(s2 - sl_m, 2), risk=sl_m,
-            t1=round(r2,2), t2=round((pm_h+r2)/2,2), t3=round(pm_h,2),
-            market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='buy')
-    if bias in ('bear', 'neutral'):
-        trades['monthly_sell'] = dict(entry=round(r2,2), sl=round(r2 + sl_m, 2), risk=sl_m,
-            t1=round(s2,2), t2=round((pm_l+s2)/2,2), t3=round(pm_l,2),
-            market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='sell')
+    # ── شهرية ──
+    sl_m = round(atr * 1.5, 2)
+    t = dict(entry=round(s_f, 2), sl=round(s_f - sl_m, 2), risk=sl_m,
+             t1=r_n, t2=round((pm_h + r_n) / 2, 2) if pm_h else r_f,
+             t3=round(pm_h, 2) if pm_h else round(r_f + atr * 0.5, 2),
+             market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='buy')
+    if bias in ('bull', 'neutral') and _rr(r_n - s_f, sl_m) >= MIN_RR:
+        trades['monthly_buy'] = t
+    t = dict(entry=round(r_f, 2), sl=round(r_f + sl_m, 2), risk=sl_m,
+             t1=s_n, t2=round((pm_l + s_n) / 2, 2) if pm_l else s_f,
+             t3=round(pm_l, 2) if pm_l else round(s_f - atr * 0.5, 2),
+             market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='sell')
+    if bias in ('bear', 'neutral') and _rr(r_f - s_n, sl_m) >= MIN_RR:
+        trades['monthly_sell'] = t
 
     # ── سوينج ──
     sl_sw = round(atr * 0.35, 2)
     mid   = round((sw_h + sw_l) / 2, 2)
-    trades['swing_buy']  = dict(entry=round(sw_l,2), sl=round(sw_l-sl_sw,2), risk=sl_sw,
-        t1=mid, t2=round(sw_h,2), t3=round(sw_h+atr*0.4,2),
-        market='آجل (Futures)', tf='أسابيع', typ='سوينج 🌊', dir='buy')
-    trades['swing_sell'] = dict(entry=round(sw_h,2), sl=round(sw_h+sl_sw,2), risk=sl_sw,
-        t1=mid, t2=round(sw_l,2), t3=round(sw_l-atr*0.4,2),
-        market='آجل (Futures)', tf='أسابيع', typ='سوينج 🌊', dir='sell')
+    t = dict(entry=round(sw_l, 2), sl=round(sw_l - sl_sw, 2), risk=sl_sw,
+             t1=mid, t2=round(sw_h, 2), t3=round(sw_h + atr * 0.4, 2),
+             market='آجل (Futures)', tf='أسابيع', typ='سوينج 🌊', dir='buy')
+    if sw_l < gold and _rr(mid - sw_l, sl_sw) >= MIN_RR:
+        trades['swing_buy'] = t
+    t = dict(entry=round(sw_h, 2), sl=round(sw_h + sl_sw, 2), risk=sl_sw,
+             t1=mid, t2=round(sw_l, 2), t3=round(sw_l - atr * 0.4, 2),
+             market='آجل (Futures)', tf='أسابيع', typ='سوينج 🌊', dir='sell')
+    if sw_h > gold and _rr(sw_h - mid, sl_sw) >= MIN_RR:
+        trades['swing_sell'] = t
 
-    # ── انعكاس (Counter-trend) — فقط عند توفر الشروط ──
-    has_div  = '💡' in div or '⚠️' in div
-    sl_rev   = round(atr * 0.28, 2)
+    # ── انعكاس (Counter-trend) ──
+    has_div = '💡' in div or '⚠️' in div
+    sl_rev  = round(atr * 0.28, 2)
     if (has_div or rsi < 38) and bias != 'bull':
-        trades['rev_buy']  = dict(entry=round(gold,2), sl=round(gold-sl_rev,2), risk=sl_rev,
-            t1=round(pivot,2), t2=round(r1,2), t3=round(r2,2),
-            market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
+        t = dict(entry=round(gold, 2), sl=round(gold - sl_rev, 2), risk=sl_rev,
+                 t1=round(pivot, 2), t2=r_n, t3=r_f,
+                 market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
+        if _rr(pivot - gold, sl_rev) >= MIN_RR:
+            trades['rev_buy'] = t
     if (has_div or rsi > 62) and bias != 'bear':
-        trades['rev_sell'] = dict(entry=round(gold,2), sl=round(gold+sl_rev,2), risk=sl_rev,
-            t1=round(pivot,2), t2=round(s1,2), t3=round(s2,2),
-            market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
+        t = dict(entry=round(gold, 2), sl=round(gold + sl_rev, 2), risk=sl_rev,
+                 t1=round(pivot, 2), t2=s_n, t3=s_f,
+                 market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
+        if _rr(gold - pivot, sl_rev) >= MIN_RR:
+            trades['rev_sell'] = t
     return trades
 
 
@@ -693,8 +739,8 @@ def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
 
 def calc_all_entries(d: dict, bias: str) -> dict:
     """
-    3 صفقات شراء + 3 صفقات بيع مبنية على مستويات تقنية حقيقية.
-    القاعدة: الصفقة المعتدلة (2) دائماً Futures بـ 38$ — الأخريان Spot بـ 15$.
+    3 صفقات شراء + 3 صفقات بيع مبنية على مستويات تقنية مُصفّاة ومُتحقَّق منها.
+    الشرط الذهبي: المقاومة دائماً فوق السعر — الدعم دائماً تحت السعر.
     """
     gold   = d['gold']
     s1, r1 = d['s1'], d['r1']
@@ -702,78 +748,106 @@ def calc_all_entries(d: dict, bias: str) -> dict:
     s3, r3 = d['s3'], d['r3']
     rn     = d['round_numbers']
 
-    MIN_GAP = 8.0  # حد أدنى للفرق بين الأهداف
+    # ── مستويات مُصفّاة: مضمون أن المقاومة فوق السعر والدعم تحته ──
+    def _valid_res(levels):
+        """أقرب مستوى مقاومة صحيح فوق السعر الحالي"""
+        v = sorted([x for x in levels if x and x > gold])
+        return v[0] if v else round(gold + 50, 2)
+
+    def _valid_res2(levels, first):
+        """ثاني مستوى مقاومة فوق السعر (مختلف عن الأول)"""
+        v = sorted([x for x in levels if x and x > gold and abs(x - first) > 8])
+        return v[0] if v else round(first + 40, 2)
+
+    def _valid_sup(levels):
+        """أقرب مستوى دعم صحيح تحت السعر الحالي"""
+        v = sorted([x for x in levels if x and x < gold], reverse=True)
+        return v[0] if v else round(gold - 50, 2)
+
+    def _valid_sup2(levels, first):
+        """ثاني مستوى دعم تحت السعر (مختلف عن الأول)"""
+        v = sorted([x for x in levels if x and x < gold and abs(x - first) > 8], reverse=True)
+        return v[0] if v else round(first - 40, 2)
+
+    all_res = [r1, r2, r3, rn['nearest_resistance']]
+    all_sup = [s1, s2, s3, rn['nearest_support']]
+
+    r_near = _valid_res(all_res)                    # أقرب مقاومة فوق السعر
+    r_far  = _valid_res2(all_res, r_near)           # ثاني مقاومة
+    r_far2 = _valid_res2(all_res + [r_far + 30], r_far)  # ثالث مقاومة
+    s_near = _valid_sup(all_sup)                    # أقرب دعم تحت السعر
+    s_far  = _valid_sup2(all_sup, s_near)           # ثاني دعم
+    s_far2 = _valid_sup2(all_sup + [s_far - 30], s_far)  # ثالث دعم
+
+    MIN_GAP = 8.0
 
     def _buy_t(e):
-        """أهداف الشراء: تصاعدية خالصة مع فجوات كافية"""
-        raw  = sorted(set([x for x in [r1,r2,r3,rn['nearest_resistance']] if x and x > e]))
-        # ازل المستويات القريبة جداً من بعضها
+        """أهداف الشراء: مستويات مقاومة فوق نقطة الدخول فقط"""
+        raw = sorted(set([x for x in [r_near, r_far, r_far2] if x and x > e]))
         pool = []
         for x in raw:
             if not pool or x - pool[-1] >= MIN_GAP:
                 pool.append(x)
-        t1 = pool[0] if len(pool)>0 else round(e+30,2)
-        t2 = pool[1] if len(pool)>1 else round(t1+50,2)
-        t3 = pool[2] if len(pool)>2 else round(t2+50,2)
+        t1 = pool[0] if len(pool) > 0 else round(e + 30, 2)
+        t2 = pool[1] if len(pool) > 1 else round(t1 + 40, 2)
+        t3 = pool[2] if len(pool) > 2 else round(t2 + 40, 2)
         return t1, t2, t3
 
     def _sell_t(e):
-        """أهداف البيع: تنازلية خالصة مع فجوات كافية"""
-        raw  = sorted(set([x for x in [s1,s2,s3,rn['nearest_support']] if x and x < e]), reverse=True)
-        # ازل المستويات القريبة جداً من بعضها
+        """أهداف البيع: مستويات دعم تحت نقطة الدخول فقط"""
+        raw = sorted(set([x for x in [s_near, s_far, s_far2] if x and x < e]), reverse=True)
         pool = []
         for x in raw:
             if not pool or pool[-1] - x >= MIN_GAP:
                 pool.append(x)
-        t1 = pool[0] if len(pool)>0 else round(e-30,2)
-        t2 = pool[1] if len(pool)>1 else round(t1-50,2)
-        t3 = pool[2] if len(pool)>2 else round(t2-50,2)
+        t1 = pool[0] if len(pool) > 0 else round(e - 30, 2)
+        t2 = pool[1] if len(pool) > 1 else round(t1 - 40, 2)
+        t3 = pool[2] if len(pool) > 2 else round(t2 - 40, 2)
         return t1, t2, t3
 
     def mb(entry, sl_d, mkt, style):
-        e=round(entry,2); t1,t2,t3=_buy_t(e)
-        rr1=round((t1-e)/sl_d,1); rr2=round((t2-e)/sl_d,1); rr3=round((t3-e)/sl_d,1)
-        return {"dir":"شراء 📗","market":mkt,"style":style,"entry":e,
-                "sl":round(e-sl_d,2),"risk":sl_d,"t1":t1,"t2":t2,"t3":t3,
-                "rr1":rr1,"rr2":rr2,"rr3":rr3,"is_buy":True}
+        e = round(entry, 2); t1, t2, t3 = _buy_t(e)
+        rr1 = round((t1 - e) / sl_d, 1); rr2 = round((t2 - e) / sl_d, 1); rr3 = round((t3 - e) / sl_d, 1)
+        return {"dir": "شراء 📗", "market": mkt, "style": style, "entry": e,
+                "sl": round(e - sl_d, 2), "risk": sl_d, "t1": t1, "t2": t2, "t3": t3,
+                "rr1": rr1, "rr2": rr2, "rr3": rr3, "is_buy": True}
 
     def ms(entry, sl_d, mkt, style):
-        e=round(entry,2); t1,t2,t3=_sell_t(e)
-        rr1=round((e-t1)/sl_d,1); rr2=round((e-t2)/sl_d,1); rr3=round((e-t3)/sl_d,1)
-        return {"dir":"بيع 📕","market":mkt,"style":style,"entry":e,
-                "sl":round(e+sl_d,2),"risk":sl_d,"t1":t1,"t2":t2,"t3":t3,
-                "rr1":rr1,"rr2":rr2,"rr3":rr3,"is_buy":False}
+        e = round(entry, 2); t1, t2, t3 = _sell_t(e)
+        rr1 = round((e - t1) / sl_d, 1); rr2 = round((e - t2) / sl_d, 1); rr3 = round((e - t3) / sl_d, 1)
+        return {"dir": "بيع 📕", "market": mkt, "style": style, "entry": e,
+                "sl": round(e + sl_d, 2), "risk": sl_d, "t1": t1, "t2": t2, "t3": t3,
+                "rr1": rr1, "rr2": rr2, "rr3": rr3, "is_buy": False}
 
     if bias == "bull":
-        buys  = [mb(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
-                 mb(s1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — S1"),
-                 mb(s2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — S2")]
-        sells = [ms(r1,   TIGHT_SL, "فوري (Spot)",   "🔴 بيع R1"),
-                 ms(r2,   STD_SL,   "آجل (Futures)", "🟡 بيع R2"),
-                 ms(r3,   TIGHT_SL, "فوري (Spot)",   "🟢 بيع R3")]
+        buys  = [mb(gold,   TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
+                 mb(s_near, STD_SL,   "آجل (Futures)", "🟡 معتدل — دعم قريب"),
+                 mb(s_far,  TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — دعم بعيد")]
+        sells = [ms(r_near, TIGHT_SL, "فوري (Spot)",   "🔴 عند مقاومة قريبة"),
+                 ms(r_far,  STD_SL,   "آجل (Futures)", "🟡 عند مقاومة ثانية"),
+                 ms(r_far2, TIGHT_SL, "فوري (Spot)",   "🟢 عند مقاومة بعيدة")]
     elif bias == "bear":
-        sells = [ms(gold, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
-                 ms(r1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — R1"),
-                 ms(r2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — R2")]
-        buys  = [mb(s1,   TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — S1"),
-                 mb(s2,   STD_SL,   "آجل (Futures)", "🟡 معتدل — S2"),
-                 mb(s3,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — S3")]
+        sells = [ms(gold,   TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
+                 ms(r_near, STD_SL,   "آجل (Futures)", "🟡 معتدل — مقاومة قريبة"),
+                 ms(r_far,  TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — مقاومة بعيدة")]
+        buys  = [mb(s_near, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — دعم قريب"),
+                 mb(s_far,  STD_SL,   "آجل (Futures)", "🟡 معتدل — دعم ثاني"),
+                 mb(s_far2, TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — دعم بعيد")]
     else:  # neutral
-        buys  = [mb(rn['nearest_resistance'], TIGHT_SL, "فوري (Spot)",   "🔴 اختراق نفسي"),
-                 mb(r1,   STD_SL,   "آجل (Futures)", "🟡 اختراق R1"),
-                 mb(r2,   TIGHT_SL, "فوري (Spot)",   "🟢 اختراق R2")]
-        sells = [ms(rn['nearest_support'],   TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — كسر"),
-                 ms(s1,   STD_SL,   "آجل (Futures)", "🟡 معتدل — S1"),
-                 ms(s2,   TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — S2")]
-
+        buys  = [mb(s_near, TIGHT_SL, "فوري (Spot)",   "🔴 دعم قريب — اختراق"),
+                 mb(s_far,  STD_SL,   "آجل (Futures)", "🟡 معتدل — دعم ثاني"),
+                 mb(s_far2, TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — دعم بعيد")]
+        sells = [ms(r_near, TIGHT_SL, "فوري (Spot)",   "🔴 مقاومة قريبة — اختراق"),
+                 ms(r_far,  STD_SL,   "آجل (Futures)", "🟡 معتدل — مقاومة ثانية"),
+                 ms(r_far2, TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — مقاومة بعيدة")]
 
     refs = {
-        "above": round(min([x for x in [r1,rn['nearest_resistance']] if x and x>gold], default=r1), 2),
-        "below": round(max([x for x in [s1,rn['nearest_support']]    if x and x<gold], default=s1), 2),
-        "r1":r1,"r2":r2,"s1":s1,"s2":s2,
+        "above": r_near,
+        "below": s_near,
+        "r1": r_near, "r2": r_far, "s1": s_near, "s2": s_far,
     }
     return {
-        "bias":bias, "buys":buys, "sells":sells, "refs":refs,
+        "bias": bias, "buys": buys, "sells": sells, "refs": refs,
         "momentum":  calc_momentum_signal(d),
         "trend":     calc_trend_signal(d),
         "liquidity": calc_liquidity_signal(d),
@@ -788,15 +862,21 @@ def _calc_price_forecasts(gold: float, atr: float, bias: str, tf_data: dict) -> 
     توقع الإغلاق والقمة والقاع باستخدام ATR × جذر(n) مع تعديل الاتجاه.
     الإطارات: 1h, 4h, 1d, 1w, 1mo
     """
-    # معامل الاتجاه: صعودي +1 / هبوطي -1 / محايد 0
-    dir_factor = 1.0 if bias == "bull" else -1.0 if bias == "bear" else 0.0
+    if bias == "bull":
+        dir_factor = 1.0
+    elif bias == "bear":
+        dir_factor = -1.0
+    else:
+        # في حالة التذبذب نستخدم RSI + MACD الساعي لاشتقاق الميل الفعلي
+        rsi_1h  = float(tf_data.get('tf_hourly', {}).get('rsi', 50) or 50)
+        macd_1h = float(tf_data.get('tf_hourly', {}).get('macd_hist', 0) or 0)
+        rsi_bias  = (rsi_1h - 50) / 50          # نطاق -1 إلى +1
+        macd_bias = 0.4 if macd_1h > 0 else (-0.4 if macd_1h < 0 else 0.0)
+        dir_factor = round((rsi_bias * 0.6 + macd_bias * 0.4), 3)  # مرجح
 
-    # ATR اليومي = المدخل. نشتق منه مضاعفات ATR لكل إطار.
-    # القاعدة: ATR(n_bars) ≈ ATR_daily × sqrt(n/bars_per_day)
-    # بافتراض 24 شمعة في اليوم للساعي
     def _fc(n_hours: float):
         """يحسب التوقع لعدد ساعات معيّن من الآن"""
-        scaled_atr = atr * (n_hours / 24.0) ** 0.5   # ATR مُعدَّل للإطار
+        scaled_atr = atr * (n_hours / 24.0) ** 0.5
         center     = round(gold + dir_factor * scaled_atr * 0.25, 2)
         high       = round(center + scaled_atr * 0.55, 2)
         low        = round(center - scaled_atr * 0.55, 2)
@@ -806,8 +886,8 @@ def _calc_price_forecasts(gold: float, atr: float, bias: str, tf_data: dict) -> 
         "1h"  : _fc(1),
         "4h"  : _fc(4),
         "1d"  : _fc(24),
-        "1w"  : _fc(24 * 5),    # أسبوع تداول = 5 أيام
-        "1mo" : _fc(24 * 22),   # شهر تداول ≈ 22 يوم
+        "1w"  : _fc(24 * 5),
+        "1mo" : _fc(24 * 22),
     }
 
 

@@ -439,6 +439,15 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
                  market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
         if _rr(gold - pivot, sl_rev) >= MIN_RR:
             trades['rev_sell'] = t
+    # ── ضمان ترتيب الأهداف رياضياً ──
+    for k, t in trades.items():
+        targets = [t['t1'], t['t2'], t['t3']]
+        if t['dir'] == 'buy':
+            targets.sort()
+        else:
+            targets.sort(reverse=True)
+        t['t1'], t['t2'], t['t3'] = targets
+        
     return trades
 
 

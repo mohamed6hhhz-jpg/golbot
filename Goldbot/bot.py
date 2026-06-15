@@ -1703,9 +1703,8 @@ def _http_send(text: str) -> bool:
 async def _telethon_bot_send(text: str) -> bool:
     """MTProto باستخدام توكن البوت — يتجاوز حجب HTTP نهائياً ولا يتعارض مع جلسات المستخدم"""
     try:
-        from telethon.sessions import StringSession
-        # جلسة وهمية في الذاكرة، يتم تسجيل الدخول كبوت لتجنب تعارض AuthKeyDuplicatedError
-        client = TelegramClient(StringSession(), API_ID, API_HASH)
+        # استخدام ملف جلسة محلي بدلاً من الذاكرة لتجنب تسجيل الدخول بالتوكن في كل رسالة (يمنع الـ FloodWait)
+        client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN)
         await client.send_message(TELEGRAM_CHAT_ID, text)
         await client.disconnect()

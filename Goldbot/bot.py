@@ -1394,20 +1394,23 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
                 entry_rule = f"⛔ لا تدخل — (السوق متضارب والعائد لا يبرر المخاطرة الحالية)"
             else:
                 entry_rule = f"❌ تجاهل الصفقة — (خطر عالي جداً وعكس تيار السوق)"
+            
             lines.append(
-                f"\n   ─────────────────────────\n"
-                f"   {nums[i]} {t['dir']}  ·  {t['style']}\n"
-                f"   🏪 السوق  : {t['market']}\n"
-                f"   📊 الثقة  : {pct}%  {lbl}\n"
-                f"   🔔 القرار : {entry_rule}\n"
-                f"   💡 السبب  : {reason}\n"
-                f"   ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─\n"
-                f"   📍 دخول   : {t['entry']}$\n"
-                f"   🛡️  وقف   : {t['sl']}$  (خطر: {t['risk']}$)\n"
-                f"   🎯 الأهداف:\n"
-                f"      T1 ← {t['t1']}$  (R: {t['rr1']}x)\n"
-                f"      T2 ← {t['t2']}$  (R: {t['rr2']}x)\n"
-                f"      T3 ← {t['t3']}$  (R: {t['rr3']}x)"
+                f"\n   ╭─────────────────────────────╮\n"
+                f"   │ {nums[i]} {t['dir']}  ·  {t['style']}\n"
+                f"   ├─────────────────────────────┤\n"
+                f"   │ 🏪 السوق  : {t['market']}\n"
+                f"   │ 📊 الثقة  : {pct}%  {lbl}\n"
+                f"   │ 🔔 القرار : {entry_rule}\n"
+                f"   │ 💡 السبب  : {reason}\n"
+                f"   ├─────────────────────────────┤\n"
+                f"   │ 📍 دخول   : {t['entry']}$\n"
+                f"   │ 🛡️  وقف   : {t['sl']}$  (خطر: {t['risk']}$)\n"
+                f"   │ 🎯 الأهداف:\n"
+                f"   │    T1 ← {t['t1']}$  (R: {t['rr1']}x)\n"
+                f"   │    T2 ← {t['t2']}$  (R: {t['rr2']}x)\n"
+                f"   │    T3 ← {t['t3']}$  (R: {t['rr3']}x)\n"
+                f"   ╰─────────────────────────────╯"
             )
         return "\n".join(lines)
 
@@ -1423,21 +1426,25 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     exp_high = round(gold + d['atr'] * 0.65, 2)
     range_line = f"نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$"
 
-    fixed = f"""💰 {header}
+    fixed = f"""👑 📊 التقرير الكمي الشامل للذهب
 🕐 {date_now}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📍 أسعار الذهب
    فوري  (XAU/USD) : {spot_label}
    آجل   (GC=F)    : {futures_label}{contango_str}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 ملخص السوق
    الزخم        : {ent['momentum']} {'→ تسارع بيع، الذهب عرضة للهبوط' if 'هابط' in ent['momentum'] else '→ تسارع شراء، الذهب في دعم' if 'صاعد' in ent['momentum'] else '→ حركة غير محددة'}
    الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ الاتجاه غير محدد'}
    السيولة       : {ent['liquidity']} {'→ الحركات موثوقة ✅' if 'مرتفعة' in ent['liquidity'] else '→ انتبه: حركات وهمية محتملة ⚠️'}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 حكم السوق: {conf['verdict']}
 {score_table}
    ∑ {conf['total']:+d}/±{conf['n']}  ▪ 🟢{conf['bullish']} 🔴{conf['bearish']} ⚪{conf['neutral']}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🕐 الاتجاه العام (متعدد الإطارات): {d['tf_label']}
    ⚡ {d['tf_15m'].get('bias','—')} | RSI={d['tf_15m'].get('rsi','—')} | {tf_gold_impact(d['tf_15m'].get('score',0))} [15د]
@@ -1445,8 +1452,10 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    ⏰ {d['tf_4h'].get('bias','—')} | RSI={d['tf_4h'].get('rsi','—')} | {tf_gold_impact(d['tf_4h'].get('score',0))} [4س]
    📅 {d['tf_daily'].get('bias','—')} | RSI={d['tf_daily'].get('rsi','—')} | {tf_gold_impact(d['tf_daily'].get('score',0))} [1ي]
    📆 {d['tf_weekly'].get('bias','—')} | RSI={d['tf_weekly'].get('rsi','—')} | {tf_gold_impact(d['tf_weekly'].get('score',0))} [أسبوعي]
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📈 حركة السعر: {hist_line}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📡 الأسواق
    DXY:{d['dxy']:.1f}({d['dxy_bias']}) {'→🟢دعم ذهب' if d['dxy']<101 else '→🔴ضغط' if d['dxy']>104 else '→⚪محايد'} | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | 10Y:{d['tnx']:.2f}% | 30Y:{f"{d['tty']:.2f}%" if d['tty'] else '—'} | Spread(10Y-2Y):{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
@@ -1454,6 +1463,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    🎯 نسبة P/C:{f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
    {d['real_yield_brief']}
 {d['real_yield_signal']}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧮 المؤشرات وتأثيرها على الذهب
    RSI:{d['rsi']}({d['rsi_label'].split()[0]}) | {_rsi_gold_impact(d['rsi'])}
@@ -1462,6 +1472,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    ADX:{d['adx']}(DI+{d['di_plus']}/DI-{d['di_minus']}) | {_adx_gold_impact(d['adx'],d['di_plus'],d['di_minus'])}
    OBV:{d['obv_trend']} | {_obv_gold_impact(d['obv_trend'])}
    CCI:{d['cci']}({d['cci_label'].split()[0]}) | W%R:{d['williams_r']} | ATR:{d['atr']}$
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔢 المستويات
    🟣 مقاومة نفسية:{rn['nearest_resistance']}$(+{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(-{rn['dist_to_support']}$)

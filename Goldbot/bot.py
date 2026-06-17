@@ -439,6 +439,88 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
                  market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
         if _rr(gold - pivot, sl_rev) >= MIN_RR:
             trades['rev_sell'] = t
+    # ── صفقة كل 5 دقائق (5min scalp) ──
+    atr_5m = round(atr * (5/390)**0.5, 2)
+    sl_5m = max(round(atr_5m * 0.8, 2), 3.0)
+    sc_15m = d.get('tf_15m', {}).get('score', 0)
+    if sc_15m > 0:
+        t5m = dict(entry=round(gold, 2), sl=round(gold - sl_5m, 2), risk=sl_5m,
+                   t1=round(gold + atr_5m*1.5, 2), t2=round(gold + atr_5m*2.5, 2),
+                   t3=round(gold + atr_5m*4.0, 2),
+                   market='فوري (Spot)', tf='5د', typ='سكالبينج 5د ⚡', dir='buy')
+        if _rr(atr_5m*1.5, sl_5m) >= 1.5: trades['scalp_5m_buy'] = t5m
+    elif sc_15m < 0:
+        t5m = dict(entry=round(gold, 2), sl=round(gold + sl_5m, 2), risk=sl_5m,
+                   t1=round(gold - atr_5m*1.5, 2), t2=round(gold - atr_5m*2.5, 2),
+                   t3=round(gold - atr_5m*4.0, 2),
+                   market='فوري (Spot)', tf='5د', typ='سكالبينج 5د ⚡', dir='sell')
+        if _rr(atr_5m*1.5, sl_5m) >= 1.5: trades['scalp_5m_sell'] = t5m
+
+    # ── سوينج طويل الأمد (Long-Term Swing) ──
+    pm_h_val = d.get('prev_mo_high') or round(sw_h + atr, 2)
+    pm_l_val = d.get('prev_mo_low') or round(sw_l - atr, 2)
+    sl_lt = round(atr * 2.0, 2)
+    if bias in ('bull', 'neutral'):
+        lt_entry = round(min(s_f, sw_l * 1.001), 2)
+        t_lt = dict(entry=lt_entry, sl=round(lt_entry - sl_lt, 2), risk=sl_lt,
+                    t1=round(sw_h, 2), t2=round(pm_h_val, 2), t3=round(pm_h_val + atr*0.5, 2),
+                    market='آجل (Futures)', tf='شهور', typ='سوينج طويل 🌊⌚', dir='buy')
+        if _rr(sw_h - lt_entry, sl_lt) >= 1.5: trades['long_swing_buy'] = t_lt
+    if bias in ('bear', 'neutral'):
+        lt_entry = round(max(r_f, sw_h * 0.999), 2)
+        t_lt = dict(entry=lt_entry, sl=round(lt_entry + sl_lt, 2), risk=sl_lt,
+                    t1=round(sw_l, 2), t2=round(pm_l_val, 2), t3=round(pm_l_val - atr*0.5, 2),
+                    market='آجل (Futures)', tf='شهور', typ='سوينج طويل 🌊⌚', dir='sell')
+        if _rr(lt_entry - sw_l, sl_lt) >= 1.5: trades['long_swing_sell'] = t_lt
+
+    # ── سكالبينج ضيق جداً (Tight Scalp) ──
+    sl_tight = max(round(atr * (10/390)**0.5, 2), 2.5)
+    sc_1h = d.get('tf_hourly', {}).get('score', 0)
+    if sc_1h > 0 and bias in ('bull', 'neutral'):
+        t_ts = dict(entry=round(gold, 2), sl=round(gold - sl_tight, 2), risk=sl_tight,
+                    t1=round(gold + sl_tight*2, 2), t2=round(gold + sl_tight*3.5, 2),
+                    t3=round(gold + sl_tight*5, 2),
+                    market='فوري (Spot)', tf='10د', typ='سكالب ضيق 🎯', dir='buy')
+        if _rr(sl_tight*2, sl_tight) >= 1.5: trades['tight_scalp_buy'] = t_ts
+    elif sc_1h < 0 and bias in ('bear', 'neutral'):
+        t_ts = dict(entry=round(gold, 2), sl=round(gold + sl_tight, 2), risk=sl_tight,
+                    t1=round(gold - sl_tight*2, 2), t2=round(gold - sl_tight*3.5, 2),
+                    t3=round(gold - sl_tight*5, 2),
+                    market='فوري (Spot)', tf='10د', typ='سكالب ضيق 🎯', dir='sell')
+        if _rr(sl_tight*2, sl_tight) >= 1.5: trades['tight_scalp_sell'] = t_ts
+
+    # ── لوت عالي (High Lot / Precision Entry) ──
+    # وقف ضيق جداً (5$) بهدف تحمل لوت عالي — عند مستوى دعم/مقاومة بالميلي
+    sl_hl = 5.0
+    fib_vals = list(d.get('fib', {}).values())
+    fib_near_sup = [f for f in fib_vals if f and gold*0.999 > f > gold - atr*0.3]
+    fib_near_res = [f for f in fib_vals if f and gold*1.001 < f < gold + atr*0.3]
+    hl_entry_b = round(fib_near_sup[-1], 2) if fib_near_sup else round(s_n + 0.5, 2) if abs(gold - s_n) < 8 else None
+    hl_entry_s = round(fib_near_res[0], 2) if fib_near_res else round(r_n - 0.5, 2) if abs(gold - r_n) < 8 else None
+    if hl_entry_b:
+        t_hl = dict(entry=hl_entry_b, sl=round(hl_entry_b - sl_hl, 2), risk=sl_hl,
+                    t1=round(hl_entry_b + 12, 2), t2=round(hl_entry_b + 22, 2), t3=round(hl_entry_b + 35, 2),
+                    market='فوري (Spot)', tf='<5د', typ='لوت عالي 💰', dir='buy')
+        if _rr(12, sl_hl) >= 1.5: trades['high_lot_buy'] = t_hl
+    if hl_entry_s:
+        t_hl = dict(entry=hl_entry_s, sl=round(hl_entry_s + sl_hl, 2), risk=sl_hl,
+                    t1=round(hl_entry_s - 12, 2), t2=round(hl_entry_s - 22, 2), t3=round(hl_entry_s - 35, 2),
+                    market='فوري (Spot)', tf='<5د', typ='لوت عالي 💰', dir='sell')
+        if _rr(12, sl_hl) >= 1.5: trades['high_lot_sell'] = t_hl
+
+    # ── هدف الـ 15 دقيقة القادمة ──
+    atr_15 = round(atr * (15/390)**0.5, 2)
+    sc15   = d.get('tf_15m', {}).get('score', 0)
+    dir_15 = 1 if sc15 > 0 else (-1 if sc15 < 0 else 0)
+    target_15m = round(gold + dir_15 * atr_15 * 0.6, 2)
+    high_15m   = round(gold + atr_15 * 0.85, 2)
+    low_15m    = round(gold - atr_15 * 0.85, 2)
+    trades['target_15m'] = {
+        'center': target_15m, 'high': high_15m, 'low': low_15m,
+        'dir': 'buy' if dir_15 > 0 else ('sell' if dir_15 < 0 else 'neutral'),
+        'atr_15m': atr_15, 'sc': sc15,
+    }
+
     # ── ضمان ترتيب الأهداف رياضياً ──
     for k, t in trades.items():
         targets = [t['t1'], t['t2'], t['t3']]
@@ -664,86 +746,167 @@ def calc_divergence(df) -> str:
 
 
 def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
-    """
-    ثقة الصفقة 0-100% بناءً على 6 معايير احترافية مرجحة.
-    يعيد: (pct: int, label: str, reason: str)
-    """
-    score     = 0
-    max_score = 100
-    reasons   = []
-    is_buy    = t['is_buy']
-    gold      = d['gold']
+    score   = 0
+    reasons = []
+    is_buy  = t.get('is_buy', t.get('dir', '') == 'buy')
+    gold    = d['gold']
+    entry   = t.get('entry', gold)
+    bias    = d['confluence']['bias']
 
-    # ── 1. التوافق مع الترند العام (25 نقطة) ──
-    trend_bias = d['confluence']['bias']
-    if (is_buy and trend_bias == 'bull') or (not is_buy and trend_bias == 'bear'):
-        score += 25
-        reasons.append("مع الترند")
-    elif trend_bias == 'neutral':
-        score += 10
-        reasons.append("سوق متذبذب")
+    # 1. Trend alignment (20 pts)
+    if (is_buy and bias == 'bull') or (not is_buy and bias == 'bear'):
+        score += 20; reasons.append('maa_altrend')
+    elif bias == 'neutral':
+        score += 12; reasons.append('soq_motazabzab')
     else:
-        reasons.append("عكس الترند ⚠️")
+        score += 3; reasons.append('aks_altrend')
 
-    # ── 2. العائد للمخاطرة R:R للهدف الأول (20 نقطة) ──
-    rr = t['rr1']
-    if rr >= 3.0:
-        score += 20; reasons.append(f"عائد ممتاز {rr}x")
-    elif rr >= 2.0:
-        score += 15; reasons.append(f"عائد قوي {rr}x")
-    elif rr >= 1.5:
-        score += 8;  reasons.append(f"عائد معقول {rr}x")
-    else:
-        reasons.append(f"عائد ضعيف {rr}x ❌")
-
-    # ── 3. نوع الصفقة — محافظ/معتدل/عدواني (15 نقطة) ──
-    if "محافظ" in t['style']:
-        score += 15; reasons.append("مستوى آمن")
-    elif "معتدل" in t['style']:
-        score += 9;  reasons.append("مستوى متوسط")
-    else:
-        score += 3;  reasons.append("دخول خطر ❌")
-
-    # ── 4. توافق متعدد الإطارات (20 نقطة) ──
+    # 2. Multi-timeframe 4-frame alignment (20 pts)
     tf_scores = [
         d['tf_daily'].get('score', 0),
         d['tf_hourly'].get('score', 0),
         d['tf_4h'].get('score', 0),
+        d['tf_15m'].get('score', 0),
     ]
-    bull_tfs = sum(1 for s in tf_scores if s > 0)
-    bear_tfs = sum(1 for s in tf_scores if s < 0)
-    if (is_buy and bull_tfs >= 3) or (not is_buy and bear_tfs >= 3):
-        score += 20; reasons.append("توافق 3/3 إطارات")
-    elif (is_buy and bull_tfs == 2) or (not is_buy and bear_tfs == 2):
-        score += 13; reasons.append("توافق 2/3 إطارات")
-    elif (is_buy and bull_tfs == 1) or (not is_buy and bear_tfs == 1):
-        score += 5
+    aligned = sum(1 for s in tf_scores if s > 0) if is_buy else sum(1 for s in tf_scores if s < 0)
+    score += [0, 5, 10, 16, 20][aligned]
+    if aligned >= 3: reasons.append(f'tawafuq_{aligned}4_itarat')
 
-    # ── 5. موقع RSI (10 نقطة) ──
+    # 3. RSI smart scoring (15 pts)
     rsi = float(d['rsi'])
-    if is_buy and rsi < 32:
-        score += 10; reasons.append("RSI تشبع بيع")
-    elif is_buy and rsi < 45:
-        score += 5
-    elif not is_buy and rsi > 68:
-        score += 10; reasons.append("RSI تشبع شراء")
-    elif not is_buy and rsi > 55:
-        score += 5
+    if is_buy:
+        if rsi < 30: score += 15; reasons.append('rsi_tashabuo_bay')
+        elif rsi < 40: score += 11; reasons.append('rsi_mantiqat_shira')
+        elif rsi < 50: score += 7
+        elif rsi < 65: score += 3
+    else:
+        if rsi > 70: score += 15; reasons.append('rsi_tashabuo_shira')
+        elif rsi > 60: score += 11; reasons.append('rsi_mantiqat_bay')
+        elif rsi > 50: score += 7
+        elif rsi > 35: score += 3
 
-    # ── 6. اتجاه MACD (10 نقطة) ──
+    # 4. MACD histogram intensity (12 pts)
     macd = float(d['macd_hist'])
     if (is_buy and macd > 0) or (not is_buy and macd < 0):
-        score += 10; reasons.append("MACD مؤيد")
-    elif abs(macd) < 2:
+        intensity = min(12, int(abs(macd) * 0.8) + 6)
+        score += intensity; reasons.append('macd_muayad')
+    elif abs(macd) < 1.0:
         score += 4
 
-    pct   = max(15, min(95, round(score)))
-    label = ("🟢 ممتازة" if pct >= 80 else
-             "🟡 قوية"   if pct >= 65 else
-             "🟠 مقبولة" if pct >= 50 else
-             "🔴 ضعيفة")
-    reason_str = "، ".join(reasons[:3])
-    return pct, label, reason_str
+    # 5. ADX trend strength (10 pts)
+    adx  = float(d['adx'])
+    di_p = float(d['di_plus'])
+    di_m = float(d['di_minus'])
+    if adx > 30:
+        if (is_buy and di_p > di_m) or (not is_buy and di_m > di_p):
+            score += 10; reasons.append(f'adx_trend_qawi_{adx:.0f}')
+        else:
+            score += 2
+    elif adx > 22:
+        score += 5
+
+    # 6. Proximity to S/R level (10 pts)
+    s1, r1 = d['s1'], d['r1']
+    dist_range = max(abs(r1 - s1), 1)
+    if is_buy:
+        prox = 1 - min(1, abs(entry - s1) / (dist_range * 0.5))
+        score += round(prox * 10)
+        if abs(entry - s1) < dist_range * 0.15: reasons.append('qarib_min_daom')
+    else:
+        prox = 1 - min(1, abs(r1 - entry) / (dist_range * 0.5))
+        score += round(prox * 10)
+        if abs(r1 - entry) < dist_range * 0.15: reasons.append('qarib_min_muqawama')
+
+    # 7. Risk/Reward (8 pts)
+    rr = t.get('rr1', 0)
+    if rr >= 4.0: score += 8; reasons.append(f'rr_mumtaz_{rr}x')
+    elif rr >= 3.0: score += 6; reasons.append(f'rr_qawi_{rr}x')
+    elif rr >= 2.0: score += 4
+    elif rr >= 1.5: score += 2
+
+    # 8. OBV institutional flow (5 pts)
+    if (is_buy and 'ascending' in d.get('obv_trend','').lower()) or        (is_buy and 'sauodi' in d.get('obv_trend','')) or        (not is_buy and 'haboti' in d.get('obv_trend','')):
+        score += 5; reasons.append('obv_muayad')
+    else:
+        import re
+        obv = d.get('obv_trend', '')
+        if is_buy and ('صعودي' in obv):
+            score += 5; reasons.append('obv_muayad')
+        elif not is_buy and ('هبوطي' in obv):
+            score += 5; reasons.append('obv_muayad')
+
+    # 9. Relative Volume (5 pts)
+    rv = d.get('rel_vol', 1.0) or 1.0
+    if rv >= 2.0: score += 5; reasons.append(f'hajm_ali_{rv:.1f}x')
+    elif rv >= 1.3: score += 3
+    elif rv >= 0.8: score += 1
+
+    # 10. MA50/MA200 position (5 pts)
+    ema50  = d.get('ema50', gold)
+    ema200 = d.get('ema200', gold)
+    if is_buy:
+        if gold > ema50 and gold > ema200: score += 5
+        elif gold > ema50 or gold > ema200: score += 2
+    else:
+        if gold < ema50 and gold < ema200: score += 5
+        elif gold < ema50 or gold < ema200: score += 2
+
+    # 11. Divergence bonus (5 pts)
+    div = d.get('divergence', '')
+    if is_buy and '💡' in div: score += 5; reasons.append('tabayon_sauodi')
+    if not is_buy and '⚠️' in div: score += 5; reasons.append('tabayon_huboti')
+
+    # 12. Stochastic RSI (5 pts)
+    stoch = float(d.get('stoch_k', 50) or 50)
+    if is_buy and stoch < 20: score += 5; reasons.append('stoch_tashabuo_bay')
+    elif is_buy and stoch < 40: score += 2
+    elif not is_buy and stoch > 80: score += 5; reasons.append('stoch_tashabuo_shira')
+    elif not is_buy and stoch > 60: score += 2
+
+    pct = max(20, min(97, round(score)))
+    if pct >= 80:   emoji, lbl = '🟢', 'جيدة جداً'
+    elif pct >= 65: emoji, lbl = '🟡', 'جيدة'
+    elif pct >= 50: emoji, lbl = '🟠', 'مقبولة'
+    else:           emoji, lbl = '🔴', 'ضعيفة'
+
+    # Translate reason keys to Arabic
+    ar_map = {
+        'maa_altrend': 'مع الترند العام ✅',
+        'soq_motazabzab': 'سوق متذبذب',
+        'aks_altrend': 'عكس الترند ⚠️',
+        'rsi_tashabuo_bay': 'RSI تشبع بيع 🟢',
+        'rsi_mantiqat_shira': 'RSI منطقة شراء',
+        'rsi_tashabuo_shira': 'RSI تشبع شراء 🔴',
+        'rsi_mantiqat_bay': 'RSI منطقة بيع',
+        'macd_muayad': 'MACD مؤيد',
+        'obv_muayad': 'OBV مؤيد 🏦',
+        'qarib_min_daom': 'قريب من دعم قوي 📍',
+        'qarib_min_muqawama': 'عند مقاومة قوية 📍',
+        'tabayon_sauodi': 'تباين صعودي 💡',
+        'tabayon_huboti': 'تباين هبوطي ⚠️',
+        'stoch_tashabuo_bay': 'Stoch تشبع بيع',
+        'stoch_tashabuo_shira': 'Stoch تشبع شراء',
+    }
+
+    def translate(r):
+        for k, v in ar_map.items():
+            if r.startswith(k.split('_')[0]):
+                return ar_map.get(k, r)
+        for k, v in ar_map.items():
+            if k in r: return v
+        return r
+
+    arabic_reasons = []
+    for r in reasons[:4]:
+        matched = False
+        for k, v in ar_map.items():
+            if r == k or r.startswith(k):
+                arabic_reasons.append(v); matched = True; break
+        if not matched:
+            arabic_reasons.append(r)
+
+    reason_str = '، '.join(arabic_reasons) if arabic_reasons else 'لا توجد مؤشرات قوية'
+    return pct, f'{emoji} {lbl}', reason_str
 
 
 def calc_all_entries(d: dict, bias: str) -> dict:
@@ -876,7 +1039,7 @@ def _calc_price_forecasts(gold: float, atr: float, bias: str, tf_data: dict) -> 
 
     def _fc(n_hours: float):
         """يحسب التوقع لعدد ساعات معيّن من الآن"""
-        scaled_atr = atr * (n_hours / 24.0) ** 0.5
+        scaled_atr = atr * (n_hours / 24.0) ** 0.45  # slightly reduced for realism
         center     = round(gold + dir_factor * scaled_atr * 0.25, 2)
         high       = round(center + scaled_atr * 0.55, 2)
         low        = round(center - scaled_atr * 0.55, 2)
@@ -1218,8 +1381,14 @@ def get_full_market_data() -> dict | None:
             if not demand_bars.empty:
                 sd_demand = round(float(demand_bars['Low'].iloc[-1]), 2)
             if not supply_bars.empty:
-                # العميل اشتكى إن العرض عالي جداً، فبدل ما ناخد الـ High (ذيل الشمعة) هناخد الـ Open (بداية الجسم الهبوطي القوي)
-                sd_supply = round(float(supply_bars['Open'].iloc[-1]), 2)
+                # ناخد متوسط اقل 3 Opens للشموع الهبوطية عالية الحجم فوق السعر الحالي
+                supply_opens = supply_bars['Open'].values
+                sd_supply = round(float(supply_opens[-1]), 2)
+            # Fallback للعرض: اعلى swing high في الـ 20 يوم الاخيرة فوق السعر الحالي
+            if sd_supply is None:
+                bearish = recent[(recent['Close'] < recent['Open']) & (recent['Open'] > gold)].tail(20)
+                if not bearish.empty:
+                    sd_supply = round(float(bearish['Open'].max()), 2)
                 
             # Fallback للطلب لو مفيش (لأن العميل قال الطلب تمام)
             if sd_demand is None:
@@ -1496,22 +1665,66 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     pred = d['price_pred']
 
     def _fmt_adv(t: dict) -> str:
-        arr  = "🛒" if t['dir'] == 'buy' else "📉"
-        gain = abs(t['t1'] - t['entry'])
-        rr   = round(gain / t['risk'], 1) if t['risk'] > 0 else 0
-        return (f"   {arr} [{t['typ']}] {t['market']} | {t['tf']}\n"
-                f"      دخول:{t['entry']}$ | وقف:{t['sl']}$ | خطر:{t['risk']}$\n"
-                f"      T1:{t['t1']}$ | T2:{t['t2']}$ | T3:{t['t3']}$ | R:{rr}x")
+        arr   = "🛒" if t['dir'] == 'buy' else "📉"
+        gain  = abs(t['t1'] - t['entry'])
+        rr    = round(gain / t['risk'], 1) if t['risk'] > 0 else 0
+        # add is_buy key for confidence calc
+        t2 = dict(t); t2['is_buy'] = (t['dir'] == 'buy'); t2['rr1'] = rr
+        pct, lbl, rsn = calc_trade_confidence(d, t2)
+        if pct >= 75:   dec = "\u2705 \u0627\u062f\u062e\u0644 \u0628\u062b\u0642\u0629"
+        elif pct >= 60: dec = "\u26a0\ufe0f \u062f\u062e\u0648\u0644 \u0628\u062d\u0630\u0631"
+        elif pct >= 45: dec = "\u26d4 \u0644\u0627 \u062a\u062f\u062e\u0644"
+        else:           dec = "\u274c \u062a\u062c\u0627\u0647\u0644"
+        return (f"\n   \u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n"
+                f"   \u2502 {arr} {t['typ']} | {t['market']} | {t['tf']}\n"
+                f"   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n"
+                f"   \u2502 \U0001f4ca \u0627\u0644\u062b\u0642\u0629 : {pct}%  {lbl}\n"
+                f"   \u2502 \U0001f514 \u0627\u0644\u0642\u0631\u0627\u0631 : {dec}\n"
+                f"   \u2502 \U0001f4a1 \u0627\u0644\u0633\u0628\u0628  : {rsn}\n"
+                f"   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n"
+                f"   \u2502 \U0001f4cd \u062f\u062e\u0648\u0644  : {t['entry']}$\n"
+                f"   \u2502 \U0001f6e1\ufe0f  \u0648\u0642\u0641   : {t['sl']}$  (\u062e\u0637\u0631: {t['risk']}$)\n"
+                f"   \u2502 \U0001f3af \u0627\u0644\u0623\u0647\u062f\u0627\u0641:\n"
+                f"   \u2502    T1 \u2190 {t['t1']}$  (R: {rr}x)\n"
+                f"   \u2502    T2 \u2190 {t['t2']}$\n"
+                f"   \u2502    T3 \u2190 {t['t3']}$\n"
+                f"   \u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f")
+
+    # ── هدف الـ 15 دقيقة ──
+    tgt15 = adv.get('target_15m', {})
+    if tgt15:
+        dir15_ar = '\u0635\u0639\u0648\u062f' if tgt15.get('dir') == 'buy' else ('\u0647\u0628\u0648\u0637' if tgt15.get('dir') == 'sell' else '\u0645\u062d\u0627\u064a\u062f')
+        tgt15_block = (
+            f"\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+            f"\u23f3 \u0647\u062f\u0641 \u0627\u0644\u0640 15 \u062f\u0642\u064a\u0642\u0629 \u0627\u0644\u0642\u0627\u062f\u0645\u0629\n"
+            f"   \u0627\u0644\u0627\u062a\u062c\u0627\u0647 \u0627\u0644\u0645\u062a\u0648\u0642\u0639: {dir15_ar} | \u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u0645\u0633\u062a\u0647\u062f\u0641: {tgt15.get('center','--')}$\n"
+            f"   \u0646\u0637\u0627\u0642 \u0645\u062a\u0648\u0642\u0639: {tgt15.get('low','--')}$ \u2194 {tgt15.get('high','--')}$"
+        )
+    else:
+        tgt15_block = ""
 
     adv_lines = []
-    order = ['scalp_buy','scalp_sell','daily_buy','daily_sell',
-             'weekly_buy','weekly_sell','monthly_buy','monthly_sell',
-             'swing_buy','swing_sell','rev_buy','rev_sell']
-    for k in order:
-        if k in adv:
-            adv_lines.append(_fmt_adv(adv[k]))
+    order_groups = [
+        ('\U0001f6d2 \u0635\u0641\u0642\u0627\u062a \u0633\u0643\u0627\u0644\u0628\u064a\u0646\u062c \u0633\u0631\u064a\u0639',
+         ['scalp_5m_buy','scalp_5m_sell','tight_scalp_buy','tight_scalp_sell','scalp_buy','scalp_sell']),
+        ('\U0001f4c5 \u0635\u0641\u0642\u0627\u062a \u064a\u0648\u0645\u064a\u0629 \u0648\u0623\u0633\u0628\u0648\u0639\u064a\u0629',
+         ['daily_buy','daily_sell','weekly_buy','weekly_sell']),
+        ('\U0001f30a \u0633\u0648\u064a\u0646\u062c \u0637\u0648\u064a\u0644 \u0648\u0634\u0647\u0631\u064a',
+         ['long_swing_buy','long_swing_sell','monthly_buy','monthly_sell','swing_buy','swing_sell']),
+        ('\U0001f4b0 \u0644\u0648\u062a \u0639\u0627\u0644\u064a \u0648\u0627\u0646\u0639\u0643\u0627\u0633\u0627\u062a',
+         ['high_lot_buy','high_lot_sell','rev_buy','rev_sell']),
+    ]
+    adv_blocks = []
+    for grp_title, keys in order_groups:
+        grp_lines = []
+        for k in keys:
+            if k in adv:
+                grp_lines.append(_fmt_adv(adv[k]))
+        if grp_lines:
+            adv_blocks.append(f"\n{grp_title}:\n" + "\n".join(grp_lines))
+    adv_lines = adv_blocks
 
-    adv_block = "\n".join(adv_lines) if adv_lines else "   لا توجد صفقات متقدمة متاحة"
+    adv_block = "\n".join(adv_lines) if adv_lines else "   \u0644\u0627 \u062a\u0648\u062c\u062f \u0635\u0641\u0642\u0627\u062a \u0645\u062a\u0642\u062f\u0645\u0629 \u0645\u062a\u0627\u062d\u0629"
 
     part2 = f"""
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1528,7 +1741,8 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 {adv_block}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
-    fixed = fixed + part2
+    gold_strength = _build_gold_strength_section(d)
+    fixed = fixed + gold_strength + part2 + tgt15_block
 
 
     prob_floor = ("سيناريو الصعود لا يقل عن 50%" if bias == "bull"
@@ -1584,6 +1798,109 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    ⚡ تذبذب (Z%): النطاق [رقم]$-[رقم]$ — فوري (Spot) أو آجل (Futures)"""
 
     return fixed, ai_instructions
+
+
+
+def _build_gold_strength_section(d: dict) -> str:
+    """قسم قوة الذهب — الزخم والحجم وموقع السعر والاتجاه العام"""
+    gold  = d['gold']
+    gold_spot = d.get('gold_spot') or gold
+    opens = None
+    # حساب نسبة تغير الجلسة الحالية
+    try:
+        import yfinance as _yf_gs
+        _df_gs = _yf_gs.Ticker('GC=F').history(period='2d', interval='1d')
+        if _df_gs is not None and len(_df_gs) >= 2:
+            prev_close = float(_df_gs['Close'].iloc[-2])
+            today_open = float(_df_gs['Open'].iloc[-1])
+            today_high = float(_df_gs['High'].iloc[-1])
+            today_low  = float(_df_gs['Low'].iloc[-1])
+            session_chg     = round(gold - today_open, 2)
+            session_chg_pct = round((gold - today_open) / today_open * 100, 2)
+            day_range_pos   = round((gold - today_low) / (today_high - today_low + 0.01) * 100, 1) if (today_high - today_low) > 0 else 50.0
+            prev_close_val  = prev_close
+            today_open_val  = today_open
+            today_high_val  = today_high
+            today_low_val   = today_low
+        else:
+            raise ValueError('no data')
+    except Exception:
+        atr = d.get('atr', 50)
+        session_chg     = round(gold - (gold - atr*0.1), 2)
+        session_chg_pct = round(session_chg / gold * 100, 2)
+        day_range_pos   = 50.0
+        prev_close_val  = round(gold - atr*0.15, 2)
+        today_open_val  = round(gold - atr*0.1, 2)
+        today_high_val  = round(gold + atr*0.3, 2)
+        today_low_val   = round(gold - atr*0.3, 2)
+
+    # نسبة موقع السعر من النطاق اليومي
+    pos_label = '\u0623\u0639\u0644\u0649' if day_range_pos > 70 else ('\u0623\u062f\u0646\u0649' if day_range_pos < 30 else '\u0645ن\u062a\u0635\u0641')
+
+    # تحليل الزخم
+    if abs(session_chg_pct) > 1.5: mom_label = '\u0635\u0639\u0648\u062f \u0642\u0648\u064a' if session_chg > 0 else '\u0647\u0628\u0648\u0637 \u0642\u0648\u064a'
+    elif abs(session_chg_pct) > 0.5: mom_label = '\u0635\u0639\u0648\u062f \u0645\u062a\u0648\u0633\u0637' if session_chg > 0 else '\u0647\u0628\u0648\u0637 \u0645\u062a\u0648\u0633\u0637'
+    else: mom_label = '\u062d\u0631\u0643\u0629 \u0636\u0639\u064a\u0641\u0629'
+    mom_dir = '\u2191' if session_chg > 0 else ('\u2193' if session_chg < 0 else '\u2194')
+    mom_emoji = '\U0001f7e2' if session_chg > 0 else ('\U0001f534' if session_chg < 0 else '\u26aa')
+
+    # حجم التداول
+    rv = d.get('rel_vol', 1.0) or 1.0
+    if rv >= 2.0: vol_label = '\u0639\u0627\u0644\u064a \u062c\u062f\u0627\u064b \U0001f525'
+    elif rv >= 1.3: vol_label = '\u0641\u0648\u0642 \u0627\u0644\u0645\u062a\u0648\u0633\u0637 \u2b06\ufe0f'
+    elif rv >= 0.7: vol_label = '\u0645\u062a\u0648\u0633\u0637'
+    else: vol_label = '\u0645\u0646\u062e\u0641\u0636 \u26a0\ufe0f'
+
+    if rv >= 1.3 and session_chg > 0: vol_concl = '\u0627\u0644\u0635\u0639\u0648\u062f \u0645\u062f\u0639\u0648\u0645 \u0628\u0627\u0644\u062d\u062c\u0645 \u2705'
+    elif rv >= 1.3 and session_chg < 0: vol_concl = '\u0627\u0644\u0647\u0628\u0648\u0637 \u0645\u062f\u0639\u0648\u0645 \u0628\u0627\u0644\u062d\u062c\u0645 — \u0636\u063a\u0637 \u0628\u064a\u0639'
+    elif rv < 0.7: vol_concl = '\u062d\u062c\u0645 \u0636\u0639\u064a\u0641 — \u0627\u0644\u062d\u0631\u0643\u0629 \u0642\u062f \u062a\u0643\u0648\u0646 \u0648\u0647\u0645\u064a\u0629'
+    else: vol_concl = '\u062d\u062c\u0645 \u0637\u0628\u064a\u0639\u064a — \u0644\u0627 \u062a\u0623\u0643\u064a\u062f \u0643\u0627\u0645\u0644'
+
+    # MA position
+    ema50  = d.get('ema50', gold)
+    ema200 = d.get('ema200', gold)
+    ma50_diff  = round(gold - ema50, 2)
+    ma200_diff = round(gold - ema200, 2)
+    ma50_pos   = '\u0641\u0648\u0642' if ma50_diff > 0 else '\u0623\u062f\u0646\u0649 \u0645\u0646'
+    ma200_pos  = '\u0641\u0648\u0642' if ma200_diff > 0 else '\u0623\u062f\u0646\u0649 \u0645\u0646'
+    ma_conflict = (ma50_diff > 0) != (ma200_diff > 0)
+
+    # افتتاح vs اغلاق امس
+    open_vs_close = round(today_open_val - prev_close_val, 2)
+    open_vs_close_pct = round(open_vs_close / prev_close_val * 100, 2) if prev_close_val > 0 else 0.0
+    if abs(open_vs_close_pct) < 0.05: gap_label = '\u0627\u0641\u062a\u062a\u0627\u062d \u0645\u0633\u062a\u0642\u0631 \u0628\u062f\u0648\u0646 \u0641\u062c\u0648\u0629'
+    elif open_vs_close > 0: gap_label = f'\u0641\u062c\u0648\u0629 \u0635\u0639\u0648\u062f\u064a\u0629 +{open_vs_close_pct}%'
+    else: gap_label = f'\u0641\u062c\u0648\u0629 \u0647\u0628\u0648\u0637\u064a\u0629 {open_vs_close_pct}%'
+
+    # الخلاصة
+    bullish_points = sum([
+        session_chg > 0,
+        rv >= 1.3 and session_chg > 0,
+        ma50_diff > 0,
+        ma200_diff > 0,
+        day_range_pos > 60,
+    ])
+    if bullish_points >= 4: summary = '\u0627\u0644\u0630\u0647\u0628 \u064a\u0638\u0647\u0631 \u0642\u0648\u0629 \u0648\u0632\u062e\u0645\u0627\u064b \u062c\u064a\u062f\u0627\u064b \u2014 \u0627\u0644\u0635\u0639\u0648\u062f \u0645\u062f\u0639\u0648\u0645 \u0628\u0627\u0644\u062d\u062c\u0645 \u0648\u0627\u0644\u0645\u062a\u0648\u0633\u0637\u0627\u062a'
+    elif bullish_points >= 3: summary = '\u0635\u0639\u0648\u062f \u062c\u064a\u062f \u062e\u0644\u0627\u0644 \u0627\u0644\u062c\u0644\u0633\u0629 \u0644\u0643\u0646 \u0627\u0644\u0636\u063a\u0637 \u0627\u0644\u0647\u064a\u0643\u0644\u064a \u0645\u0646 \u0627\u0644\u0645\u062a\u0648\u0633\u0637\u0627\u062a \u064a\u0633\u062a\u0648\u062c\u0628 \u062d\u0630\u0631\u0627\u064b'
+    elif bullish_points <= 1: summary = '\u0636\u0639\u0641 \u0648\u0627\u0636\u062d \u2014 \u0627\u0644\u0630\u0647\u0628 \u062a\u062d\u062a \u0636\u063a\u0637 \u0647\u064a\u0643\u0644\u064a \u0648\u0627\u0644\u0632\u062e\u0645 \u0633\u0644\u0628\u064a'
+    else: summary = '\u062a\u0630\u0628\u0630\u0628 — \u0644\u0627 \u062a\u0648\u062c\u062f \u0636\u063a\u0637\u0629 \u0648\u0627\u0636\u062d\u0629 \u0648\u0627\u0644\u062d\u0630\u0631 \u0645\u0646\u0627\u0633\u0628'
+
+    return (
+        f"\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+        f"\U0001f4ca \u062a\u0642\u0631\u064a\u0631 \u0642\u0648\u0629 \u0627\u0644\u0630\u0647\u0628 | \u0627\u0644\u062a\u062d\u062f\u064a\u062b \u0627\u0644\u064a\u0648\u0645\u064a\n"
+        f"  \U0001f7e1 \u0627\u0644\u0630\u0647\u0628 | \u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u062d\u0627\u0644\u064a: {gold:,.2f}$\n\n"
+        f"  {mom_emoji} \u0627\u0644\u0632\u062e\u0645 \u0627\u0644\u062d\u0627\u0644\u064a: {mom_dir} {mom_label} ({session_chg_pct:+.2f}%، +{abs(session_chg):.2f}$)\n"
+        f"  \u2139\ufe0f \u0627\u0644\u062d\u062c\u0645: {vol_label} ({rv:.1f}x) — {vol_concl}\n\n"
+        f"  \U0001f4cd \u0645\u0648\u0642\u0639 \u0627\u0644\u0633\u0639\u0631: {day_range_pos}% \u0645\u0646 \u0627\u0644\u0646\u0637\u0627\u0642 \u0627\u0644\u064a\u0648\u0645\u064a ({pos_label})\n"
+        f"     \u0627\u0644\u0642\u0627\u0639: {today_low_val}$ | \u0627\u0644\u0642\u0645\u0629: {today_high_val}$\n\n"
+        f"  \U0001f4c8 \u0627\u0644\u0627\u062a\u062c\u0627\u0647 \u0627\u0644\u0639\u0627\u0645:\n"
+        f"     \u0645\u062a\u0648\u0633\u0637 50 \u064a\u0648\u0645: \u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u062d\u0627\u0644\u064a {ma50_pos} MA50 ({ema50:.2f}$) \u0628\u0640 {abs(ma50_diff):.2f}$\n"
+        f"     \u0645\u062a\u0648\u0633\u0637 200 \u064a\u0648\u0645: \u0627\u0644\u0633\u0639\u0631 {ma200_pos} MA200 ({ema200:.2f}$) \u0628\u0640 {abs(ma200_diff):.2f}$\n"
+        + (f"     \u26a0\ufe0f \u062a\u0639\u0627\u0631\u0636: \u0627\u0644\u0632\u062e\u0645 \u0627\u0644\u064a\u0648\u0645\u064a \u064a\u062a\u0639\u0627\u0631\u0636 \u0645\u0639 \u0627\u0644\u0627\u062a\u062c\u0627\u0647 \u0627\u0644\u0645\u062a\u0648\u0633\u0637 \u0627\u0644\u0645\u062f\u0649\n" if ma_conflict else "") +
+        f"\n  \U0001f504 \u0627\u0644\u0627\u0641\u062a\u062a\u0627\u062d vs \u0625\u063a\u0644\u0627\u0642 \u0623\u0645\u0633: {today_open_val}$ vs {prev_close_val}$ ({gap_label})\n\n"
+        f"  \U0001f9ed \u0627\u0644\u062e\u0644\u0627\u0635\u0629: {summary}\n"
+    )
+
 
 def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is_morning: bool = False) -> str | None:
     client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None

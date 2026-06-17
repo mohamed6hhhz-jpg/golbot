@@ -2064,6 +2064,27 @@ def _build_today_ohlc_section(d: dict) -> str:
     nearest_fib_high = fib_vals_above[0] if fib_vals_above else pred_high
     nearest_fib_low  = fib_vals_below[0] if fib_vals_below else pred_low
 
+    # الاتجاه خلال ساعة والاتجاه خلال اليوم
+    diff_1h = fc_1h.get('close', gold) - gold
+    if diff_1h > atr * 0.05: trend_1h = 'صاعد 📈'
+    elif diff_1h < -atr * 0.05: trend_1h = 'هابط 📉'
+    else: trend_1h = 'عرضي (متذبذب) ↔️'
+
+    diff_1d = pred_close - gold
+    if diff_1d > atr * 0.15: trend_1d = 'صاعد 📈'
+    elif diff_1d < -atr * 0.15: trend_1d = 'هابط 📉'
+    else: trend_1d = 'عرضي (متذبذب) ↔️'
+
+    # أيهما يضرب أولاً
+    if bull_prob > bear_prob + 10:
+        hit_first = 'القمة أولاً 🔺 (ضغط شراء وزخم صاعد)'
+    elif bear_prob > bull_prob + 10:
+        hit_first = 'القاع أولاً 🔻 (ضغط بيع وزخم هابط)'
+    else:
+        if diff_1d > 0: hit_first = 'القمة أولاً 🔺 (ميل إيجابي طفيف)'
+        elif diff_1d < 0: hit_first = 'القاع أولاً 🔻 (ميل سلبي طفيف)'
+        else: hit_first = 'غير محدد ⚖️ (سوق عرضي بحت)'
+
     lines_out = [
         "\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501",
         "\U0001f4ca \u062a\u0648\u0642\u0639\u0627\u062a \u064a\u0648\u0645 \u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629",

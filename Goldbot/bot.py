@@ -1838,11 +1838,10 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
 
 def _build_gold_strength_section(d: dict) -> str:
-    """قسم قوة الذهب — الزخم والحجم وموقع السعر والاتجاه العام"""
+    """قسم قوة الذهب — بالصيغة النصية التفصيلية المطلوبة"""
     gold  = d['gold']
-    gold_spot = d.get('gold_spot') or gold
-    opens = None
-    # حساب نسبة تغير الجلسة الحالية
+    
+    # محاولة جلب بيانات اليوم والأمس من yfinance
     try:
         import yfinance as _yf_gs
         _df_gs = _yf_gs.Ticker('GC=F').history(period='2d', interval='1d')
@@ -1851,94 +1850,144 @@ def _build_gold_strength_section(d: dict) -> str:
             today_open = float(_df_gs['Open'].iloc[-1])
             today_high = float(_df_gs['High'].iloc[-1])
             today_low  = float(_df_gs['Low'].iloc[-1])
-            session_chg     = round(gold - today_open, 2)
-            session_chg_pct = round((gold - today_open) / today_open * 100, 2)
-            day_range_pos   = round((gold - today_low) / (today_high - today_low + 0.01) * 100, 1) if (today_high - today_low) > 0 else 50.0
-            prev_close_val  = prev_close
-            today_open_val  = today_open
-            today_high_val  = today_high
-            today_low_val   = today_low
+            session_chg     = gold - today_open
+            session_chg_pct = (gold - today_open) / today_open * 100
+            day_range_pos   = (gold - today_low) / (today_high - today_low + 0.01) * 100 if (today_high - today_low) > 0 else 50.0
         else:
             raise ValueError('no data')
     except Exception:
         atr = d.get('atr', 50)
-        session_chg     = round(gold - (gold - atr*0.1), 2)
-        session_chg_pct = round(session_chg / gold * 100, 2)
+        session_chg     = gold - (gold - atr*0.1)
+        session_chg_pct = session_chg / gold * 100
         day_range_pos   = 50.0
-        prev_close_val  = round(gold - atr*0.15, 2)
-        today_open_val  = round(gold - atr*0.1, 2)
-        today_high_val  = round(gold + atr*0.3, 2)
-        today_low_val   = round(gold - atr*0.3, 2)
+        prev_close      = gold - atr*0.15
+        today_open      = gold - atr*0.1
+        today_high      = gold + atr*0.3
+        today_low       = gold - atr*0.3
 
-    # نسبة موقع السعر من النطاق اليومي
-    pos_label = '\u0623\u0639\u0644\u0649' if day_range_pos > 70 else ('\u0623\u062f\u0646\u0649' if day_range_pos < 30 else '\u0645ن\u062a\u0635\u0641')
+    is_up = session_chg >= 0
+    dir_str_noun = 'ارتفاعاً' if is_up else 'انخفاضاً'
+    dir_str_adj  = 'صعوداً' if is_up else 'هبوطاً'
+    dir_str_act  = 'بزيادة' if is_up else 'بانخفاض'
+    dir_str_noun_def = 'الصعود' if is_up else 'الهبوط'
+    dir_str_action = 'شرائياً' if is_up else 'بيعياً'
+    dir_str_fem = 'الصاعدة' if is_up else 'الهابطة'
 
-    # تحليل الزخم
-    if abs(session_chg_pct) > 1.5: mom_label = '\u0635\u0639\u0648\u062f \u0642\u0648\u064a' if session_chg > 0 else '\u0647\u0628\u0648\u0637 \u0642\u0648\u064a'
-    elif abs(session_chg_pct) > 0.5: mom_label = '\u0635\u0639\u0648\u062f \u0645\u062a\u0648\u0633\u0637' if session_chg > 0 else '\u0647\u0628\u0648\u0637 \u0645\u062a\u0648\u0633\u0637'
-    else: mom_label = '\u062d\u0631\u0643\u0629 \u0636\u0639\u064a\u0641\u0629'
-    mom_dir = '\u2191' if session_chg > 0 else ('\u2193' if session_chg < 0 else '\u2194')
-    mom_emoji = '\U0001f7e2' if session_chg > 0 else ('\U0001f534' if session_chg < 0 else '\u26aa')
+    # ── 1. الزخم الحالي ──
+    abs_pct = abs(session_chg_pct)
+    if abs_pct > 1.2:
+        mom_level = 'قوياً جداً'
+        mom_desc  = 'يشير إلى قوة استثنائية'
+        mom_press = f'يعكس ضغطاً {dir_str_action} كبيراً'
+    elif abs_pct > 0.5:
+        mom_level = 'متوسط المستوى'
+        mom_desc  = 'لا يشير إلى قوة استثنائية'
+        mom_press = f'لكنه يعكس ضغطاً {dir_str_action} ملحوظاً'
+    else:
+        mom_level = 'ضعيفاً'
+        mom_desc  = 'يعكس حركة طفيفة'
+        mom_press = 'وهو ما يعكس استقراراً نسبياً'
 
-    # حجم التداول
+    momentum_text = f"الذهب يسجل {dir_str_noun} خلال الجلسة الحالية بنسبة {abs_pct:.2f}% و{dir_str_act} {abs(session_chg):.2f} دولار. يُعدّ هذا {dir_str_adj} {mom_level}، {mom_desc}، {mom_press} خلال الجلسة."
+
+    # ── 2. حجم التداول ──
     rv = d.get('rel_vol', 1.0) or 1.0
-    if rv >= 2.0: vol_label = '\u0639\u0627\u0644\u064a \u062c\u062f\u0627\u064b \U0001f525'
-    elif rv >= 1.3: vol_label = '\u0641\u0648\u0642 \u0627\u0644\u0645\u062a\u0648\u0633\u0637 \u2b06\ufe0f'
-    elif rv >= 0.7: vol_label = '\u0645\u062a\u0648\u0633\u0637'
-    else: vol_label = '\u0645\u0646\u062e\u0641\u0636 \u26a0\ufe0f'
+    if rv >= 1.5:
+        vol_title = 'حجم مرتفع'
+        vol_desc  = 'يقع ضمن المستوى المرتفع'
+        vol_supp  = 'قوياً'
+        vol_end   = 'مما يُشير إلى اهتمام استثنائي من السوق'
+    elif rv >= 0.8:
+        vol_title = 'حجم متوسط'
+        vol_desc  = 'يقع ضمن المستوى الطبيعي'
+        vol_supp  = 'مقبولاً'
+        vol_end   = 'دون أن يُشير إلى اهتمام استثنائي من السوق'
+    else:
+        vol_title = 'حجم ضعيف'
+        vol_desc  = 'يقع ضمن المستوى المنخفض'
+        vol_supp  = 'ضعيفاً'
+        vol_end   = 'مما يدل على غياب السيولة القوية'
 
-    if rv >= 1.3 and session_chg > 0: vol_concl = '\u0627\u0644\u0635\u0639\u0648\u062f \u0645\u062f\u0639\u0648\u0645 \u0628\u0627\u0644\u062d\u062c\u0645 \u2705'
-    elif rv >= 1.3 and session_chg < 0: vol_concl = '\u0627\u0644\u0647\u0628\u0648\u0637 \u0645\u062f\u0639\u0648\u0645 \u0628\u0627\u0644\u062d\u062c\u0645 — \u0636\u063a\u0637 \u0628\u064a\u0639'
-    elif rv < 0.7: vol_concl = '\u062d\u062c\u0645 \u0636\u0639\u064a\u0641 — \u0627\u0644\u062d\u0631\u0643\u0629 \u0642\u062f \u062a\u0643\u0648\u0646 \u0648\u0647\u0645\u064a\u0629'
-    else: vol_concl = '\u062d\u062c\u0645 \u0637\u0628\u064a\u0639\u064a — \u0644\u0627 \u062a\u0623\u0643\u064a\u062f \u0643\u0627\u0645\u0644'
+    volume_text = f"{vol_title}\nحجم التداول الحالي {vol_desc}، ويُعطي دعماً {vol_supp} للحركة {dir_str_fem} {vol_end}."
 
-    # MA position
-    ema50  = d.get('ema50', gold)
+    # ── 3. نتيجة الزخم والحجم ──
+    mom_vol_title = 'نتيجة الزخم والحجم:'
+    if abs_pct > 1.2 and rv >= 1.5:
+        mom_vol_text = f"{dir_str_noun_def} الحالي قوي جداً ويحظى بدعم قوي من حجم التداول. يوجد توافق قوي بين الزخم والحجم، مما يؤكد قوة الاتجاه. الدخول مع الاتجاه مفضل في هذه المرحلة."
+    elif abs_pct <= 0.5 and rv < 0.8:
+        mom_vol_text = f"{dir_str_noun_def} الحالي ضعيف ويحظى بدعم ضعيف من حجم التداول. يوجد توافق على الضعف بين الزخم والحجم، مما يستدعي الحذر الشديد من الحركات الوهمية."
+    else:
+        mom_vol_text = f"{dir_str_noun_def} الحالي متوسط المستوى ويحظى بدعم نسبي من حجم التداول. لا يوجد تعارض واضح بين الزخم والحجم، غير أن الحركة لا ترقى إلى مستوى {dir_str_noun_def} المدعوم بالكامل. الحذر النسبي مناسب في هذه المرحلة."
+
+    # ── 4. موقع السعر ──
+    if day_range_pos > 66:
+        pos_desc = 'العلوي'
+    elif day_range_pos < 33:
+        pos_desc = 'السفلي'
+    else:
+        pos_desc = 'الأوسط'
+    price_pos_text = f"السعر الحالي عند {gold:,.2f} دولار يتداول في الجزء {pos_desc} من النطاق اليومي، إذ تبلغ نسبة موقعه {day_range_pos:.2f}% من النطاق بين القاع اليومي {today_low:,.2f} والقمة اليومية {today_high:,.2f}. هذا يُشير إلى ميل السعر نحو الجانب {pos_desc} من الحركة اليومية."
+
+    # ── 5. الاتجاه العام ──
+    ema50 = d.get('ema50', gold)
     ema200 = d.get('ema200', gold)
-    ma50_diff  = round(gold - ema50, 2)
-    ma200_diff = round(gold - ema200, 2)
-    ma50_pos   = '\u0641\u0648\u0642' if ma50_diff > 0 else '\u0623\u062f\u0646\u0649 \u0645\u0646'
-    ma200_pos  = '\u0641\u0648\u0642' if ma200_diff > 0 else '\u0623\u062f\u0646\u0649 \u0645\u0646'
-    ma_conflict = (ma50_diff > 0) != (ma200_diff > 0)
+    
+    ma50_state = 'أعلى' if gold > ema50 else 'أدنى'
+    ma50_match = 'يتوافق' if (gold > ema50) == is_up else 'يتعارض'
+    ma50_desc  = 'يدعم السعر بقوة' if (gold > ema50) == is_up else 'ما زال يُشير إلى ضعف السعر' if not is_up else 'ما زال يُشير إلى ضغط على السعر'
+    ma50_text = f"متوسط 50 يوم:\nالسعر الحالي {ma50_state} من متوسط 50 يوم البالغ {ema50:,.2f} دولار. هذا يعني أن الزخم اليومي {ma50_match} مع الاتجاه المتوسط المدى، والذي {ma50_desc} على المدى المتوسط."
 
-    # افتتاح vs اغلاق امس
-    open_vs_close = round(today_open_val - prev_close_val, 2)
-    open_vs_close_pct = round(open_vs_close / prev_close_val * 100, 2) if prev_close_val > 0 else 0.0
-    if abs(open_vs_close_pct) < 0.05: gap_label = '\u0627\u0641\u062a\u062a\u0627\u062d \u0645\u0633\u062a\u0642\u0631 \u0628\u062f\u0648\u0646 \u0641\u062c\u0648\u0629'
-    elif open_vs_close > 0: gap_label = f'\u0641\u062c\u0648\u0629 \u0635\u0639\u0648\u062f\u064a\u0629 +{open_vs_close_pct}%'
-    else: gap_label = f'\u0641\u062c\u0648\u0629 \u0647\u0628\u0648\u0637\u064a\u0629 {open_vs_close_pct}%'
+    ma200_state = 'أعلى' if gold > ema200 else 'أدنى'
+    ma200_desc = 'يدعم السعر من الأسفل' if gold > ema200 else 'يضغط على السعر من الأعلى'
+    ma_support = 'مدعوماً بشكل هيكلي' if (gold > ema50 and gold > ema200) == is_up else 'يواجه ضغطاً هيكلياً'
+    ma200_text = f"متوسط 200 يوم:\nالسعر أيضاً {ma200_state} من متوسط 200 يوم البالغ {ema200:,.2f} دولار. الاتجاه العام على المدى البعيد ما زال {ma200_desc}، مما يعني أن {dir_str_noun_def} الحالي {ma_support} من كلا المتوسطين."
 
-    # الخلاصة
-    bullish_points = sum([
-        session_chg > 0,
-        rv >= 1.3 and session_chg > 0,
-        ma50_diff > 0,
-        ma200_diff > 0,
-        day_range_pos > 60,
-    ])
-    if bullish_points >= 4: summary = '\u0627\u0644\u0630\u0647\u0628 \u064a\u0638\u0647\u0631 \u0642\u0648\u0629 \u0648\u0632\u062e\u0645\u0627\u064b \u062c\u064a\u062f\u0627\u064b \u2014 \u0627\u0644\u0635\u0639\u0648\u062f \u0645\u062f\u0639\u0648\u0645 \u0628\u0627\u0644\u062d\u062c\u0645 \u0648\u0627\u0644\u0645\u062a\u0648\u0633\u0637\u0627\u062a'
-    elif bullish_points >= 3: summary = '\u0635\u0639\u0648\u062f \u062c\u064a\u062f \u062e\u0644\u0627\u0644 \u0627\u0644\u062c\u0644\u0633\u0629 \u0644\u0643\u0646 \u0627\u0644\u0636\u063a\u0637 \u0627\u0644\u0647\u064a\u0643\u0644\u064a \u0645\u0646 \u0627\u0644\u0645\u062a\u0648\u0633\u0637\u0627\u062a \u064a\u0633\u062a\u0648\u062c\u0628 \u062d\u0630\u0631\u0627\u064b'
-    elif bullish_points <= 1: summary = '\u0636\u0639\u0641 \u0648\u0627\u0636\u062d \u2014 \u0627\u0644\u0630\u0647\u0628 \u062a\u062d\u062a \u0636\u063a\u0637 \u0647\u064a\u0643\u0644\u064a \u0648\u0627\u0644\u0632\u062e\u0645 \u0633\u0644\u0628\u064a'
-    else: summary = '\u062a\u0630\u0628\u0630\u0628 — \u0644\u0627 \u062a\u0648\u062c\u062f \u0636\u063a\u0637\u0629 \u0648\u0627\u0636\u062d\u0629 \u0648\u0627\u0644\u062d\u0630\u0631 \u0645\u0646\u0627\u0633\u0628'
+    # ── 6. الافتتاح والاغلاق ──
+    open_vs_close = today_open - prev_close
+    open_vs_close_pct = (open_vs_close / prev_close * 100) if prev_close > 0 else 0.0
+    if abs(open_vs_close_pct) < 0.15:
+        gap_desc = 'لا يتجاوز'
+        gap_res  = 'مستقر دون فجوة سعرية تُذكر'
+    else:
+        gap_desc = 'يبلغ'
+        gap_res  = 'بفجوة سعرية واضحة'
+    gap_text = f"افتتحت الجلسة الحالية عند {today_open:,.2f} دولار مقارنةً بإغلاق أمس عند {prev_close:,.2f} دولار. الفارق بينهما {gap_desc} {abs(open_vs_close_pct):.2f}%، مما يُشير إلى افتتاح {gap_res}. {dir_str_noun_def} الحالي جاء بعد الافتتاح خلال الجلسة."
+
+    # ── 7. الخلاصة النهائية ──
+    ma_aligned = ((gold > ema50) == is_up) and ((gold > ema200) == is_up)
+    if abs_pct > 1.2 and rv >= 1.5 and ma_aligned:
+        sum_warn = 'مدعوم بقوة'
+        sum_ma = 'يدعم'
+        sum_end = 'وهي مدعومة بشكل هيكلي'
+    else:
+        sum_warn = 'يحتاج حذر'
+        sum_ma = 'لا يدعم' if not ma_aligned else 'يدعم'
+        sum_end = 'لكنها تواجه ضغطاً هيكلياً' if not ma_aligned else 'وهي مدعومة بشكل هيكلي'
+
+    summary_text = f"وفقاً للمعلومات المتوفرة، فإن {dir_str_noun_def} الحالي في الذهب {sum_warn}. الزخم {mom_level} وحجم التداول {vol_title.replace('حجم ', '')}، كما أن السعر ما زال يتداول {'أعلى' if gold > ema50 else 'أسفل'} متوسط 50 و{'أعلى' if gold > ema200 else 'أسفل'} متوسط 200 يوم، مما يعني أن الاتجاه العام على المدى المتوسط والبعيد {sum_ma} هذا {dir_str_noun_def} بشكل كامل. الحركة {dir_str_fem} اليومية قائمة، {sum_end} من المتوسطات العامة."
 
     return (
-        f"\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
-        f"\U0001f4ca \u062a\u0642\u0631\u064a\u0631 \u0642\u0648\u0629 \u0627\u0644\u0630\u0647\u0628 | \u0627\u0644\u062a\u062d\u062f\u064a\u062b \u0627\u0644\u064a\u0648\u0645\u064a\n"
-        f"  \U0001f7e1 \u0627\u0644\u0630\u0647\u0628 | \u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u062d\u0627\u0644\u064a: {gold:,.2f}$\n\n"
-        f"  {mom_emoji} \u0627\u0644\u0632\u062e\u0645 \u0627\u0644\u062d\u0627\u0644\u064a: {mom_dir} {mom_label} ({session_chg_pct:+.2f}%، +{abs(session_chg):.2f}$)\n"
-        f"  \u2139\ufe0f \u0627\u0644\u062d\u062c\u0645: {vol_label} ({rv:.1f}x) — {vol_concl}\n\n"
-        f"  \U0001f4cd \u0645\u0648\u0642\u0639 \u0627\u0644\u0633\u0639\u0631: {day_range_pos}% \u0645\u0646 \u0627\u0644\u0646\u0637\u0627\u0642 \u0627\u0644\u064a\u0648\u0645\u064a ({pos_label})\n"
-        f"     \u0627\u0644\u0642\u0627\u0639: {today_low_val}$ | \u0627\u0644\u0642\u0645\u0629: {today_high_val}$\n\n"
-        f"  \U0001f4c8 \u0627\u0644\u0627\u062a\u062c\u0627\u0647 \u0627\u0644\u0639\u0627\u0645:\n"
-        f"     \u0645\u062a\u0648\u0633\u0637 50 \u064a\u0648\u0645: \u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u062d\u0627\u0644\u064a {ma50_pos} MA50 ({ema50:.2f}$) \u0628\u0640 {abs(ma50_diff):.2f}$\n"
-        f"     \u0645\u062a\u0648\u0633\u0637 200 \u064a\u0648\u0645: \u0627\u0644\u0633\u0639\u0631 {ma200_pos} MA200 ({ema200:.2f}$) \u0628\u0640 {abs(ma200_diff):.2f}$\n"
-        + (f"     \u26a0\ufe0f \u062a\u0639\u0627\u0631\u0636: \u0627\u0644\u0632\u062e\u0645 \u0627\u0644\u064a\u0648\u0645\u064a \u064a\u062a\u0639\u0627\u0631\u0636 \u0645\u0639 \u0627\u0644\u0627\u062a\u062c\u0627\u0647 \u0627\u0644\u0645\u062a\u0648\u0633\u0637 \u0627\u0644\u0645\u062f\u0649\n" if ma_conflict else "") +
-        f"\n  \U0001f504 \u0627\u0644\u0627\u0641\u062a\u062a\u0627\u062d vs \u0625\u063a\u0644\u0627\u0642 \u0623\u0645\u0633: {today_open_val}$ vs {prev_close_val}$ ({gap_label})\n\n"
-        f"  \U0001f9ed \u0627\u0644\u062e\u0644\u0627\u0635\u0629: {summary}\n"
+        f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 تقرير قوة الذهب | التحديث اليومي\n\n"
+        f"🟡 الذهب\n\n"
+        f"السعر الحالي:\n"
+        f"{gold:,.2f} دولار\n\n"
+        f"⚡️ الزخم الحالي:\n"
+        f"{momentum_text}\n\n"
+        f"📊 حجم التداول:\n"
+        f"{volume_text}\n\n"
+        f"📌 نتيجة الزخم والحجم:\n"
+        f"{mom_vol_text}\n\n"
+        f"📍 موقع السعر:\n"
+        f"{price_pos_text}\n\n"
+        f"📈 الاتجاه العام:\n\n"
+        f"{ma50_text}\n\n"
+        f"{ma200_text}\n\n"
+        f"🔄 مقارنة الافتتاح والإغلاق السابق:\n"
+        f"{gap_text}\n\n"
+        f"🧭 الخلاصة النهائية:\n"
+        f"{summary_text}\n"
     )
-
-
-
 
 def _build_today_ohlc_section(d: dict) -> str:
     """

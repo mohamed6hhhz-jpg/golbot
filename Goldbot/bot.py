@@ -521,15 +521,17 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
         'atr_15m': atr_15, 'sc': sc15,
     }
 
-    # ── ضمان ترتيب الأهداف رياضياً ──
+    # ── ضمان ترتيب الأهداف رياضياً — تخطي أي صفقة ليس فيها t1/t2/t3 ──
     for k, t in trades.items():
+        if 't1' not in t or 't2' not in t or 't3' not in t:
+            continue  # target_15m وأي صفقة خاصة لها هيكل مختلف
         targets = [t['t1'], t['t2'], t['t3']]
-        if t['dir'] == 'buy':
+        if t.get('dir') == 'buy':
             targets.sort()
         else:
             targets.sort(reverse=True)
         t['t1'], t['t2'], t['t3'] = targets
-        
+
     return trades
 
 

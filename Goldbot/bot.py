@@ -1022,28 +1022,61 @@ def calc_all_entries(d: dict, bias: str) -> dict:
 # ══════════════════════════════════════════════
 def _calc_price_forecasts(gold: float, atr: float, bias: str, tf_data: dict) -> dict:
     """
-    توقع الإغلاق والقمة والقاع باستخدام ATR × جذر(n) مع تعديل الاتجاه.
-    الإطارات: 1h, 4h, 1d, 1w, 1mo
+    توقع الإغلاق والقمة والقاع — معادلة محسّنة متعددة العوامل:
+    ATR × جذر(n) مُرجَّح بـ: اتجاه الترند + ADX + RSI + توافق الإطارات + فيبوناتشي
     """
-    if bias == "bull":
-        dir_factor = 1.0
-    elif bias == "bear":
-        dir_factor = -1.0
-    else:
-        # في حالة التذبذب نستخدم RSI + MACD الساعي لاشتقاق الميل الفعلي
-        rsi_1h  = float(tf_data.get('tf_hourly', {}).get('rsi', 50) or 50)
-        macd_1h = float(tf_data.get('tf_hourly', {}).get('macd_hist', 0) or 0)
-        rsi_bias  = (rsi_1h - 50) / 50          # نطاق -1 إلى +1
-        macd_bias = 0.4 if macd_1h > 0 else (-0.4 if macd_1h < 0 else 0.0)
-        dir_factor = round((rsi_bias * 0.6 + macd_bias * 0.4), 3)  # مرجح
+    import numpy as np
 
+    # ── استخراج عوامل الترند ──
+    rsi_1h   = float(tf_data.get('tf_hourly', {}).get('rsi', 50) or 50)
+    rsi_4h   = float(tf_data.get('tf_4h', {}).get('rsi', 50) or 50)
+    rsi_1d   = float(tf_data.get('tf_daily', {}).get('rsi', 50) or 50)
+    macd_1h  = float(tf_data.get('tf_hourly', {}).get('macd_hist', 0) or 0)
+    adx_val  = float(tf_data.get('tf_daily', {}).get('adx', 20) or 20)
+
+    # نحسب الميل المرجّح من 3 إطارات (1h, 4h, 1d)
+    def rsi_to_bias(r): return (r - 50) / 50.0   # -1 to +1
+
+    if bias == 'bull':
+        base_dir = 1.0
+    elif bias == 'bear':
+        base_dir = -1.0
+    else:
+        # في التذبذب نشتق الاتجاه من متوسط مرجّح لـ RSI الثلاثة
+        weighted_rsi = rsi_to_bias(rsi_1h)*0.5 + rsi_to_bias(rsi_4h)*0.3 + rsi_to_bias(rsi_1d)*0.2
+        macd_contrib  = 0.3 if macd_1h > 0 else (-0.3 if macd_1h < 0 else 0.0)
+        base_dir = round(np.clip(weighted_rsi * 0.7 + macd_contrib, -1.0, 1.0), 3)
+
+    # ── معامل قوة الترند من ADX (0.6 - 1.0) ──
+    # ADX ضعيف (< 20) → تقليص حجم التوقع | ADX قوي (> 35) → تعزيزه
+    adx_mult = np.clip(0.6 + (adx_val - 20) / 50.0, 0.55, 1.15)
+
+    # ── توافق الإطارات ──
+    tf_scores = [
+        tf_data.get('tf_hourly', {}).get('score', 0),
+        tf_data.get('tf_4h', {}).get('score', 0),
+        tf_data.get('tf_daily', {}).get('score', 0),
+    ]
+    aligned_bull = sum(1 for s in tf_scores if s > 0)
+    aligned_bear = sum(1 for s in tf_scores if s < 0)
+    consensus    = (aligned_bull - aligned_bear) / 3.0  # -1 to +1
+    # إضافة bonus للتوافق: يزيد confidence الاتجاه
+    dir_final = round(np.clip(base_dir * 0.75 + consensus * 0.25, -1.0, 1.0), 3)
+
+    # ── حساب التوقع لكل إطار ──
     def _fc(n_hours: float):
-        """يحسب التوقع لعدد ساعات معيّن من الآن"""
-        scaled_atr = atr * (n_hours / 24.0) ** 0.45  # slightly reduced for realism
-        center     = round(gold + dir_factor * scaled_atr * 0.25, 2)
-        high       = round(center + scaled_atr * 0.55, 2)
-        low        = round(center - scaled_atr * 0.55, 2)
-        return {"close": center, "high": high, "low": low}
+        # حجم تحرك ATR مُعدَّل بجذر الزمن + معامل ADX
+        scaled_atr = atr * ((n_hours / 24.0) ** 0.45) * adx_mult
+        # مركز التوقع = السعر الحالي + اتجاه × نسبة من ATR
+        center_raw = gold + dir_final * scaled_atr * 0.30
+        center     = round(center_raw, 2)
+        # نطاق القمة والقاع أوسع في الإطارات الأطول
+        spread_factor = min(0.65, 0.45 + n_hours * 0.003)
+        high = round(center + scaled_atr * spread_factor, 2)
+        low  = round(center - scaled_atr * spread_factor, 2)
+        # جودة التوقع كنسبة مئوية (كلما زاد ADX وتوافق الإطارات → جودة أعلى)
+        quality = round(min(95, 40 + adx_val * 0.8 + abs(consensus) * 30), 0)
+        return {"close": center, "high": high, "low": low, "quality": int(quality)}
 
     return {
         "1h"  : _fc(1),
@@ -1731,18 +1764,19 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 📈 توقعات السعر (إغلاق · قمة · قاع)
    📌 مبني على: ATR={d['atr']}$ × √زمن مُعدَّل بالاتجاه
    ─────────────────────────
-   ⏱️ ساعة   │ إغلاق: {d['tf_forecasts']['1h']['close']}$  │  قمة: {d['tf_forecasts']['1h']['high']}$  │  قاع: {d['tf_forecasts']['1h']['low']}$
-   ⏰ 4 ساعات│ إغلاق: {d['tf_forecasts']['4h']['close']}$  │  قمة: {d['tf_forecasts']['4h']['high']}$  │  قاع: {d['tf_forecasts']['4h']['low']}$
-   📅 يوم    │ إغلاق: {d['tf_forecasts']['1d']['close']}$  │  قمة: {d['tf_forecasts']['1d']['high']}$  │  قاع: {d['tf_forecasts']['1d']['low']}$
-   📆 أسبوع  │ إغلاق: {d['tf_forecasts']['1w']['close']}$  │  قمة: {d['tf_forecasts']['1w']['high']}$  │  قاع: {d['tf_forecasts']['1w']['low']}$
-   🗓️ شهر    │ إغلاق: {d['tf_forecasts']['1mo']['close']}$ │  قمة: {d['tf_forecasts']['1mo']['high']}$ │  قاع: {d['tf_forecasts']['1mo']['low']}$
+   ⏱️ ساعة   │ إغلاق: {d['tf_forecasts']['1h']['close']}$  │  قمة: {d['tf_forecasts']['1h']['high']}$  │  قاع: {d['tf_forecasts']['1h']['low']}$  │ جودة:{d['tf_forecasts']['1h'].get('quality','—')}%
+   ⏰ 4 ساعات│ إغلاق: {d['tf_forecasts']['4h']['close']}$  │  قمة: {d['tf_forecasts']['4h']['high']}$  │  قاع: {d['tf_forecasts']['4h']['low']}$  │ جودة:{d['tf_forecasts']['4h'].get('quality','—')}%
+   📅 يوم    │ إغلاق: {d['tf_forecasts']['1d']['close']}$  │  قمة: {d['tf_forecasts']['1d']['high']}$  │  قاع: {d['tf_forecasts']['1d']['low']}$  │ جودة:{d['tf_forecasts']['1d'].get('quality','—')}%
+   📆 أسبوع  │ إغلاق: {d['tf_forecasts']['1w']['close']}$  │  قمة: {d['tf_forecasts']['1w']['high']}$  │  قاع: {d['tf_forecasts']['1w']['low']}$  │ جودة:{d['tf_forecasts']['1w'].get('quality','—')}%
+   🗓️ شهر    │ إغلاق: {d['tf_forecasts']['1mo']['close']}$ │  قمة: {d['tf_forecasts']['1mo']['high']}$ │  قاع: {d['tf_forecasts']['1mo']['low']}$ │ جودة:{d['tf_forecasts']['1mo'].get('quality','—')}%
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 صفقات متقدمة (آجل وفوري)
 {adv_block}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
     gold_strength = _build_gold_strength_section(d)
-    fixed = fixed + gold_strength + part2 + tgt15_block
+    today_ohlc    = _build_today_ohlc_section(d)
+    fixed = fixed + gold_strength + part2 + tgt15_block + today_ohlc
 
 
     prob_floor = ("سيناريو الصعود لا يقل عن 50%" if bias == "bull"
@@ -1900,6 +1934,110 @@ def _build_gold_strength_section(d: dict) -> str:
         f"\n  \U0001f504 \u0627\u0644\u0627\u0641\u062a\u062a\u0627\u062d vs \u0625\u063a\u0644\u0627\u0642 \u0623\u0645\u0633: {today_open_val}$ vs {prev_close_val}$ ({gap_label})\n\n"
         f"  \U0001f9ed \u0627\u0644\u062e\u0644\u0627\u0635\u0629: {summary}\n"
     )
+
+
+
+
+def _build_today_ohlc_section(d: dict) -> str:
+    """
+    قسم مستقل في آخر التقرير:
+    إغلاق اليوم المتوقع + القمة + القاع — بجودة حقيقية ومفسّرة
+    """
+    gold = d['gold']
+    fc   = d.get('tf_forecasts', {})
+    atr  = d.get('atr', 50.0)
+    bias = d['confluence']['bias']
+
+    fc_1d = fc.get('1d', {})
+    fc_4h = fc.get('4h', {})
+    fc_1h = fc.get('1h', {})
+
+    pred_close = fc_1d.get('close', round(gold, 2))
+    pred_high  = fc_1d.get('high',  round(gold + atr * 0.4, 2))
+    pred_low   = fc_1d.get('low',   round(gold - atr * 0.4, 2))
+    quality    = fc_1d.get('quality', 50)
+
+    # تفسير اتجاه الإغلاق
+    diff = pred_close - gold
+    diff_pct = round(diff / gold * 100, 2) if gold > 0 else 0.0
+
+    if diff > atr * 0.15:
+        close_interp = f'الإغلاق المتوقع صعودي (+{diff:.2f}$) — الزخم يدعم السعر للأعلى'
+    elif diff < -atr * 0.15:
+        close_interp = f'الإغلاق المتوقع هبوطي ({diff:.2f}$) — ضغط بيع سائد'
+    else:
+        close_interp = f'الإغلاق المتوقع محايد (تغير {diff:+.2f}$) — سوق متوازن'
+
+    # احتمالية تجاوز القمة
+    dist_to_high = round(pred_high - gold, 2)
+    dist_to_low  = round(gold - pred_low, 2)
+
+    # جودة التوقع label
+    if quality >= 75:  q_label = f'جودة عالية ({quality}%) ✅'
+    elif quality >= 55: q_label = f'جودة جيدة ({quality}%) 🟡'
+    else:               q_label = f'جودة متوسطة ({quality}%) 🟠'
+
+    # نطاق ATR اليوم
+    exp_low  = round(gold - atr * 0.65, 2)
+    exp_high = round(gold + atr * 0.65, 2)
+
+    # مستويات السيناريوهات (تقاطع التوقع مع فيبو + pivot)
+    fib = d.get('fib', {})
+    pivot = d.get('pivot', gold)
+    r1, s1 = d.get('r1', gold+50), d.get('s1', gold-50)
+
+    # تقييم احتمالية كسر القمة أو القاع
+    # بناءً على: ADX + RSI + حجم التداول
+    adx = float(d.get('adx', 20))
+    rsi = float(d.get('rsi', 50))
+    rv  = d.get('rel_vol', 1.0) or 1.0
+
+    bull_prob = 0
+    bear_prob = 0
+    if bias == 'bull': bull_prob += 20
+    elif bias == 'bear': bear_prob += 20
+    else: bull_prob += 10; bear_prob += 10
+    if rsi > 55: bull_prob += 15
+    elif rsi < 45: bear_prob += 15
+    if adx > 25:
+        if d.get('di_plus', 0) > d.get('di_minus', 0): bull_prob += 10
+        else: bear_prob += 10
+    if rv > 1.5: bull_prob += 5 if bias != 'bear' else 0; bear_prob += 5 if bias == 'bear' else 0
+
+    bull_prob = min(bull_prob, 80)
+    bear_prob = min(bear_prob, 80)
+
+    # أقرب مستوى فيبو للقمة والقاع
+    fib_vals_above = sorted([v for v in fib.values() if v and v > gold])
+    fib_vals_below = sorted([v for v in fib.values() if v and v < gold], reverse=True)
+    nearest_fib_high = fib_vals_above[0] if fib_vals_above else pred_high
+    nearest_fib_low  = fib_vals_below[0] if fib_vals_below else pred_low
+
+    lines_out = [
+        "\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501",
+        "\U0001f4ca \u062a\u0648\u0642\u0639\u0627\u062a \u064a\u0648\u0645 \u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629",
+        f"   \U0001f4cc \u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u062d\u0627\u0644\u064a: {gold:,.2f}$  |  {q_label}",
+        "",
+        "   \u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e",
+        f"   \u2502 \U0001f7e2 \u0625\u063a\u0644\u0627\u0642 \u0627\u0644\u064a\u0648\u0645 \u0627\u0644\u0645\u062a\u0648\u0642\u0639: {pred_close:,.2f}$",
+        f"   \u2502    \u2514\u2500 {close_interp}",
+        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
+        f"   \u2502 \U0001f53a \u0642\u0645\u0629 \u0627\u0644\u064a\u0648\u0645 \u0627\u0644\u0645\u062a\u0648\u0642\u0639\u0629: {pred_high:,.2f}$  (+{dist_to_high}$ \u0645\u0646 \u0627\u0644\u062d\u0627\u0644\u064a)",
+        f"   \u2502    \u0623\u0642\u0631\u0628 \u0641\u064a\u0628\u0648 \u0641\u0648\u0642\u0647\u0627: {nearest_fib_high:,.2f}$  |  \u0645\u0642\u0627\u0648\u0645\u0629: {r1}$",
+        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
+        f"   \u2502 \U0001f53b \u0642\u0627\u0639 \u0627\u0644\u064a\u0648\u0645 \u0627\u0644\u0645\u062a\u0648\u0642\u0639:  {pred_low:,.2f}$  (-{dist_to_low}$ \u0645\u0646 \u0627\u0644\u062d\u0627\u0644\u064a)",
+        f"   \u2502    \u0623\u0642\u0631\u0628 \u0641\u064a\u0628\u0648 \u062a\u062d\u062a\u0647\u0627: {nearest_fib_low:,.2f}$   |  \u062f\u0639\u0645: {s1}$",
+        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
+        f"   \u2502 \U0001f4cf \u0646\u0637\u0627\u0642 ATR \u0627\u0644\u064a\u0648\u0645\u064a: {exp_low:,.2f}$ \u2194 {exp_high:,.2f}$",
+        f"   \u2502 \U0001f4c5 Pivot \u0627\u0644\u064a\u0648\u0645: {pivot:,.2f}$",
+        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
+        f"   \u2502 \U0001f4c8 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0635\u0639\u0648\u062f \u0646\u062d\u0648 \u0627\u0644\u0642\u0645\u0629: {bull_prob}%",
+        f"   \u2502 \U0001f4c9 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0647\u0628\u0648\u0637 \u0646\u062d\u0648 \u0627\u0644\u0642\u0627\u0639:  {bear_prob}%",
+        "   \u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f",
+        "",
+        "   \u2139\ufe0f \u0647\u0630\u0627 \u0627\u0644\u062a\u0648\u0642\u0639 \u0645\u0628\u0646\u064a \u0639\u0644\u0649: ATR + ADX(\u0642\u0648\u0629 \u0627\u0644\u062a\u0631\u0646\u062f) + \u062a\u0648\u0627\u0641\u0642 \u0627\u0644\u0625\u0637\u0627\u0631\u0627\u062a + \u0641\u064a\u0628\u0648\u0646\u0627\u062a\u0634\u064a",
+    ]
+    return "\n".join(lines_out)
 
 
 def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is_morning: bool = False) -> str | None:

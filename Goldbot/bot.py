@@ -2271,8 +2271,8 @@ def _send_single(text: str) -> bool:
 
 
 def send_to_telegram(message: str) -> bool:
-    # --- تم إيقاف الإرسال بناءً على طلب المستخدم ---
-    return True
+    if not message:
+        return False
     chunks = _split_message(message)
     log.info(f"📤 إرسال في {len(chunks)} جزء...")
     all_ok = True

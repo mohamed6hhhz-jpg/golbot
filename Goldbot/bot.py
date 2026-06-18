@@ -2277,10 +2277,10 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True) -> bool:
         return False
 
 
-def _send_single(text: str) -> bool:
+def _send_single(text: str, is_public_allowed: bool = True) -> bool:
     """إرسال عبر MTProto (Bot) أولاً للهروب من مشاكل Timeout، والـ HTTP كاحتياطي."""
     try:
-        ok = asyncio.run(_telethon_bot_send(text))
+        ok = asyncio.run(_telethon_bot_send(text, is_public_allowed))
         if ok:
             log.info("✅ [Telethon Bot] تم الإرسال بنجاح.")
             return True
@@ -2288,7 +2288,7 @@ def _send_single(text: str) -> bool:
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            ok = loop.run_until_complete(_telethon_bot_send(text))
+            ok = loop.run_until_complete(_telethon_bot_send(text, is_public_allowed))
             loop.close()
             if ok:
                 log.info("✅ [Telethon Bot] تم الإرسال بنجاح.")
@@ -2299,7 +2299,7 @@ def _send_single(text: str) -> bool:
         log.warning(f"⚠️ [Telethon Bot] {e}")
 
     log.warning("⚠️ [Telethon Bot] فشل — جاري المحاولة عبر HTTP...")
-    if _http_send(text):
+    if _http_send(text, is_public_allowed):
         log.info("✅ [HTTP] تم الإرسال بنجاح.")
         return True
     log.error("❌ فشل الإرسال من جميع الوسائل.")
@@ -2307,14 +2307,22 @@ def _send_single(text: str) -> bool:
 
 
 def send_to_telegram(message: str) -> bool:
+    global LAST_PUBLIC_REPORT_TIME
     if not message:
         return False
+        
+    now = time.time()
+    is_public = False
+    if now - LAST_PUBLIC_REPORT_TIME >= 3500:
+        is_public = True
+        LAST_PUBLIC_REPORT_TIME = now
+        
     chunks = _split_message(message)
-    log.info(f"📤 إرسال في {len(chunks)} جزء...")
+    log.info(f"📤 إرسال في {len(chunks)} جزء... (Public Allowed: {is_public})")
     all_ok = True
     for i, chunk in enumerate(chunks, 1):
         prefix = f"[{i}/{len(chunks)}] " if len(chunks) > 1 else ""
-        ok     = _send_single(prefix + chunk)
+        ok     = _send_single(prefix + chunk, is_public)
         log.info(f"✅ جزء {i}/{len(chunks)} وصل." if ok else f"❌ فشل جزء {i}/{len(chunks)}.")
         all_ok = all_ok and ok
         if i < len(chunks): time.sleep(1.5)

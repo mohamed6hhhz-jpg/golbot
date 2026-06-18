@@ -2253,8 +2253,18 @@ async def _telethon_bot_send(text: str) -> bool:
         # استخدام ملف جلسة محلي بدلاً من الذاكرة لتجنب تسجيل الدخول بالتوكن في كل رسالة (يمنع الـ FloodWait)
         client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN)
+        # جلب المحادثات للكاش عشان يقدر يتعرف على الـ ID بتاع القنوات البرايفت
+        try:
+            await client.get_dialogs()
+        except Exception:
+            pass
+            
         for chat in TARGET_CHATS:
-            await client.send_message(chat, text)
+            try:
+                await client.send_message(chat, text)
+            except Exception as inner_e:
+                log.warning(f"⚠️ [Telethon Bot] فشل الإرسال للجروب {chat}: {inner_e}")
+                
         await client.disconnect()
         return True
     except Exception as e:

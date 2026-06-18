@@ -31,8 +31,12 @@ async def health():
     return {"status": "ok"}
 
 
+from fastapi import HTTPException
+
 @app.get("/test_gold")
-async def test_gold():
+async def test_gold(secret: str = ""):
+    if secret != "gold2026vip":
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid secret key")
     """
     يجلب البيانات، يولد تقرير، يبعته لتيليجرام،
     ويرجع النتيجة الكاملة في المتصفح مباشرة.

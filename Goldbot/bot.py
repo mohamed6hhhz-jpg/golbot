@@ -2064,16 +2064,29 @@ def _build_today_ohlc_section(d: dict) -> str:
     nearest_fib_high = fib_vals_above[0] if fib_vals_above else pred_high
     nearest_fib_low  = fib_vals_below[0] if fib_vals_below else pred_low
 
-    # الاتجاه خلال ساعة والاتجاه خلال اليوم
+    # الاتجاه خلال الإطارات المختلفة
+    def get_trend(diff_val, threshold):
+        if diff_val > threshold: return 'صاعد 📈'
+        elif diff_val < -threshold: return 'هابط 📉'
+        return 'عرضي (متذبذب) ↔️'
+
     diff_1h = fc_1h.get('close', gold) - gold
-    if diff_1h > atr * 0.05: trend_1h = 'صاعد 📈'
-    elif diff_1h < -atr * 0.05: trend_1h = 'هابط 📉'
-    else: trend_1h = 'عرضي (متذبذب) ↔️'
+    trend_1h = get_trend(diff_1h, atr * 0.05)
+
+    fc_4h = fc.get('4h', {})
+    diff_4h = fc_4h.get('close', gold) - gold
+    trend_4h = get_trend(diff_4h, atr * 0.1)
 
     diff_1d = pred_close - gold
-    if diff_1d > atr * 0.15: trend_1d = 'صاعد 📈'
-    elif diff_1d < -atr * 0.15: trend_1d = 'هابط 📉'
-    else: trend_1d = 'عرضي (متذبذب) ↔️'
+    trend_1d = get_trend(diff_1d, atr * 0.15)
+
+    fc_1w = fc.get('1wk', fc.get('1w', {}))
+    diff_1w = fc_1w.get('close', gold) - gold
+    trend_1w = get_trend(diff_1w, atr * 0.3)
+
+    fc_1m = fc.get('1mo', fc.get('1m', {}))
+    diff_1m = fc_1m.get('close', gold) - gold
+    trend_1m = get_trend(diff_1m, atr * 0.5)
 
     # أيهما يضرب أولاً
     if bull_prob > bear_prob + 10:

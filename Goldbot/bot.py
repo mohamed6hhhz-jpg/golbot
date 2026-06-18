@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 GROQ_API_KEY        = os.environ.get("GROQ_API_KEY")
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
-TELEGRAM_CHAT_ID   = "@Osamaadd780"
+TELEGRAM_CHAT_ID   = -1002922209855
 
 API_ID   = 34105911
 API_HASH = 'b444ab6b4eeba8a66db4143b934dc540'

@@ -31,6 +31,7 @@ GROQ_API_KEY        = os.environ.get("GROQ_API_KEY")
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
 TARGET_CHATS = [-1002922209855, -1003775201576]
+LAST_PUBLIC_REPORT_TIME = 0
 
 API_ID   = 34105911
 API_HASH = 'b444ab6b4eeba8a66db4143b934dc540'
@@ -2222,7 +2223,7 @@ async def _telethon_send(text: str) -> bool:
         return False
 
 
-def _http_send(text: str) -> bool:
+def _http_send(text: str, is_public_allowed: bool = True) -> bool:
     """الإرسال عبر HTTP Bot API — الوسيلة الأساسية."""
     url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     headers = {
@@ -2231,6 +2232,8 @@ def _http_send(text: str) -> bool:
     }
     success = True
     for chat in TARGET_CHATS:
+        if chat == -1002922209855 and not is_public_allowed:
+            continue
         payload = {"chat_id": str(chat), "text": text}
         chat_success = False
         for attempt in range(4):
@@ -2247,7 +2250,7 @@ def _http_send(text: str) -> bool:
     return success
 
 
-async def _telethon_bot_send(text: str) -> bool:
+async def _telethon_bot_send(text: str, is_public_allowed: bool = True) -> bool:
     """MTProto باستخدام توكن البوت — يتجاوز حجب HTTP نهائياً ولا يتعارض مع جلسات المستخدم"""
     try:
         # استخدام ملف جلسة محلي بدلاً من الذاكرة لتجنب تسجيل الدخول بالتوكن في كل رسالة (يمنع الـ FloodWait)
@@ -2260,6 +2263,8 @@ async def _telethon_bot_send(text: str) -> bool:
             pass
             
         for chat in TARGET_CHATS:
+            if chat == -1002922209855 and not is_public_allowed:
+                continue
             try:
                 await client.send_message(chat, text)
             except Exception as inner_e:

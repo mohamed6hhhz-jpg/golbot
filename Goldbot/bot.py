@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 GROQ_API_KEY        = os.environ.get("GROQ_API_KEY")
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
-TELEGRAM_CHAT_ID   = -1002922209855
+TARGET_CHATS = [-1002922209855, -1003775201576]
 
 API_ID   = 34105911
 API_HASH = 'b444ab6b4eeba8a66db4143b934dc540'
@@ -2213,7 +2213,8 @@ async def _telethon_send(text: str) -> bool:
     try:
         client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
         await client.start()   # جلسة موجودة — بدون ImportBotAuthorizationRequest
-        await client.send_message(TELEGRAM_CHAT_ID, text)
+        for chat in TARGET_CHATS:
+            await client.send_message(chat, text)
         await client.disconnect()
         return True
     except Exception as e:
@@ -2224,21 +2225,26 @@ async def _telethon_send(text: str) -> bool:
 def _http_send(text: str) -> bool:
     """الإرسال عبر HTTP Bot API — الوسيلة الأساسية."""
     url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": str(TELEGRAM_CHAT_ID), "text": text}
     headers = {
         "Connection": "close",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
-    for attempt in range(4):
-        try:
-            r = requests.post(url, json=payload, headers=headers, timeout=45)
-            r.raise_for_status()
-            return True
-        except Exception as e:
-            wait = 2 ** attempt
-            log.warning(f"⚠️ [HTTP] {attempt+1}/4 — {e} — انتظار {wait}s")
-            time.sleep(wait)
-    return False
+    success = True
+    for chat in TARGET_CHATS:
+        payload = {"chat_id": str(chat), "text": text}
+        chat_success = False
+        for attempt in range(4):
+            try:
+                r = requests.post(url, json=payload, headers=headers, timeout=45)
+                r.raise_for_status()
+                chat_success = True
+                break
+            except Exception as e:
+                wait = 2 ** attempt
+                log.warning(f"⚠️ [HTTP] {attempt+1}/4 — {e} — انتظار {wait}s")
+                time.sleep(wait)
+        if not chat_success: success = False
+    return success
 
 
 async def _telethon_bot_send(text: str) -> bool:
@@ -2247,7 +2253,8 @@ async def _telethon_bot_send(text: str) -> bool:
         # استخدام ملف جلسة محلي بدلاً من الذاكرة لتجنب تسجيل الدخول بالتوكن في كل رسالة (يمنع الـ FloodWait)
         client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN)
-        await client.send_message(TELEGRAM_CHAT_ID, text)
+        for chat in TARGET_CHATS:
+            await client.send_message(chat, text)
         await client.disconnect()
         return True
     except Exception as e:

@@ -2130,9 +2130,10 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
     if not client:
         return None
 
-    if is_morning:  header = "🌅 نشرة الصباح — استراتيجية اليوم"
-    elif is_alert:  header = f"🚨 تنبيه — حركة {'+' if price_diff>0 else ''}{price_diff:.2f}$"
-    else:           header = "📊 نشرة التحليل الكمي للذهب"
+    banner = "💎 المزايا الحصرية مفعلة: (مبني على 12 مؤشر، زيرو انعكاس، سكالبينج، توقع القمة والقاع، وعزل العرض والطلب)"
+    if is_morning:  header = f"🌅 نشرة الصباح — استراتيجية اليوم\n{banner}"
+    elif is_alert:  header = f"🚨 تنبيه — حركة {'+' if price_diff>0 else ''}{price_diff:.2f}$\n{banner}"
+    else:           header = f"📊 نشرة التحليل الكمي للذهب\n{banner}"
 
     fixed_block, ai_instructions = _build_fixed_template(d, header)
 

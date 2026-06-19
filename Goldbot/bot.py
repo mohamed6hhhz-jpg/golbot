@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 GROQ_API_KEY        = os.environ.get("GROQ_API_KEY")
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
-TARGET_CHATS = [-1002922209855, -1003775201576]
+TARGET_CHATS = [7737655407]
 LAST_PUBLIC_REPORT_TIME = 0
 
 API_ID   = 34105911
@@ -83,7 +83,9 @@ def _fetch(symbol: str, period: str = "90d", interval: str = "1d", max_retries: 
 
 
 def _last_close(df) -> float | None:
-    return float(df['Close'].iloc[-1]) if df is not None and not df.empty else None
+    if df is None or df.empty: return None
+    valid = df[df['Close'].notna()]
+    return float(valid['Close'].iloc[-1]) if not valid.empty else None
 
 def _last_with_date(df) -> tuple[float | None, str]:
     """يرجع (آخر سعر, تاريخه كنص) — حتى لو السوق مغلق."""
@@ -371,12 +373,12 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     sell_entry_d = round(pivot if piv_valid else r_n, 2)
     t = dict(entry=buy_entry_d, sl=round(buy_entry_d - sl_d, 2), risk=sl_d,
              t1=r_n, t2=r_f, t3=round(r_f + atr * 0.3, 2),
-             market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='buy')
+             market='آجل (Futures)', tf='1ي', typ='يومية 📅', dir='buy')
     if bias in ('bull', 'neutral') and _rr(r_n - buy_entry_d, sl_d) >= MIN_RR:
         trades['daily_buy'] = t
     t = dict(entry=sell_entry_d, sl=round(sell_entry_d + sl_d, 2), risk=sl_d,
              t1=s_n, t2=s_f, t3=round(s_f - atr * 0.3, 2),
-             market='فوري (Spot)', tf='1ي', typ='يومية 📅', dir='sell')
+             market='آجل (Futures)', tf='1ي', typ='يومية 📅', dir='sell')
     if bias in ('bear', 'neutral') and _rr(sell_entry_d - s_n, sl_d) >= MIN_RR:
         trades['daily_sell'] = t
 
@@ -401,13 +403,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     t = dict(entry=round(s_f, 2), sl=round(s_f - sl_m, 2), risk=sl_m,
              t1=r_n, t2=round((pm_h + r_n) / 2, 2) if pm_h else r_f,
              t3=round(pm_h, 2) if pm_h else round(r_f + atr * 0.5, 2),
-             market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='buy')
+             market='آجل (Futures)', tf='1ش', typ='شهرية 🗓️', dir='buy')
     if bias in ('bull', 'neutral') and _rr(r_n - s_f, sl_m) >= MIN_RR:
         trades['monthly_buy'] = t
     t = dict(entry=round(r_f, 2), sl=round(r_f + sl_m, 2), risk=sl_m,
              t1=s_n, t2=round((pm_l + s_n) / 2, 2) if pm_l else s_f,
              t3=round(pm_l, 2) if pm_l else round(s_f - atr * 0.5, 2),
-             market='فوري (Spot)', tf='1ش', typ='شهرية 🗓️', dir='sell')
+             market='آجل (Futures)', tf='1ش', typ='شهرية 🗓️', dir='sell')
     if bias in ('bear', 'neutral') and _rr(r_f - s_n, sl_m) >= MIN_RR:
         trades['monthly_sell'] = t
 
@@ -431,13 +433,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     if (has_div or rsi < 38) and bias != 'bull':
         t = dict(entry=round(gold, 2), sl=round(gold - sl_rev, 2), risk=sl_rev,
                  t1=round(pivot, 2), t2=r_n, t3=r_f,
-                 market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
+                 market='آجل (Futures)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
         if _rr(pivot - gold, sl_rev) >= MIN_RR:
             trades['rev_buy'] = t
     if (has_div or rsi > 62) and bias != 'bear':
         t = dict(entry=round(gold, 2), sl=round(gold + sl_rev, 2), risk=sl_rev,
                  t1=round(pivot, 2), t2=s_n, t3=s_f,
-                 market='فوري (Spot)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
+                 market='آجل (Futures)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
         if _rr(gold - pivot, sl_rev) >= MIN_RR:
             trades['rev_sell'] = t
     # ── صفقة كل 5 دقائق (5min scalp) ──
@@ -448,13 +450,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
         t5m = dict(entry=round(gold, 2), sl=round(gold - sl_5m, 2), risk=sl_5m,
                    t1=round(gold + atr_5m*1.5, 2), t2=round(gold + atr_5m*2.5, 2),
                    t3=round(gold + atr_5m*4.0, 2),
-                   market='فوري (Spot)', tf='5د', typ='سكالبينج 5د ⚡', dir='buy')
+                   market='آجل (Futures)', tf='5د', typ='سكالبينج 5د ⚡', dir='buy')
         if _rr(atr_5m*1.5, sl_5m) >= 1.5: trades['scalp_5m_buy'] = t5m
     elif sc_15m < 0:
         t5m = dict(entry=round(gold, 2), sl=round(gold + sl_5m, 2), risk=sl_5m,
                    t1=round(gold - atr_5m*1.5, 2), t2=round(gold - atr_5m*2.5, 2),
                    t3=round(gold - atr_5m*4.0, 2),
-                   market='فوري (Spot)', tf='5د', typ='سكالبينج 5د ⚡', dir='sell')
+                   market='آجل (Futures)', tf='5د', typ='سكالبينج 5د ⚡', dir='sell')
         if _rr(atr_5m*1.5, sl_5m) >= 1.5: trades['scalp_5m_sell'] = t5m
 
     # ── سوينج طويل الأمد (Long-Term Swing) ──
@@ -481,13 +483,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
         t_ts = dict(entry=round(gold, 2), sl=round(gold - sl_tight, 2), risk=sl_tight,
                     t1=round(gold + sl_tight*2, 2), t2=round(gold + sl_tight*3.5, 2),
                     t3=round(gold + sl_tight*5, 2),
-                    market='فوري (Spot)', tf='10د', typ='سكالب ضيق 🎯', dir='buy')
+                    market='آجل (Futures)', tf='10د', typ='سكالب ضيق 🎯', dir='buy')
         if _rr(sl_tight*2, sl_tight) >= 1.5: trades['tight_scalp_buy'] = t_ts
     elif sc_1h < 0 and bias in ('bear', 'neutral'):
         t_ts = dict(entry=round(gold, 2), sl=round(gold + sl_tight, 2), risk=sl_tight,
                     t1=round(gold - sl_tight*2, 2), t2=round(gold - sl_tight*3.5, 2),
                     t3=round(gold - sl_tight*5, 2),
-                    market='فوري (Spot)', tf='10د', typ='سكالب ضيق 🎯', dir='sell')
+                    market='آجل (Futures)', tf='10د', typ='سكالب ضيق 🎯', dir='sell')
         if _rr(sl_tight*2, sl_tight) >= 1.5: trades['tight_scalp_sell'] = t_ts
 
     # ── لوت عالي (High Lot / Precision Entry) ──
@@ -501,12 +503,12 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     if hl_entry_b:
         t_hl = dict(entry=hl_entry_b, sl=round(hl_entry_b - sl_hl, 2), risk=sl_hl,
                     t1=round(hl_entry_b + 12, 2), t2=round(hl_entry_b + 22, 2), t3=round(hl_entry_b + 35, 2),
-                    market='فوري (Spot)', tf='<5د', typ='لوت عالي 💰', dir='buy')
+                    market='آجل (Futures)', tf='<5د', typ='لوت عالي 💰', dir='buy')
         if _rr(12, sl_hl) >= 1.5: trades['high_lot_buy'] = t_hl
     if hl_entry_s:
         t_hl = dict(entry=hl_entry_s, sl=round(hl_entry_s + sl_hl, 2), risk=sl_hl,
                     t1=round(hl_entry_s - 12, 2), t2=round(hl_entry_s - 22, 2), t3=round(hl_entry_s - 35, 2),
-                    market='فوري (Spot)', tf='<5د', typ='لوت عالي 💰', dir='sell')
+                    market='آجل (Futures)', tf='<5د', typ='لوت عالي 💰', dir='sell')
         if _rr(12, sl_hl) >= 1.5: trades['high_lot_sell'] = t_hl
 
     # ── هدف الـ 15 دقيقة القادمة ──
@@ -986,26 +988,26 @@ def calc_all_entries(d: dict, bias: str) -> dict:
                 "rr1": rr1, "rr2": rr2, "rr3": rr3, "is_buy": False}
 
     if bias == "bull":
-        buys  = [mb(gold,   TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
+        buys  = [mb(gold,   TIGHT_SL, "آجل (Futures)",   "🔴 عدواني"),
                  mb(s_near, STD_SL,   "آجل (Futures)", "🟡 معتدل — دعم قريب"),
-                 mb(s_far,  TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — دعم بعيد")]
-        sells = [ms(r_near, TIGHT_SL, "فوري (Spot)",   "🔴 عند مقاومة قريبة"),
+                 mb(s_far,  TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — دعم بعيد")]
+        sells = [ms(r_near, TIGHT_SL, "آجل (Futures)",   "🔴 عند مقاومة قريبة"),
                  ms(r_far,  STD_SL,   "آجل (Futures)", "🟡 عند مقاومة ثانية"),
-                 ms(r_far2, TIGHT_SL, "فوري (Spot)",   "🟢 عند مقاومة بعيدة")]
+                 ms(r_far2, TIGHT_SL, "آجل (Futures)",   "🟢 عند مقاومة بعيدة")]
     elif bias == "bear":
-        sells = [ms(gold,   TIGHT_SL, "فوري (Spot)",   "🔴 عدواني"),
+        sells = [ms(gold,   TIGHT_SL, "آجل (Futures)",   "🔴 عدواني"),
                  ms(r_near, STD_SL,   "آجل (Futures)", "🟡 معتدل — مقاومة قريبة"),
-                 ms(r_far,  TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — مقاومة بعيدة")]
-        buys  = [mb(s_near, TIGHT_SL, "فوري (Spot)",   "🔴 عدواني — دعم قريب"),
+                 ms(r_far,  TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — مقاومة بعيدة")]
+        buys  = [mb(s_near, TIGHT_SL, "آجل (Futures)",   "🔴 عدواني — دعم قريب"),
                  mb(s_far,  STD_SL,   "آجل (Futures)", "🟡 معتدل — دعم ثاني"),
-                 mb(s_far2, TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — دعم بعيد")]
+                 mb(s_far2, TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — دعم بعيد")]
     else:  # neutral
-        buys  = [mb(s_near, TIGHT_SL, "فوري (Spot)",   "🔴 دعم قريب — اختراق"),
+        buys  = [mb(s_near, TIGHT_SL, "آجل (Futures)",   "🔴 دعم قريب — اختراق"),
                  mb(s_far,  STD_SL,   "آجل (Futures)", "🟡 معتدل — دعم ثاني"),
-                 mb(s_far2, TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — دعم بعيد")]
-        sells = [ms(r_near, TIGHT_SL, "فوري (Spot)",   "🔴 مقاومة قريبة — اختراق"),
+                 mb(s_far2, TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — دعم بعيد")]
+        sells = [ms(r_near, TIGHT_SL, "آجل (Futures)",   "🔴 مقاومة قريبة — اختراق"),
                  ms(r_far,  STD_SL,   "آجل (Futures)", "🟡 معتدل — مقاومة ثانية"),
-                 ms(r_far2, TIGHT_SL, "فوري (Spot)",   "🟢 محافظ — مقاومة بعيدة")]
+                 ms(r_far2, TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — مقاومة بعيدة")]
 
     refs = {
         "above": r_near,
@@ -1185,6 +1187,15 @@ def get_full_market_data() -> dict | None:
     tip_df    = _fetch("TIP",      period="60d"); time.sleep(0.6)
     vix_df    = _fetch("^VIX",     period="60d"); time.sleep(0.6)
     sp500_df  = _fetch("^GSPC",    period="60d"); time.sleep(0.6)
+    nasdaq_df = _fetch("^IXIC",    period="60d"); time.sleep(0.6)
+    # ── العملات الأجنبية ──
+    eurusd_df = _fetch("EURUSD=X", period="5d"); time.sleep(0.5)
+    gbpusd_df = _fetch("GBPUSD=X", period="5d"); time.sleep(0.5)
+    audusd_df = _fetch("AUDUSD=X", period="5d"); time.sleep(0.5)
+    nzdusd_df = _fetch("NZDUSD=X", period="5d"); time.sleep(0.5)
+    usdjpy_df = _fetch("JPY=X",    period="5d"); time.sleep(0.5)
+    usdchf_df = _fetch("CHF=X",    period="5d"); time.sleep(0.5)
+    usdcad_df = _fetch("CAD=X",    period="5d"); time.sleep(0.5)
     # [8] 2Y Treasury Yield — US Treasury API الرسمية (مفيش rate limit)
     twy = None
     try:
@@ -1540,6 +1551,84 @@ def get_full_market_data() -> dict | None:
         ind_adx_i=ind_adx_i, ind_obv_i=ind_obv_i, ind_cci_i=ind_cci_i, ind_bb_i=ind_bb_i,
     )
 
+    
+    def _pct_chg(df):
+        if df is None or df.empty: return 0.0, 0.0
+        valid = df[df['Close'].notna()]
+        if len(valid) < 2: return 0.0, 0.0
+        c1, c2 = valid['Close'].iloc[-2], valid['Close'].iloc[-1]
+        return round(float(c2), 2), round(float((c2 - c1) / c1 * 100), 2)
+
+    sp500_p, sp500_pct = _pct_chg(sp500_df)
+    nasdaq_p, nasdaq_pct = _pct_chg(nasdaq_df)
+    vix_p, vix_pct = _pct_chg(vix_df)
+    dxy_p, dxy_pct = _pct_chg(dxy_df)
+
+    d['sp500_pct'] = sp500_pct
+    d['nasdaq_p'] = nasdaq_p
+    d['nasdaq_pct'] = nasdaq_pct
+    d['vix_p'] = vix_p
+    d['vix_pct'] = vix_pct
+    d['dxy_p'] = dxy_p
+    d['dxy_pct'] = dxy_pct
+
+    
+    # ── [إضافة حساب فارق نقاط العوائد للقالب 4] ──
+    tnx_diff = 0
+    if tnx_df is not None and len(tnx_df) >= 2:
+        c1, c2 = tnx_df['Close'].iloc[-2], tnx_df['Close'].iloc[-1]
+        tnx_diff = int(round((c2 - c1) * 100)) # نقاط أساس
+    
+    twy_diff = 0
+    try:
+        _irx = _fetch("^IRX", period="5d")
+        if _irx is not None and len(_irx) >= 2:
+            c1, c2 = _irx['Close'].iloc[-2], _irx['Close'].iloc[-1]
+            twy_diff = int(round((c2 - c1) * 100))
+    except:
+        pass
+
+    d['tnx_diff'] = tnx_diff
+    d['twy_diff'] = twy_diff
+    d['tnx_val'] = tnx
+    d['twy_val'] = twy
+
+
+    # ── [مؤشر قوة العملات للقالب 5] ──
+    def _fx_chg(df):
+        if df is None or len(df) < 2: return 0.0
+        c1, c2 = df['Close'].iloc[-2], df['Close'].iloc[-1]
+        return (c2 - c1) / c1 * 100
+
+    eur_pct = _fx_chg(eurusd_df)
+    gbp_pct = _fx_chg(gbpusd_df)
+    aud_pct = _fx_chg(audusd_df)
+    nzd_pct = _fx_chg(nzdusd_df)
+    
+    # بالنسبة للأزواج اللي الدولار هو الأساس، نقوم بعكس النسبة
+    jpy_pct = -_fx_chg(usdjpy_df)
+    chf_pct = -_fx_chg(usdchf_df)
+    cad_pct = -_fx_chg(usdcad_df)
+
+    # قوة الدولار هي متوسط عكس قوة الباقي تقريباً (مبسط)
+    usd_pct = - (eur_pct + gbp_pct + aud_pct + nzd_pct + jpy_pct + chf_pct + cad_pct) / 7.0
+
+    fx_strength = {
+        "EUR": eur_pct,
+        "GBP": gbp_pct,
+        "AUD": aud_pct,
+        "NZD": nzd_pct,
+        "JPY": jpy_pct,
+        "CHF": chf_pct,
+        "CAD": cad_pct,
+        "USD": usd_pct
+    }
+    
+    # نرتب العملات من الأقوى للأضعف
+    sorted_fx = sorted(fx_strength.items(), key=lambda x: x[1], reverse=True)
+    d['fx_sorted'] = sorted_fx
+
+
     d['confluence']      = calc_confluence(d)
     d['entries']         = calc_all_entries(d, d['confluence']['bias'])
     d['adv_trades']      = calc_advanced_trades(d, d['confluence']['bias'])
@@ -1583,9 +1672,9 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
     refs   = ent['refs']
     nums   = ("1️⃣","2️⃣","3️⃣")
-    bias_section = {"bull":"🎯 صفقات الاتجاه الصعودي",
-                    "bear":"🎯 صفقات الاتجاه الهبوطي",
-                    "neutral":"⚡ صفقات الاختراق (سوق متذبذب)"}.get(ent['bias'],"🎯 الصفقات")
+    bias_section = {"bull":"🎯 صفقات الاتجاه الصعودي (آجل GC=F)",
+                    "bear":"🎯 صفقات الاتجاه الهبوطي (آجل GC=F)",
+                    "neutral":"⚡ صفقات الاختراق المتذبذب (آجل GC=F)"}.get(ent['bias'],"🎯 الصفقات (آجل GC=F)")
 
     def fmt_block(trades):
         lines = []
@@ -1679,7 +1768,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    CCI:{d['cci']}({d['cci_label'].split()[0]}) | W%R:{d['williams_r']} | ATR:{d['atr']}$
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔢 المستويات
+🔢 المستويات (مبنية على الآجل GC=F)
    🟣 مقاومة نفسية:{rn['nearest_resistance']}$(+{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(-{rn['dist_to_support']}$)
    📍 Swing H:{d['swing_high']}$ / L:{d['swing_low']}$ | VWAP:{f"{d['vwap']}$" if d['vwap'] else '—'}
    📅 PrevWk H:{f"{d['prev_wk_high']}$" if d['prev_wk_high'] else '—'} / L:{f"{d['prev_wk_low']}$" if d['prev_wk_low'] else '—'} | PrevMo H:{f"{d['prev_mo_high']}$" if d['prev_mo_high'] else '—'} / L:{f"{d['prev_mo_low']}$" if d['prev_mo_low'] else '—'}
@@ -1696,7 +1785,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 {sell_block}
    ↑ مراقبة: {refs['above']}$ | ↓ مراقبة: {refs['below']}$"""
 
-    # ── الجزء الثاني: توقعات + صفقات متقدمة ──
+    # ── الجزء الثاني: توقعات + صفقات متقدمة (آجل) ──
     adv  = d['adv_trades']
     pred = d['price_pred']
 
@@ -2126,6 +2215,95 @@ def _build_today_ohlc_section(d: dict) -> str:
     return "\n".join(lines_out)
 
 
+def _build_template_1(d: dict) -> str:
+    """بناء القالب الأول (الموجز الكلاسيكي المنفصل)"""
+    w_bias = d['tf_weekly'].get('bias', 'متذبذب')
+    w_icon = '📈' if 'صاعد' in w_bias else ('📉' if 'هابط' in w_bias else '↔️')
+    
+    d_bias = d['tf_daily'].get('bias', 'متذبذب')
+    d_icon = '📈' if 'صاعد' in d_bias else ('📉' if 'هابط' in d_bias else '↔️')
+    
+    gold = d['gold']
+    vwap = d.get('vwap') or gold
+    rsi_1h = d['tf_hourly'].get('rsi', 50) if d.get('tf_hourly') else 50
+    score_4h = d['tf_4h'].get('score', 0) if d.get('tf_4h') else 0
+    
+    context_lines = []
+    if gold < vwap:
+        context_lines.append("الإغلاق تم أسفل مناطق دعم مكسورة تحولت إلى مقاومات.")
+    else:
+        context_lines.append("الإغلاق تم أعلى مقاومات مخترقة تحولت إلى دعوم.")
+        
+    if score_4h < -2 and rsi_1h < 40:
+        context_lines.append("يوجد زخم بيعي مسيطر وقناة سعرية هابطة على فريم الساعة.")
+    elif score_4h > 2 and rsi_1h > 60:
+        context_lines.append("توجد قناة سعرية صاعدة متكونة على فريم الساعة بزخم شرائي قوي.")
+    else:
+        context_lines.append("السعر يتداول في نطاق عرضي تجميعي على المدى القصير.")
+        
+    context_text = "\n".join(context_lines)
+    
+    main_bias = d['confluence']['bias']
+    atr = d.get('atr', 20)
+    
+    if main_bias == 'bear' or main_bias == 'neutral':
+        # نفضل البيع
+        zone_color = "🔴"
+        zone_name = "منطقة البيع"
+        # المقاومات
+        r1, r2 = d.get('r1', gold+10), d.get('r2', gold+20)
+        z1 = round(min(r1, r2), 2)
+        z2 = round(max(r1, r2), 2)
+        t1 = round(d.get('s1', gold-10), 2)
+        t2 = round(d.get('s2', gold-20), 2)
+        cont_action = "الهبوط لمستويات أقل"
+        rev_color = "🟢"
+        rev_zone = round(d.get('swing_high') or (r2 + atr), 2)
+        rev_dir = "الصعود"
+        break_dir = "أعلاها"
+    else:
+        # الشراء
+        zone_color = "🟢"
+        zone_name = "منطقة الشراء"
+        s1, s2 = d.get('s1', gold-10), d.get('s2', gold-20)
+        z1 = round(min(s1, s2), 2)
+        z2 = round(max(s1, s2), 2)
+        t1 = round(d.get('r1', gold+10), 2)
+        t2 = round(d.get('r2', gold+20), 2)
+        cont_action = "الصعود لمستويات أعلى"
+        rev_color = "🔴"
+        rev_zone = round(d.get('swing_low') or (s2 - atr), 2)
+        rev_dir = "الهبوط"
+        break_dir = "أسفلها"
+
+    zone_start = min(z1, z2)
+    zone_end = max(z1, z2)
+    
+    # القالب كما طلبه العميل بالحرف
+    template = f"""تحليل الذهب 🟡
+
+1W (الأسبوعي)
+التحيز الأسبوعي: {w_bias} {w_icon}
+
+1D (اليومي)
+التحيز اليومي: {d_bias} {d_icon}
+
+4H - 1H
+{context_text}
+
+{zone_color} {zone_name}: من {zone_start} إلى {zone_end}
+
+في حال احترام المنطقة، نتوقع استهداف:
+{t1}
+{t2}
+
+وفي حالة كسر {t2}، سيستمر {cont_action}.
+
+{rev_color} أما إذا لم يحترم السعر منطقة {zone_end} وتمكن من اختراقها، فسيستهدف {rev_zone}.
+وتعتبر منطقة {rev_zone} هي المنطقة الذهبية الفاصلة بين الصعود والهبوط، وباختراقها والثبات {break_dir} يمكننا القول إن السعر بدأ يغير اتجاهه ويميل إلى {rev_dir}."""
+    
+    return template
+
 def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is_morning: bool = False) -> str | None:
     client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
     if not client:
@@ -2223,7 +2401,7 @@ async def _telethon_send(text: str) -> bool:
         return False
 
 
-def _http_send(text: str, is_public_allowed: bool = True) -> bool:
+def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     """الإرسال عبر HTTP Bot API — الوسيلة الأساسية."""
     url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     headers = {
@@ -2231,8 +2409,9 @@ def _http_send(text: str, is_public_allowed: bool = True) -> bool:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
     success = True
-    for chat in TARGET_CHATS:
-        if chat == -1002922209855 and not is_public_allowed:
+    targets = [chat_id] if chat_id else TARGET_CHATS
+    for chat in targets:
+        if chat == -1002922209855 and not is_public_allowed and not chat_id:
             continue
         payload = {"chat_id": str(chat), "text": text}
         chat_success = False
@@ -2250,20 +2429,16 @@ def _http_send(text: str, is_public_allowed: bool = True) -> bool:
     return success
 
 
-async def _telethon_bot_send(text: str, is_public_allowed: bool = True) -> bool:
+async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     """MTProto باستخدام توكن البوت — يتجاوز حجب HTTP نهائياً ولا يتعارض مع جلسات المستخدم"""
     try:
         # استخدام ملف جلسة محلي بدلاً من الذاكرة لتجنب تسجيل الدخول بالتوكن في كل رسالة (يمنع الـ FloodWait)
         client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN)
-        # جلب المحادثات للكاش عشان يقدر يتعرف على الـ ID بتاع القنوات البرايفت
-        try:
-            await client.get_dialogs()
-        except Exception:
-            pass
-            
-        for chat in TARGET_CHATS:
-            if chat == -1002922209855 and not is_public_allowed:
+        
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        for chat in targets:
+            if chat == -1002922209855 and not is_public_allowed and not chat_id:
                 continue
             try:
                 await client.send_message(chat, text)
@@ -2277,10 +2452,10 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True) -> bool:
         return False
 
 
-def _send_single(text: str, is_public_allowed: bool = True) -> bool:
+def _send_single(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     """إرسال عبر MTProto (Bot) أولاً للهروب من مشاكل Timeout، والـ HTTP كاحتياطي."""
     try:
-        ok = asyncio.run(_telethon_bot_send(text, is_public_allowed))
+        ok = asyncio.run(_telethon_bot_send(text, is_public_allowed, chat_id))
         if ok:
             log.info("✅ [Telethon Bot] تم الإرسال بنجاح.")
             return True
@@ -2288,7 +2463,7 @@ def _send_single(text: str, is_public_allowed: bool = True) -> bool:
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            ok = loop.run_until_complete(_telethon_bot_send(text, is_public_allowed))
+            ok = loop.run_until_complete(_telethon_bot_send(text, is_public_allowed, chat_id))
             loop.close()
             if ok:
                 log.info("✅ [Telethon Bot] تم الإرسال بنجاح.")
@@ -2299,14 +2474,14 @@ def _send_single(text: str, is_public_allowed: bool = True) -> bool:
         log.warning(f"⚠️ [Telethon Bot] {e}")
 
     log.warning("⚠️ [Telethon Bot] فشل — جاري المحاولة عبر HTTP...")
-    if _http_send(text, is_public_allowed):
+    if _http_send(text, is_public_allowed, chat_id):
         log.info("✅ [HTTP] تم الإرسال بنجاح.")
         return True
     log.error("❌ فشل الإرسال من جميع الوسائل.")
     return False
 
 
-def send_to_telegram(message: str) -> bool:
+def send_to_telegram(message: str, chat_id=None) -> bool:
     global LAST_PUBLIC_REPORT_TIME
     if not message:
         return False
@@ -2315,19 +2490,565 @@ def send_to_telegram(message: str) -> bool:
     is_public = False
     if now - LAST_PUBLIC_REPORT_TIME >= 3500:
         is_public = True
-        LAST_PUBLIC_REPORT_TIME = now
+        if not chat_id: LAST_PUBLIC_REPORT_TIME = now
         
     chunks = _split_message(message)
-    log.info(f"📤 إرسال في {len(chunks)} جزء... (Public Allowed: {is_public})")
+    log.info(f"📤 إرسال في {len(chunks)} جزء... (Public Allowed: {is_public}, Chat: {chat_id})")
     all_ok = True
     for i, chunk in enumerate(chunks, 1):
-        prefix = f"[{i}/{len(chunks)}] " if len(chunks) > 1 else ""
-        ok     = _send_single(prefix + chunk, is_public)
+        ok     = _send_single(chunk, is_public, chat_id)
         log.info(f"✅ جزء {i}/{len(chunks)} وصل." if ok else f"❌ فشل جزء {i}/{len(chunks)}.")
         all_ok = all_ok and ok
         if i < len(chunks): time.sleep(1.5)
     return all_ok
 
+
+def _build_template_2(d: dict) -> str:
+    """بناء القالب الثاني (مؤشر صحة الاقتصاد الأمريكي) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    if not client:
+        return "⚠️ لا يمكن توليد تقرير الاقتصاد الكلي لعدم توفر مفتاح Groq."
+
+    dxy = d.get('dxy', 0)
+    tnx = d.get('tnx', 0)
+    twy = d.get('twy', 0)
+    inflation_est = d.get('inflation_est', 2.5)
+
+    template = """📊 مؤشر صحة الاقتصاد الأمريكي | اليوم
+
+🇺🇸 الحالة العامة:
+[حالة الاقتصاد باختصار]
+
+📈 النمو والاستهلاك:
+[تحليل للنمو بناء على قوة الدولار والعوائد الحالية]
+
+🏦 التضخم والفائدة:
+[تحليل التضخم والفائدة الحالية]
+
+👷 سوق العمل:
+[حالة سوق العمل المتوقعة أو آخر الأرقام]
+
+🟡 التأثير على الذهب:
+[كيف تؤثر هذه البيئة على الذهب]
+
+💲 التأثير على الدولار:
+[كيف تؤثر على الدولار]
+
+🧭 النظرة العامة:
+[خلاصة]"""
+
+    prompt = f"""أنت خبير اقتصادي محترف. طلب مني العميل تقرير عن صحة الاقتصاد الأمريكي يطابق هذا القالب بالضبط:
+
+{template}
+
+المعطيات الحية اليوم من السوق:
+- مؤشر الدولار (DXY): {dxy:.2f}
+- الفائدة (عائد السندات 10 سنوات): {tnx:.2f}%
+- عائد السندات 2 سنة: {twy:.2f}%
+- توقعات التضخم الحية (Breakeven): {inflation_est:.2f}%
+
+بناءً على هذه المعطيات الحية، قم بكتابة التقرير باللغة العربية بأسلوب احترافي جداً وصارم. 
+لا تخترع أرقاماً دقيقة للناتج المحلي أو البطالة إذا لم تكن متأكداً من أحدث الأرقام الحقيقية الموثقة، بل استخدم وصفاً دقيقاً (مثال: 'يسجل الاقتصاد نمواً إيجابياً'، 'معدلات البطالة مستقرة'). 
+يجب أن يكون التأثير على الذهب والدولار منطقياً جداً بناءً على المعطيات أعلاه.
+اكتب التقرير النهائي فقط دون أي مقدمات أو شروحات إضافية."""
+
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 جاري توليد القالب الثاني (الاقتصاد الكلي) عبر {model_name}...")
+            resp = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "أنت خبير اقتصادي أمريكي ومحلل مالي كمي. لا تكتب أي نصوص إضافية خارج القالب المطلوب."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=model_name,
+                temperature=0.2,
+                max_tokens=800,
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الثاني: {e}")
+            time.sleep(2)
+            continue
+            
+    return "⚠️ تعذر توليد تقرير الاقتصاد الكلي بسبب ضغط على سيرفرات الذكاء الاصطناعي."
+
+def _build_template_3(d: dict) -> str:
+    """بناء القالب الثالث (تقرير شهية المخاطرة) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    if not client:
+        return "⚠️ لا يمكن توليد تقرير المخاطرة لعدم توفر مفتاح Groq."
+
+    sp500_pct = d.get('sp500_pct', 0.0)
+    nasdaq_pct = d.get('nasdaq_pct', 0.0)
+    nasdaq_p = d.get('nasdaq_p', 0.0)
+    vix_pct = d.get('vix_pct', 0.0)
+    vix_p = d.get('vix_p', 0.0)
+    dxy_pct = d.get('dxy_pct', 0.0)
+    dxy_p = d.get('dxy_p', 0.0)
+
+    # 1. حساب درجة المخاطرة رياضياً
+    score = 5 # محايد كبداية
+    
+    # الأسهم
+    if sp500_pct > 0.5 and nasdaq_pct > 0.5: score += 2
+    elif sp500_pct > 0 and nasdaq_pct > 0: score += 1
+    elif sp500_pct < -0.5 and nasdaq_pct < -0.5: score -= 2
+    elif sp500_pct < 0 and nasdaq_pct < 0: score -= 1
+        
+    # مؤشر الخوف VIX
+    if vix_pct < -2: score += 2
+    elif vix_pct < 0: score += 1
+    elif vix_pct > 2: score -= 2
+    elif vix_pct > 0: score -= 1
+        
+    # الدولار
+    if dxy_pct < -0.2: score += 1
+    elif dxy_pct > 0.2: score -= 1
+        
+    # تحديد الحالة
+    score = max(1, min(10, score)) # حصر بين 1 و 10
+    if score >= 7:
+        state = "🟢 Risk-On قوي"
+    elif score >= 6:
+        state = "🟢 Risk-On ضعيف"
+    elif score <= 4:
+        state = "🔴 Risk-Off قوي"
+    else:
+        state = "🟡 Risk-Neutral (متذبذب/حذر)"
+
+    sign_sp = "+" if sp500_pct > 0 else ""
+    sign_nq = "+" if nasdaq_pct > 0 else ""
+    sign_vx = "+" if vix_pct > 0 else ""
+    sign_dx = "+" if dxy_pct > 0 else ""
+
+    template = f"""🌎 تقرير شهية المخاطرة
+يقيس هذا التقرير هل المستثمرون يتجهون نحو المخاطرة أم يبحثون عن الأمان والملاذات.
+
+الحالة:
+{state}
+القوة: {score}/10
+
+📊 الأسواق:
+S&P500: {sign_sp}{sp500_pct}%
+Nasdaq: {sign_nq}{nasdaq_pct}%
+VIX: {vix_p} ({sign_vx}{vix_pct}%)
+DXY: {dxy_p} ({sign_dx}{dxy_pct}%)
+
+📈 القراءة:
+[اكتب القراءة بناء على الحالة والأرقام]
+
+🟡 الذهب:
+الانحياز الحالي:
+[اكتب تأثير الحالة الحالية على الملاذات الآمنة والذهب]
+
+💵 الدولار:
+الانحياز الحالي:
+[اكتب تأثير الحالة الحالية على الدولار]
+
+الخلاصة:
+[اكتب خلاصة تدفق السيولة]
+
+ℹ️ شرح سريع
+
+🟢 Risk-On = المستثمرون أكثر تقبلاً للمخاطر ويميلون للأصول عالية المخاطرة.
+🔴 Risk-Off = ارتفاع الحذر والخوف في الأسواق وزيادة الطلب على الملاذات الآمنة مثل الذهب والدولار."""
+
+    prompt = f"""أنت خبير مالي محترف. طلب مني العميل تقرير عن 'شهية المخاطرة' يطابق هذا القالب بالضبط:
+
+{template}
+
+المطلوب:
+لقد قمت أنا بحساب الأرقام وتحديد الحالة (Risk-On / Risk-Off) كما هي ظاهرة في القالب.
+مهمتك هي ملء الفراغات بين الأقواس المربعة [...] بناءً على الحالة والأرقام الموجودة.
+إذا كانت الحالة Risk-On قوي، اشرح كيف يقل الطلب على الملاذات وتتدفق السيولة للأسهم.
+إذا كانت الحالة Risk-Off، اشرح العكس (الخوف يدفع للذهب).
+لا تكتب أي مقدمات أو خواتيم أو نصوص إضافية خارج القالب الموضح."""
+
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 جاري توليد القالب الثالث (شهية المخاطرة) عبر {model_name}...")
+            resp = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=model_name,
+                temperature=0.2,
+                max_tokens=700,
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الثالث: {e}")
+            time.sleep(2)
+            continue
+            
+    return "⚠️ تعذر توليد تقرير المخاطرة بسبب ضغط على سيرفرات الذكاء الاصطناعي."
+
+def _build_template_4(d: dict) -> str:
+    """بناء القالب الرابع (تقرير عوائد السندات الأمريكية) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    if not client:
+        return "⚠️ لا يمكن توليد تقرير عوائد السندات لعدم توفر مفتاح Groq."
+
+    tnx = d.get('tnx_val', 0.0) or 0.0
+    twy = d.get('twy_val', 0.0) or 0.0
+    tnx_diff = d.get('tnx_diff', 0)
+    twy_diff = d.get('twy_diff', 0)
+    
+    diff_val = round(tnx - twy, 2)
+    if diff_val < -0.1:
+        curve_state = "مقلوب (Inverted)"
+    elif diff_val > 0.1:
+        curve_state = "طبيعي (Normal)"
+    else:
+        curve_state = "شبه مسطح (Flat)"
+
+    tnx_dir = "ارتفع" if tnx_diff > 0 else "انخفض" if tnx_diff < 0 else "استقر"
+    twy_dir = "ارتفع" if twy_diff > 0 else "انخفض" if twy_diff < 0 else "استقر"
+
+    template = f"""📊 تقرير عوائد السندات الأمريكية | التحديث اليومي
+
+🇺🇸 عائد 10 سنوات:
+{tnx:.2f}%
+
+الحركة:
+{tnx_dir} بمقدار {abs(tnx_diff)} نقطة أساس. [اكتب تحليلاً قصيراً جداً لهذه الحركة]
+
+🇺🇸 عائد سنتين:
+{twy:.2f}%
+
+التوقعات:
+{twy_dir} بمقدار {abs(twy_diff)} نقطة أساس. [اكتب ماذا يشير ذلك بخصوص الفائدة]
+
+📈 منحنى العوائد:
+{curve_state}
+
+الفارق بين العشر سنوات والسنتين عند {diff_val} نقطة، [اكتب ماذا يعكس ذلك تجاه آفاق النمو]
+
+🟡 تأثير الذهب:
+[تأثير العوائد الحالية على الذهب]
+
+💵 تأثير الدولار:
+[تأثير العوائد الحالية على الدولار]
+
+🧭 الخلاصة:
+[خلاصة حركة العوائد وتأثيرها العام]"""
+
+    prompt = f"""أنت محلل أسواق سندات محترف. طلب مني العميل تقرير عن 'عوائد السندات الأمريكية' يطابق هذا القالب بالضبط:
+
+{template}
+
+المطلوب:
+لقد قمت أنا بحساب أرقام العوائد وفارق النقاط الأساسية (Basis Points) والمنحنى.
+مهمتك هي استبدال الأقواس المربعة [...] بتحليل مالي دقيق واحترافي بناءً على الأرقام الحالية.
+إذا كانت العوائد ترتفع بقوة، اذكر أن ذلك يشكل ضغطاً على الذهب ويدعم الدولار. وإذا انخفضت، اذكر العكس.
+إذا كان المنحنى مقلوباً، اذكر أنه يعكس مخاوف ركود.
+التزم بالقالب تماماً ولا تكتب أي نصوص إضافية أو مقدمات."""
+
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 جاري توليد القالب الرابع (عوائد السندات) عبر {model_name}...")
+            resp = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=model_name,
+                temperature=0.2,
+                max_tokens=600,
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الرابع: {e}")
+            time.sleep(2)
+            continue
+            
+    return "⚠️ تعذر توليد تقرير السندات بسبب ضغط على سيرفرات الذكاء الاصطناعي."
+
+def _build_template_5(d: dict) -> str:
+    """بناء القالب الخامس (تقرير قوة العملات) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    if not client:
+        return "⚠️ لا يمكن توليد تقرير قوة العملات لعدم توفر مفتاح Groq."
+
+    fx_sorted = d.get('fx_sorted', [])
+    if not fx_sorted or len(fx_sorted) < 6:
+        return "⚠️ بيانات العملات غير متوفرة."
+
+    top_3 = fx_sorted[:3]
+    bottom_3 = fx_sorted[-3:] # أضعف 3
+    bottom_3.reverse() # نعكسهم عشان نجيب الأضعف خالص الأول
+
+    template = f"""📊 تقرير قوة العملات | تحديث يومي
+🟢 أقوى العملات:
+🥇 {top_3[0][0]} | القوة: {top_3[0][1]:+.4f}%
+السبب: [سبب قوة هذه العملة بناء على حركتها أمام الدولار]
+🥈 {top_3[1][0]} | القوة: {top_3[1][1]:+.4f}%
+السبب: [سبب قوة هذه العملة]
+🥉 {top_3[2][0]} | القوة: {top_3[2][1]:+.4f}%
+السبب: [سبب قوة هذه العملة]
+🔴 أضعف العملات:
+1️⃣ {bottom_3[0][0]} | القوة: {bottom_3[0][1]:+.4f}%
+السبب: [سبب ضعف هذه العملة أمام الدولار]
+2️⃣ {bottom_3[1][0]} | القوة: {bottom_3[1][1]:+.4f}%
+السبب: [سبب ضعف هذه العملة]
+3️⃣ {bottom_3[2][0]} | القوة: {bottom_3[2][1]:+.4f}%
+السبب: [سبب ضعف هذه العملة]
+⚡️ الزخم:
+[اكتب وصفاً لحالة الزخم وحركة الأسواق الحالية بناء على هذه الأرقام]
+🧭 الخلاصة:
+[خلاصة لهيمنة عملات معينة وضعف أخرى]"""
+
+    prompt = f"""أنت محلل أسواق عملات (Forex) محترف. طلب مني العميل تقرير عن 'قوة العملات' يطابق هذا القالب بالضبط:
+
+{template}
+
+المطلوب:
+لقد قمت أنا بحساب ترتيب العملات وقوتها المئوية اليوم كما يظهر في القالب أعلاه.
+مهمتك هي ملء الفراغات بين الأقواس المربعة [...] بأسباب احترافية جداً وواقعية بناءً على الأرقام المعطاة.
+على سبيل المثال: إذا كانت قوة EUR موجبة، فالسبب هو "أداء قوي وارتفاع ملحوظ بفضل تدفق السيولة".
+في الزخم والخلاصة: اذكر من يهيمن ومن يعاني اليوم بناء على الترتيب الموجود.
+التزم بالقالب الموضح تماماً ولا تقم بإضافة مقدمات أو تغيير تنسيق الأسطر."""
+
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 جاري توليد القالب الخامس (قوة العملات) عبر {model_name}...")
+            resp = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "أنت خبير أسواق عملات (Forex). التزم بالقالب حرفياً ولا تضف شيئاً خارجه."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=model_name,
+                temperature=0.2,
+                max_tokens=650,
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الخامس: {e}")
+            time.sleep(2)
+            continue
+            
+    return "⚠️ تعذر توليد تقرير قوة العملات بسبب ضغط على سيرفرات الذكاء الاصطناعي."
+
+def _build_template_6(d: dict, t1: str, t2: str, t3: str, t4: str, t5: str) -> str:
+    """بناء القالب السادس والأخير (الخلاصة الذكية) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    if not client:
+        return "⚠️ لا يمكن توليد تقرير الخلاصة لعدم توفر مفتاح Groq."
+
+    template = """🎯 خلاصة انحياز الذهب | التحديث المباشر
+
+📈 نسبة الصعود: [النسبة المئوية]%
+📉 نسبة الهبوط: [النسبة المئوية]%
+
+🧭 الخلاصة:
+[سطرين أو ثلاثة فقط تلخص الموقف العام للذهب بناء على كل التقارير المرفقة مع إعطاء قرار نهائي واضح. اكتب بلغة يفهمها المبتدئون]
+
+📌 مستويات التداول الحالية:
+[انقل مستويات البيع والشراء (التي تحتوي على الدوائر 🔴 أو 🟢) من تقرير التحليل الفني المرفق وضعها هنا بدقة كما هي وبدون تغيير في أرقامها]"""
+
+    prompt = f"""أنت "المحلل الأكبر" والمستشار المالي النهائي. 
+لقد قام فريقك بإعداد 5 تقارير مفصلة حول الذهب تشمل (التحليل الفني، الاقتصاد، المخاطرة، العوائد، والعملات).
+الهدف الآن هو استخلاص عصارة هذه التقارير في "رسالة مختصرة ومباشرة للجمهور العام" تطابق هذا القالب بالضبط:
+
+{template}
+
+إليك التقارير الخمسة للتحليل:
+--- التقرير 1 (الفني والزخم): ---
+{t1}
+--- التقرير 2 (الاقتصاد الكلي): ---
+{t2}
+--- التقرير 3 (المخاطرة): ---
+{t3}
+--- التقرير 4 (العوائد): ---
+{t4}
+--- التقرير 5 (العملات): ---
+{t5}
+
+المطلوب:
+1. اقرأ التقارير جميعها بعناية.
+2. استنتج رقمين دقيقين لنسبة الصعود والهبوط (مجموعهما 100%).
+3. اكتب خلاصة مكثفة في سطرين أو ثلاثة كحد أقصى.
+4. ابحث في التقرير 1 عن "مناطق البيع" أو "مناطق الشراء" أو "المنطقة الذهبية" وانقلها كما هي نصياً في قسم المستويات. يجب أن تحافظ على الأرقام بدقة.
+5. لا تكتب أي مقدمات أو تحيات، فقط أخرج القالب المملوء."""
+
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 جاري توليد الخلاصة النهائية (القالب 6) عبر {model_name}...")
+            resp = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "أنت المحلل المالي الأكبر. اصدر حكماً نهائياً قصيراً ودقيقاً للجمهور والتزم بالقالب الحرفي."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=model_name,
+                temperature=0.3,
+                max_tokens=600,
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f"⚠️ [{model_name}] فشل في توليد الخلاصة: {e}")
+            time.sleep(2)
+            continue
+            
+    return "⚠️ تعذر توليد الخلاصة النهائية."
+
+def _build_template_0(d: dict) -> str:
+    """بناء القالب التمهيدي 0 (الصفقات المتقدمة والاتجاهات) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    if not client:
+        return "⚠️ لا يمكن توليد تقرير الصفقات المتقدمة لعدم توفر مفتاح Groq."
+
+    adv = d.get('adv_trades', {})
+    
+    def _format_trade(t):
+        if not t: return "غير متوفر حالياً"
+        return f"دخول: {t['entry']} | هدف: {t['t2']} | وقف: {t['sl']} | ({'شراء 🟢' if t['dir']=='buy' else 'بيع 🔴'})"
+
+    scalp = adv.get('scalp_buy') or adv.get('scalp_sell')
+    swing = adv.get('swing_buy') or adv.get('swing_sell')
+    rev = adv.get('rev_buy') or adv.get('rev_sell') # Zero reflection
+
+    scalp_str = _format_trade(scalp)
+    swing_str = _format_trade(swing)
+    rev_str = _format_trade(rev)
+
+    bias_1h = d.get('tf_hourly', {}).get('bias', '—')
+    bias_1d = d.get('tf_daily', {}).get('bias', '—')
+    score_1h = d.get('tf_hourly', {}).get('score', 0)
+    
+    first_hit = "القمة (مقاومة) أولاً 📈" if score_1h > 0 else "القاع (دعم) أولاً 📉" if score_1h < 0 else "متذبذب - لا مسار واضح ⚖️"
+    
+    template = f"""🎯 التقرير التمهيدي: صفقات ذكية واتجاهات الذهب
+
+⏱️ الاتجاه خلال ساعة: [ترجم إلى العربية بدقة: {bias_1h}]
+📅 الاتجاه خلال يوم: [ترجم إلى العربية بدقة: {bias_1d}]
+🏁 الأقرب للضرب أولاً: {first_hit}
+
+🔥 صفقات السكالبينج (خطف سريع):
+{scalp_str}
+
+🌊 صفقات السوينج (مدى أبعد):
+{swing_str}
+
+🎯 صفقات زيرو انعكاس (قناص):
+{rev_str}"""
+
+    prompt = f"""أنت مستشار تداول آلي خبير. طلب مني العميل تقريراً عن "الصفقات المتقدمة والاتجاهات" يطابق هذا القالب بالضبط:
+
+{template}
+
+المطلوب:
+مهمتك هي صياغة هذا التقرير بلمسة احترافية خفيفة. 
+- في خانة "الاتجاه"، ترجم كلمة (bullish إلى صاعد، bearish إلى هابط، neutral إلى عرضي).
+- بالنسبة للصفقات (سكالبينج، سوينج، زيرو انعكاس)، اترك البيانات والأرقام والاتجاهات كما هي تماماً. إذا كانت "غير متوفر حالياً" اتركها كما هي.
+- التزم بالقالب تماماً ولا تكتب أي نصوص إضافية أو مقدمات."""
+
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 جاري توليد القالب التمهيدي 0 (الصفقات المتقدمة) عبر {model_name}...")
+            resp = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "أنت خبير أسواق. التزم بالقالب الحرفي ولا تضف مقدمات. لا تغير الأرقام نهائياً."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=model_name,
+                temperature=0.2,
+                max_tokens=400,
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f"⚠️ [{model_name}] فشل في توليد القالب 0: {e}")
+            time.sleep(2)
+            continue
+            
+    return "⚠️ تعذر توليد تقرير الصفقات المتقدمة."
+
+import re
+
+def _get_subtitle(chunk: str, default_title: str) -> str:
+    if default_title != "👑 التقرير الكمي الشامل للذهب":
+        return default_title
+    lines = [line.strip() for line in chunk.split('\n') if line.strip()]
+    for line in lines:
+        arabic_chars = [c for c in line if '\u0600' <= c <= '\u06FF']
+        if len(arabic_chars) >= 3:
+            clean = re.sub(r'[^\w\s\.\-\(\)]', '', line).strip()
+            clean = re.sub(r'\s+', ' ', clean)
+            if clean:
+                if not clean.startswith("تقرير"):
+                    clean = "تقرير " + clean
+                return clean[:60]
+    return "تقرير ملخص البيانات"
+
+def send_reports(data: dict, report_text: str, prefix: str = ""):
+    VIP_CHAT = -1003775201576
+    PUB_CHAT = -1002922209855
+    
+    raw_reports = []
+    
+    if report_text:
+        raw_reports.append(("👑 التقرير الكمي الشامل للذهب", report_text, None))
+        
+    t0, t1, t2, t3, t4, t5, t6 = "", "", "", "", "", "", ""
+    try:
+        t0 = _build_template_0(data)
+        if t0: raw_reports.append(("🎯 تقرير الصفقات المتقدمة والزيرو انعكاس", t0, None))
+    except Exception as e: log.error(f"Error 0: {e}")
+    
+    try:
+        t1 = _build_template_1(data)
+        if t1: raw_reports.append(("📊 التقرير الفني المتقدم", t1, None))
+    except Exception as e: log.error(f"Error 1: {e}")
+
+    try:
+        t2 = _build_template_2(data)
+        if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي", t2, None))
+    except Exception as e: log.error(f"Error 2: {e}")
+
+    try:
+        t3 = _build_template_3(data)
+        if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة", t3, None))
+    except Exception as e: log.error(f"Error 3: {e}")
+
+    try:
+        t4 = _build_template_4(data)
+        if t4: raw_reports.append(("📈 تقرير عوائد السندات", t4, None))
+    except Exception as e: log.error(f"Error 4: {e}")
+
+    try:
+        t5 = _build_template_5(data)
+        if t5: raw_reports.append(("💱 تقرير قوة العملات", t5, None))
+    except Exception as e: log.error(f"Error 5: {e}")
+
+    try:
+        t6 = _build_template_6(data, t1, t2, t3, t4, t5)
+        if t6: raw_reports.append(("🏁 تقرير الخلاصة النهائية", t6, None))
+    except Exception as e: log.error(f"Error 6: {e}")
+
+    # تفكيك جميع التقارير إلى أجزاء صغيرة (chunks) ووضعها في قائمة مسطحة
+    flat_chunks = []
+    for title, text, chat_id in raw_reports:
+        chunks = _split_message(text)
+        for chunk in chunks:
+            flat_chunks.append((title, chunk, chat_id))
+            
+    total = len(flat_chunks)
+    
+    global LAST_PUBLIC_REPORT_TIME
+    now = time.time()
+    is_public = False
+    if now - LAST_PUBLIC_REPORT_TIME >= 3500:
+        is_public = True
+        LAST_PUBLIC_REPORT_TIME = now
+        
+    log.info(f"📤 إرسال {total} رسالة مسطحة بشكل متسلسل...")
+    
+    for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
+        subtitle = _get_subtitle(chunk, title)
+        final_text = f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب\n{subtitle}\n\n{chunk}"
+        ok = _send_single(final_text, is_public, chat_id)
+        log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
+        time.sleep(2)
 
 # ══════════════════════════════════════════════
 #  9. الحلقة الرئيسية
@@ -2415,7 +3136,7 @@ def run_bot():
             if last_gold_price is None and last_report_date != today:
                 log.info("📊 إرسال التقرير الافتتاحي...")
                 report = generate_report(data, is_alert=False)
-                if report: send_to_telegram(report)
+                send_reports(data, report)
                 last_gold_price  = current_gold
                 last_report_date = today
                 minutes_counter  = 0
@@ -2435,7 +3156,7 @@ def run_bot():
                 log.info("🌅 إرسال تقرير الصباح...")
                 report = generate_report(data, is_alert=False, is_morning=True)
                 if report:
-                    send_to_telegram(report)
+                    send_reports(data, report)
                     morning_sent_today = True
                     last_gold_price    = current_gold
                     minutes_counter    = 0
@@ -2444,7 +3165,7 @@ def run_bot():
                 log.info("🌙 إرسال ملخص الجلسة...")
                 report = generate_report(data, is_alert=False)
                 if report:
-                    send_to_telegram("🌙 [ملخص جلسة اليوم — تقرير نهائي]\n" + report)
+                    send_reports(data, report, "🌙 [ملخص جلسة اليوم — تقرير نهائي]\n")
                     closing_sent_today = True
                     last_gold_price    = current_gold
                     minutes_counter    = 0
@@ -2455,14 +3176,14 @@ def run_bot():
                     log.info(f"🚨 تحرك حاد {price_diff:+.2f}$")
                     report = generate_report(data, is_alert=True, price_diff=price_diff)
                     if report:
-                        send_to_telegram(report)
+                        send_reports(data, report)
                         last_gold_price = current_gold
                         minutes_counter = 0
                 elif minutes_counter >= ROUTINE_MINUTES:
                     log.info(f"⏰ مرت {ROUTINE_MINUTES} دقيقة — تقرير دوري...")
                     report = generate_report(data, is_alert=False)
                     if report:
-                        send_to_telegram(report)
+                        send_reports(data, report)
                         last_gold_price = current_gold
                         minutes_counter = 0
         else:

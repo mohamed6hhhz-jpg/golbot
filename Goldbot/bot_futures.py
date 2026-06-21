@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 GROQ_API_KEY        = os.environ.get("GROQ_API_KEY", "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")
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
-TARGET_CHATS = []
+TARGET_CHATS = [-1003775201576]
 LAST_PUBLIC_REPORT_TIME = 0
 
 API_ID   = 34105911
@@ -2498,8 +2498,6 @@ def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     success = True
     targets = [chat_id] if chat_id else TARGET_CHATS
     for chat in targets:
-        if chat == -1002922209855 and not is_public_allowed and not chat_id:
-            continue
         payload = {"chat_id": str(chat), "text": text}
         chat_success = False
         for attempt in range(4):
@@ -2525,8 +2523,6 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
         
         targets = [chat_id] if chat_id else TARGET_CHATS
         for chat in targets:
-            if chat == -1002922209855 and not is_public_allowed and not chat_id:
-                continue
             try:
                 await client.send_message(chat, text)
             except Exception as inner_e:

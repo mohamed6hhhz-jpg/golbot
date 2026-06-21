@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 from python.main import app
 
 # Import the Goldbot monitoring function
-from Goldbot.bot import run_bot as run_goldbot
+from Goldbot.bot_v5 import run_bot as run_goldbot
 
 # Import the Auto_Sheets_Bot async function
 from Auto_Sheets_Bot.bot import start_sheets_bot

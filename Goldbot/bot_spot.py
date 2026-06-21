@@ -19,6 +19,8 @@ _CLIENT_LOCK  = threading.Lock()
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
+    "gemma2-9b-it",
+    "mixtral-8x7b-32768",
 ]
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
@@ -2423,7 +2425,7 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
             err_str = str(e)
             if "429" in err_str or "rate_limit" in err_str.lower():
                 log.warning(f"⚠️ [{model_name}] 429 — الانتقال للتالي...")
-                time.sleep(2)
+                time.sleep(10)
                 continue
             log.error(f"❌ [{model_name}] {e}")
             break
@@ -2654,7 +2656,7 @@ def _build_template_2(d: dict) -> str:
             return resp.choices[0].message.content
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الثاني: {e}")
-            time.sleep(2)
+            time.sleep(10)
             continue
 
     return "⚠️ تعذر توليد تقرير الاقتصاد الكلي بسبب ضغط على سيرفرات الذكاء الاصطناعي."
@@ -2768,7 +2770,7 @@ DXY: {dxy_p} ({sign_dx}{dxy_pct}%)
             return resp.choices[0].message.content
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الثالث: {e}")
-            time.sleep(2)
+            time.sleep(10)
             continue
             
     return "⚠️ تعذر توليد تقرير المخاطرة بسبب ضغط على سيرفرات الذكاء الاصطناعي."
@@ -2866,7 +2868,7 @@ def _build_template_4(d: dict) -> str:
             return resp.choices[0].message.content
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الرابع: {e}")
-            time.sleep(2)
+            time.sleep(10)
             continue
 
     return "⚠️ تعذر توليد تقرير السندات بسبب ضغط على سيرفرات الذكاء الاصطناعي."
@@ -2938,7 +2940,7 @@ def _build_template_5(d: dict) -> str:
             return resp.choices[0].message.content
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الخامس: {e}")
-            time.sleep(2)
+            time.sleep(10)
             continue
             
     return "⚠️ تعذر توليد تقرير قوة العملات بسبب ضغط على سيرفرات الذكاء الاصطناعي."
@@ -3012,7 +3014,7 @@ def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: st
             return resp.choices[0].message.content
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل في توليد الخلاصة: {e}")
-            time.sleep(2)
+            time.sleep(10)
             continue
             
     return "⚠️ تعذر توليد الخلاصة النهائية."
@@ -3472,6 +3474,8 @@ def run_bot():
                     last_gold_price[mode] = current_gold
                     last_report_date = today
                     minutes_counter[mode] = 0
+                    has_sent_initial = True
+                    log.info("✅ تم إرسال التقرير الافتتاحي. البوت جاهز لمنطق 'سوق مغلق'.")  # noqa
 
                 elif hour_cairo == HEARTBEAT_HOUR and not heartbeat_sent_today[mode]:
                     conf = data['confluence']

@@ -2982,6 +2982,87 @@ def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: st
             
     return "⚠️ تعذر توليد الخلاصة النهائية."
 
+
+def _build_combined_summary(
+    spot_data: dict,
+    futures_report: str,
+    spot_report: str,
+    futures_t1: str,
+    futures_t2: str,
+    spot_t1: str,
+    spot_t2: str,
+    futures_t0: str,
+    spot_t0: str,
+) -> str:
+    """
+    الخلاصة النهائية المشتركة — تصدر مرة واحدة فقط بعد انتهاء
+    كلا البوتين (الآجل والفوري)، وتجمع القرار النهائي من السوقين.
+    """
+    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    if not client:
+        return "⚠️ لا يمكن توليد الخلاصة المشتركة لعدم توفر مفتاح Groq."
+
+    import re
+    def clean(t): return re.sub(r'[╭─╮├┤│╰╯]', '', t) if t else ""
+
+    pivot_spot    = spot_data.get('pivot', '---')
+    gold_spot     = spot_data.get('gold', 0)
+
+    prompt = f"""أنت المحلل الأكبر. لقد انتهى فريقك للتو من إعداد تقارير شاملة لسوقَي الذهب:
+① سوق الآجل (Futures/GC=F)
+② سوق الفوري (Spot/XAUUSD)
+
+السعر الفوري الحالي: {gold_spot:,.2f}$
+نقطة الفصل اليومية (Pivot): {pivot_spot}$
+
+── ملخص التحليل الفني للآجل ──
+{clean(futures_t1)[:600]}
+
+── ملخص التحليل الفني للفوري ──
+{clean(spot_t1)[:600]}
+
+── أبرز صفقات الآجل ──
+{clean(futures_t0)[:400]}
+
+── أبرز صفقات الفوري ──
+{clean(spot_t0)[:400]}
+
+المطلوب منك: اكتب خلاصة نهائية واحدة تتبع هذا القالب بالضبط (لا تضف أي مقدمة):
+
+🏆 الخلاصة النهائية | آجل + فوري
+
+📈 نسبة الصعود: [X]%
+📉 نسبة الهبوط: [Y]%
+
+🧭 القرار النهائي (3-4 أسطر):
+[اكتب حكماً واضحاً ومختصراً يجمع بين السوقين ويخبر القارئ ماذا يفعل الآن]
+
+📍 نقطة الفصل اليومية:
+{pivot_spot}$ — [اشرح دلالة التداول حالياً فوق أو تحت هذا المستوى بجملة واحدة]
+
+📌 أقوى صفقة الآن:
+[انقل أفضل صفقة موصى بها (آجل أو فوري أيهما أقوى) بالأرقام الدقيقة كما هي]"""
+
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 [Combined] توليد الخلاصة المشتركة عبر {model_name}...")
+            resp = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "أنت المحلل المالي الأكبر. أصدر خلاصة نهائية موجزة ودقيقة تجمع بين سوقي الآجل والفوري. التزم بالقالب حرفياً."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=model_name,
+                temperature=0.25,
+                max_tokens=700,
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f"⚠️ [{model_name}] فشل الخلاصة المشتركة: {e}")
+            time.sleep(2)
+            continue
+
+    return "⚠️ تعذر توليد الخلاصة النهائية المشتركة."
+
 def _build_template_0(d: dict) -> str:
     """بناء القالب التمهيدي 0 (الصفقات المتقدمة والاتجاهات) عبر الذكاء الاصطناعي"""
     client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
@@ -3070,89 +3151,158 @@ def _get_subtitle(chunk: str, default_title: str) -> str:
                 return clean[:60]
     return "تقرير ملخص البيانات"
 
+def _split_fixed_report(report_text: str, mode_label: str) -> list:
+    """
+    تقسيم التقرير الثابت إلى 5 أجزاء منطقية بناءً على علامات المحتوى الفعلي،
+    وليس بعدد الفواصل (━━━) الذي يتغير حسب البيانات.
+    """
+    markers = [
+        "📐 تحليل العائد الحقيقي",
+        "🔢 المستويات",
+        "📊 تقرير قوة الذهب",
+        "📈 توقعات السعر",
+    ]
+    labels = [
+        f"👑 الأسعار والأسواق والاتجاه ({mode_label})",
+        f"📐 العائد الحقيقي والمؤشرات ({mode_label})",
+        f"🔢 المستويات والصفقات ({mode_label})",
+        f"📊 تقرير قوة الذهب ({mode_label})",
+        f"📈 التوقعات والصفقات المتقدمة ({mode_label})",
+    ]
+
+    parts = []
+    remaining = report_text
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    for marker in markers:
+        idx = remaining.find(marker)
+        if idx < 0:
+            continue
+        sep_idx = remaining.rfind(SEP, 0, idx)
+        cut = sep_idx if sep_idx >= 0 else idx
+        part = remaining[:cut].strip()
+        if part:
+            parts.append(part)
+        remaining = remaining[cut:].strip()
+
+    if remaining.strip():
+        parts.append(remaining.strip())
+
+    if len(parts) < 2:
+        return [(f"👑 التقرير الكمي الشامل ({mode_label})", report_text)]
+
+    result = []
+    for i, part in enumerate(parts):
+        label = labels[i] if i < len(labels) else labels[-1]
+        result.append((label, part))
+    return result
+
+
 def send_reports(data: dict, report_text: str, prefix: str = ""):
-    from Goldbot.send_lock import SEND_LOCK
+    from Goldbot.send_lock import SEND_LOCK, _futures_cache
+
     log.info("⏳ [Spot] انتظار القفل المشترك...")
     with SEND_LOCK:
         log.info("🔒 [Spot] حصل على القفل — بدء توليد التقارير والإرسال...")
-        VIP_CHAT = -1003775201576
-        PUB_CHAT = -1002922209855
-        
         raw_reports = []
-        
+
+        # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
         if report_text:
-            sections = report_text.split("━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            
-            if len(sections) >= 6:
-                raw_reports.append(("👑 الأسعار وحالة السوق", sections[0] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[1] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[2], None))
-                raw_reports.append(("📌 القمم والقيعان الحالية", sections[3], None))
-                raw_reports.append(("🟢 صفقات الشراء الموصى بها", sections[4], None))
-                raw_reports.append(("🔴 صفقات البيع الموصى بها", sections[5], None))
-                raw_reports.append(("📉 الفنيات والمستويات", sections[6] if len(sections) > 6 else "", None))
-            else:
-                raw_reports.append(("👑 التقرير الكمي الشامل للذهب", report_text, None))
-            
-        t0, t1, t2, t3, t4, t5, t6 = "", "", "", "", "", "", ""
+            for label, part in _split_fixed_report(report_text, "الفوري - Spot"):
+                raw_reports.append((label, part, None))
+
+        # ── القوالب الذكية T0-T5 (كاملة بلا اختصار) ──
+        t0, t1, t2, t3, t4, t5 = "", "", "", "", "", ""
         try:
             t0 = _build_template_0(data)
-            if t0: raw_reports.append(("🎯 تقرير الصفقات المتقدمة والزيرو انعكاس", t0, None))
-        except Exception as e: log.error(f"Error 0: {e}")
-        
+            if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الفوري)", t0, None))
+        except Exception as e: log.error(f"Error T0: {e}")
+
         try:
             t1 = _build_template_1(data)
-            if t1: raw_reports.append(("📊 التقرير الفني المتقدم", t1, None))
-        except Exception as e: log.error(f"Error 1: {e}")
+            if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الفوري)", t1, None))
+        except Exception as e: log.error(f"Error T1: {e}")
 
         try:
             t2 = _build_template_2(data)
-            if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي", t2, None))
-        except Exception as e: log.error(f"Error 2: {e}")
+            if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الفوري)", t2, None))
+        except Exception as e: log.error(f"Error T2: {e}")
 
         try:
             t3 = _build_template_3(data)
-            if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة", t3, None))
-        except Exception as e: log.error(f"Error 3: {e}")
+            if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الفوري)", t3, None))
+        except Exception as e: log.error(f"Error T3: {e}")
 
         try:
             t4 = _build_template_4(data)
-            if t4: raw_reports.append(("📈 تقرير عوائد السندات", t4, None))
-        except Exception as e: log.error(f"Error 4: {e}")
+            if t4: raw_reports.append(("📈 تقرير عوائد السندات (الفوري)", t4, None))
+        except Exception as e: log.error(f"Error T4: {e}")
 
         try:
             t5 = _build_template_5(data)
-            if t5: raw_reports.append(("💱 تقرير قوة العملات", t5, None))
-        except Exception as e: log.error(f"Error 5: {e}")
+            if t5: raw_reports.append(("💱 تقرير قوة العملات (الفوري)", t5, None))
+        except Exception as e: log.error(f"Error T5: {e}")
 
-        try:
-            t6 = _build_template_6(data, report_text, t0, t1, t2, t3, t4, t5)
-            if t6: raw_reports.append(("🏁 تقرير الخلاصة النهائية", t6, None))
-        except Exception as e: log.error(f"Error 6: {e}")
+        # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──
 
+        # ── تسطيح وإرسال ──
         flat_chunks = []
         for title, text, chat_id in raw_reports:
-            chunks = _split_message(text)
-            for chunk in chunks:
+            for chunk in _split_message(text):
                 flat_chunks.append((title, chunk, chat_id))
-                
+
         total = len(flat_chunks)
-        
+
         global LAST_PUBLIC_REPORT_TIME
         now = time.time()
         is_public = False
         if now - LAST_PUBLIC_REPORT_TIME >= 14000:
             is_public = True
             LAST_PUBLIC_REPORT_TIME = now
-            
-        log.info(f"📤 [Spot] إرسال {total} رسالة بشكل متسلسل...")
-        
+
+        log.info(f"📤 [Spot] إرسال {total} رسالة متسلسلة...")
+
         for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
             subtitle = _get_subtitle(chunk, title)
-            final_text = f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n{subtitle}\n\n{chunk}"
+            final_text = (
+                f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
+                f"{subtitle}\n\n{chunk}"
+            )
             ok = _send_single(final_text, is_public, chat_id)
             log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
             time.sleep(2)
-        
-        log.info("🔓 [Spot] أطلق القفل.")
+
+        # ══════════════════════════════════════════════════════
+        #  الخلاصة النهائية المشتركة — تأتي هنا بعد كل الرسائل
+        # ══════════════════════════════════════════════════════
+        log.info("🏆 [Combined] توليد الخلاصة النهائية المشتركة (آجل + فوري)...")
+        try:
+            fc = _futures_cache  # بيانات الآجل المحفوظة
+            combined = _build_combined_summary(
+                spot_data=data,
+                futures_report=fc.get("report_text", ""),
+                spot_report=report_text,
+                futures_t1=fc.get("t1", ""),
+                futures_t2=fc.get("t2", ""),
+                spot_t1=t1,
+                spot_t2=t2,
+                futures_t0=fc.get("t0", ""),
+                spot_t0=t0,
+            )
+            if combined:
+                summary_msg = (
+                    "🏆 الخلاصة النهائية الشاملة | آجل + فوري\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    + combined
+                )
+                ok = _send_single(summary_msg, is_public, None)
+                log.info("✅ [Combined] تم إرسال الخلاصة المشتركة." if ok else "❌ [Combined] فشل إرسال الخلاصة المشتركة.")
+        except Exception as e:
+            log.error(f"❌ [Combined] خطأ في الخلاصة المشتركة: {e}")
+
+        log.info("🔓 [Spot] أطلق القفل — انتهى الدورة الكاملة.")
+
+
 
 # ══════════════════════════════════════════════
 #  9. الحلقة الرئيسية

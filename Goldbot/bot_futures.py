@@ -3070,92 +3070,140 @@ def _get_subtitle(chunk: str, default_title: str) -> str:
                 return clean[:60]
     return "تقرير ملخص البيانات"
 
+def _split_fixed_report(report_text: str, mode_label: str) -> list:
+    """
+    تقسيم التقرير الثابت إلى 5 أجزاء منطقية بناءً على علامات المحتوى الفعلي،
+    وليس بعدد الفواصل (━━━) الذي يتغير حسب البيانات.
+    """
+    # العلامات التي تحدد بداية كل قسم جديد
+    markers = [
+        "📐 تحليل العائد الحقيقي",   # ينهي: السعر + ملخص + اتجاه + حركة + أسواق
+        "🔢 المستويات",               # ينهي: تحليل العائد + المؤشرات
+        "📊 تقرير قوة الذهب",        # ينهي: المستويات + الصفقات
+        "📈 توقعات السعر",            # ينهي: تقرير القوة
+    ]
+    labels = [
+        f"👑 الأسعار والأسواق والاتجاه ({mode_label})",
+        f"📐 العائد الحقيقي والمؤشرات ({mode_label})",
+        f"🔢 المستويات والصفقات ({mode_label})",
+        f"📊 تقرير قوة الذهب ({mode_label})",
+        f"📈 التوقعات والصفقات المتقدمة ({mode_label})",
+    ]
+
+    parts = []
+    remaining = report_text
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    for marker in markers:
+        idx = remaining.find(marker)
+        if idx < 0:
+            continue
+        # قص من آخر فاصل ━━━ قبل العلامة
+        sep_idx = remaining.rfind(SEP, 0, idx)
+        cut = sep_idx if sep_idx >= 0 else idx
+        part = remaining[:cut].strip()
+        if part:
+            parts.append(part)
+        remaining = remaining[cut:].strip()
+
+    if remaining.strip():
+        parts.append(remaining.strip())
+
+    # إذا فشل التقسيم أرجع التقرير كاملاً في جزء واحد
+    if len(parts) < 2:
+        return [(f"👑 التقرير الكمي الشامل ({mode_label})", report_text)]
+
+    result = []
+    for i, part in enumerate(parts):
+        label = labels[i] if i < len(labels) else labels[-1]
+        result.append((label, part))
+    return result
+
+
 def send_reports(data: dict, report_text: str, prefix: str = ""):
-    from Goldbot.send_lock import SEND_LOCK
-    VIP_CHAT = -1003775201576
-    PUB_CHAT = -1002922209855
+    from Goldbot.send_lock import SEND_LOCK, _futures_cache
 
     log.info("⏳ [Futures] بانتظار القفل المشترك قبل بدء الإرسال...")
-    with SEND_LOCK:  # ضمان أن الآجل فقط يرسل — الفوري ينتظر خارج هذا الحاجز
-        log.info("✅ [Futures] حصل على القفل — بدء توليد التقارير والإرسال...")
+    with SEND_LOCK:
+        log.info("🔒 [Futures] حصل على القفل — بدء توليد التقارير والإرسال...")
         raw_reports = []
-        
+
+        # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
         if report_text:
-            # Split the giant fixed report into exactly 5 sections to ensure we get EXACTLY 12/12 Telegram messages
-            sections = report_text.split("━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            
-            if len(sections) >= 6:
-                raw_reports.append(("👑 الأسعار وحالة السوق", sections[0] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[1] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[2], None))
-                raw_reports.append(("📌 القمم والقيعان الحالية", sections[3], None))
-                raw_reports.append(("🟢 صفقات الشراء الموصى بها", sections[4], None))
-                raw_reports.append(("🔴 صفقات البيع الموصى بها", sections[5], None))
-                raw_reports.append(("📉 الفنيات والمستويات", sections[6] if len(sections) > 6 else "", None))
-            else:
-                raw_reports.append(("👑 التقرير الكمي الشامل للذهب", report_text, None))
-            
-        t0, t1, t2, t3, t4, t5, t6 = "", "", "", "", "", "", ""
+            for label, part in _split_fixed_report(report_text, "الآجل - Futures"):
+                raw_reports.append((label, part, None))
+
+        # ── القوالب الذكية T0-T5 (كاملة بلا اختصار) ──
+        t0, t1, t2, t3, t4, t5 = "", "", "", "", "", ""
         try:
             t0 = _build_template_0(data)
-            if t0: raw_reports.append(("🎯 تقرير الصفقات المتقدمة والزيرو انعكاس", t0, None))
-        except Exception as e: log.error(f"Error 0: {e}")
-        
+            if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الآجل)", t0, None))
+        except Exception as e: log.error(f"Error T0: {e}")
+
         try:
             t1 = _build_template_1(data)
-            if t1: raw_reports.append(("📊 التقرير الفني المتقدم", t1, None))
-        except Exception as e: log.error(f"Error 1: {e}")
+            if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الآجل)", t1, None))
+        except Exception as e: log.error(f"Error T1: {e}")
 
         try:
             t2 = _build_template_2(data)
-            if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي", t2, None))
-        except Exception as e: log.error(f"Error 2: {e}")
+            if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الآجل)", t2, None))
+        except Exception as e: log.error(f"Error T2: {e}")
 
         try:
             t3 = _build_template_3(data)
-            if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة", t3, None))
-        except Exception as e: log.error(f"Error 3: {e}")
+            if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الآجل)", t3, None))
+        except Exception as e: log.error(f"Error T3: {e}")
 
         try:
             t4 = _build_template_4(data)
-            if t4: raw_reports.append(("📈 تقرير عوائد السندات", t4, None))
-        except Exception as e: log.error(f"Error 4: {e}")
+            if t4: raw_reports.append(("📈 تقرير عوائد السندات (الآجل)", t4, None))
+        except Exception as e: log.error(f"Error T4: {e}")
 
         try:
             t5 = _build_template_5(data)
-            if t5: raw_reports.append(("💱 تقرير قوة العملات", t5, None))
-        except Exception as e: log.error(f"Error 5: {e}")
+            if t5: raw_reports.append(("💱 تقرير قوة العملات (الآجل)", t5, None))
+        except Exception as e: log.error(f"Error T5: {e}")
 
-        try:
-            t6 = _build_template_6(data, report_text, t0, t1, t2, t3, t4, t5)
-            if t6: raw_reports.append(("🏁 تقرير الخلاصة النهائية", t6, None))
-        except Exception as e: log.error(f"Error 6: {e}")
+        # ── لا خلاصة هنا — ستأتي مشتركة بعد انتهاء الفوري ──
 
-        # تفكيك جميع التقارير إلى أجزاء صغيرة (chunks) ووضعها في قائمة مسطحة
+        # ── تسطيح وإرسال ──
         flat_chunks = []
         for title, text, chat_id in raw_reports:
-            chunks = _split_message(text)
-            for chunk in chunks:
+            for chunk in _split_message(text):
                 flat_chunks.append((title, chunk, chat_id))
-                
+
         total = len(flat_chunks)
-        
+
         global LAST_PUBLIC_REPORT_TIME
         now = time.time()
         is_public = False
-        # الإرسال للجروب العام كل 4 ساعات (14000 ثانية تقريباً)
         if now - LAST_PUBLIC_REPORT_TIME >= 14000:
             is_public = True
             LAST_PUBLIC_REPORT_TIME = now
-            
+
         log.info(f"📤 [Futures] إرسال {total} رسالة متسلسلة...")
-        
+
         for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
             subtitle = _get_subtitle(chunk, title)
-            final_text = f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الآجل - Futures)\n{subtitle}\n\n{chunk}"
+            final_text = (
+                f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الآجل - Futures)\n"
+                f"{subtitle}\n\n{chunk}"
+            )
             ok = _send_single(final_text, is_public, chat_id)
             log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
             time.sleep(2)
 
-        log.info("🔓 [Futures] تم إطلاق القفل — الفوري يستطيع الإرسال الآن.")
+        # ── حفظ بيانات الآجل للخلاصة المشتركة اللاحقة ──
+        _futures_cache.clear()
+        _futures_cache.update({
+            "report_text": report_text,
+            "t0": t0, "t1": t1, "t2": t2,
+            "t3": t3, "t4": t4, "t5": t5,
+        })
+        log.info("💾 [Futures] تم حفظ بيانات الآجل — الفوري يستطيع الإرسال الآن.")
+
+
 
 # ══════════════════════════════════════════════
 #  9. الحلقة الرئيسية

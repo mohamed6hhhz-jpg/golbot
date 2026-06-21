@@ -399,15 +399,21 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
 
     # ── شهرية ──
     sl_m = round(atr * 1.5, 2)
-    t = dict(entry=round(s_f, 2), sl=round(s_f - sl_m, 2), risk=sl_m,
-             t1=r_n, t2=round((pm_h + r_n) / 2, 2) if pm_h else r_f,
-             t3=round(pm_h, 2) if pm_h else round(r_f + atr * 0.5, 2),
+    buy_ent_m  = round(s_f, 2)
+    sell_ent_m = round(r_f, 2)
+    m_buy_t1 = max(r_n, buy_ent_m + atr * 0.3)
+    m_buy_t2 = max(round((pm_h + r_n) / 2, 2) if pm_h else r_f, m_buy_t1 + atr * 0.2)
+    m_buy_t3 = max(round(pm_h, 2) if pm_h else round(r_f + atr * 0.5, 2), m_buy_t2 + atr * 0.2)
+    t = dict(entry=buy_ent_m, sl=round(buy_ent_m - sl_m, 2), risk=sl_m,
+             t1=round(m_buy_t1, 2), t2=round(m_buy_t2, 2), t3=round(m_buy_t3, 2),
              market=market_name, tf='1ش', typ='شهرية 🗓️', dir='buy')
     if bias in ('bull', 'neutral') and _rr(r_n - s_f, sl_m) >= MIN_RR:
         trades['monthly_buy'] = t
-    t = dict(entry=round(r_f, 2), sl=round(r_f + sl_m, 2), risk=sl_m,
-             t1=s_n, t2=round((pm_l + s_n) / 2, 2) if pm_l else s_f,
-             t3=round(pm_l, 2) if pm_l else round(s_f - atr * 0.5, 2),
+    m_sell_t1 = min(s_n, sell_ent_m - atr * 0.3)
+    m_sell_t2 = min(round((pm_l + s_n) / 2, 2) if pm_l else s_f, m_sell_t1 - atr * 0.2)
+    m_sell_t3 = min(round(pm_l, 2) if pm_l else round(s_f - atr * 0.5, 2), m_sell_t2 - atr * 0.2)
+    t = dict(entry=sell_ent_m, sl=round(sell_ent_m + sl_m, 2), risk=sl_m,
+             t1=round(m_sell_t1, 2), t2=round(m_sell_t2, 2), t3=round(m_sell_t3, 2),
              market=market_name, tf='1ش', typ='شهرية 🗓️', dir='sell')
     if bias in ('bear', 'neutral') and _rr(r_f - s_n, sl_m) >= MIN_RR:
         trades['monthly_sell'] = t
@@ -630,11 +636,14 @@ def tf_gold_impact(score: int) -> str:
 
 
 def _rsi_gold_impact(rsi: float) -> str:
-    if rsi < 30:   return "🟢 تشبع بيع → الذهب مرشح لارتداد صعودًا"
+    if rsi < 20:   return "🟢 تشبع بيعي حاد (RSI<20) → ارتداد صعودي مرتقب بقوة للذهب"
+    elif rsi < 30: return "🟢 تشبع بيع → الذهب مرشح لارتداد صعودًا"
+    elif rsi > 80: return "🔴 تشبع شرائي حاد (RSI>80) → تصحيح هبوطي حاد مرتقب للذهب"
     elif rsi > 70: return "🔴 تشبع شراء → الذهب مرشح لتصحيح هبوطًا"
     elif rsi < 45: return "🔴 ضغط هبوطي → الذهب تحت ضغط بائع"
     elif rsi > 55: return "🟢 دعم صعودي → الذهب يجد زخماً للأعلى"
     return "⚪ محايد → لا دعم ولا ضغط على الذهب"
+
 
 
 def _macd_gold_impact(macd_hist: float) -> str:
@@ -1366,7 +1375,8 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     except Exception:
         pass
 
-    real_yield_val = round(interest_rate - inflation_est, 2)
+    # العائد الحقيقي = عائد السندات 10 سنوات − التضخم (وليس فائدة الفيد)
+    real_yield_val = round((tnx if tnx else 4.5) - inflation_est, 2)
     real_yield_signal = "غير متاح"
     real_yield_brief  = "⚪ العائد الحقيقي — بيانات غير متاحة"
     if tip_df is not None and not tip_df.empty and len(tip_df) >= 10:
@@ -1635,10 +1645,13 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     except:
         pass
 
-    d['tnx_diff'] = tnx_diff
-    d['twy_diff'] = twy_diff
-    d['tnx_val'] = tnx
-    d['twy_val'] = twy
+    d['tnx_diff']    = tnx_diff
+    d['twy_diff']    = twy_diff
+    d['tnx_val']     = tnx
+    d['twy_val']     = twy
+    # حفظ العائد الحقيقي والتضخم لاستخدامهما في القالب 4
+    d['real_yield']  = real_yield_val
+    d['cpi_yoy']     = inflation_est
 
 
     # ── [مؤشر قوة العملات للقالب 5] ──
@@ -2577,68 +2590,71 @@ def _build_template_2(d: dict) -> str:
     if not client:
         return "⚠️ لا يمكن توليد تقرير الاقتصاد الكلي لعدم توفر مفتاح Groq."
 
-    dxy = d.get('dxy', 0)
-    tnx = d.get('tnx', 0)
-    twy = d.get('twy', 0)
-    inflation_est = d.get('inflation_est', 2.5)
+    dxy        = d.get('dxy', 0)
+    dxy_pct    = d.get('dxy_pct', 0.0)
+    tnx        = d.get('tnx', 0)
+    twy        = d.get('twy', 0)
+    vix        = d.get('vix', 0)
+    vix_pct    = d.get('vix_pct', 0.0)
+    sp500_pct  = d.get('sp500_pct', 0.0)
+    nasdaq_pct = d.get('nasdaq_pct', 0.0)
+    inflation  = d.get('inflation_est', 2.5)
+    real_yield = d.get('real_yield', round(tnx - inflation, 2))
+    yield_curve = round(tnx - twy, 2) if tnx and twy else 0
 
-    template = """📊 مؤشر صحة الاقتصاد الأمريكي | اليوم
+    dxy_bias   = "قوي" if dxy > 104 else ("ضعيف" if dxy < 101 else "محايد")
+    ry_bias    = "مرتفع ↑ (ضغط على الذهب)" if real_yield > 1.5 else ("متوسط" if real_yield > 0 else "سالب ↓ (دعم للذهب)")
+    vix_state  = "مرتفع (خوف)" if vix > 25 else ("منخفض (هدوء)" if vix < 18 else "متوسط")
+    eq_state   = "أسهم ترتفع (Risk-On)" if sp500_pct > 0.3 else ("أسهم تهبط (Risk-Off)" if sp500_pct < -0.3 else "أسهم مستقرة")
+    yc_state   = "منحنى مقلوب (مخاوف ركود)" if yield_curve < -0.1 else ("منحنى طبيعي" if yield_curve > 0.1 else "منحنى شبه مسطح")
+
+    prompt = f"""أنت خبير اقتصادي كمي متخصص. اكتب تقرير صحة الاقتصاد الأمريكي بالعربية ملتزماً بهذا القالب حرفياً:
+
+📊 مؤشر صحة الاقتصاد الأمريكي | اليوم
 
 🇺🇸 الحالة العامة:
-[حالة الاقتصاد باختصار]
+[جملة واحدة دقيقة تصف الحالة الاقتصادية بناءً على: {eq_state}، DXY={dxy:.1f}({dxy_bias})]
 
 📈 النمو والاستهلاك:
-[تحليل للنمو بناء على قوة الدولار والعوائد الحالية]
+[تحليل 2 جملة: منحنى العوائد ({yc_state}، فارق {yield_curve:+.2f}%) وتأثيره على الائتمان والنمو]
 
 🏦 التضخم والفائدة:
-[تحليل التضخم والفائدة الحالية]
+[تحليل 2 جملة: التضخم {inflation:.2f}%، عائد 10Y={tnx:.2f}%، العائد الحقيقي={real_yield:+.2f}% ({ry_bias})]
 
 👷 سوق العمل:
-[حالة سوق العمل المتوقعة أو آخر الأرقام]
+[جملة واحدة عن دلالة الأسواق الحالية على سوق العمل: VIX={vix:.1f}({vix_state})، أسهم {sp500_pct:+.2f}%]
 
 🟡 التأثير على الذهب:
-[كيف تؤثر هذه البيئة على الذهب]
+[جملتان محددتان: كيف يؤثر العائد الحقيقي {real_yield:+.2f}% والدولار {dxy:.1f} على الذهب الآن مع حكم صعودي أو هبوطي]
 
 💲 التأثير على الدولار:
-[كيف تؤثر على الدولار]
+[جملة واحدة: DXY عند {dxy:.1f}({dxy_pct:+.2f}%) واتجاهه بناءً على العوائد والأسهم]
 
 🧭 النظرة العامة:
-[خلاصة]"""
+[خلاصة في جملتين: الصورة الكاملة للبيئة الاقتصادية وتأثيرها على الذهب اليوم]
 
-    prompt = f"""أنت خبير اقتصادي محترف. طلب مني العميل تقرير عن صحة الاقتصاد الأمريكي يطابق هذا القالب بالضبط:
-
-{template}
-
-المعطيات الحية اليوم من السوق:
-- مؤشر الدولار (DXY): {dxy:.2f}
-- الفائدة (عائد السندات 10 سنوات): {tnx:.2f}%
-- عائد السندات 2 سنة: {twy:.2f}%
-- توقعات التضخم الحية (Breakeven): {inflation_est:.2f}%
-
-بناءً على هذه المعطيات الحية، قم بكتابة التقرير باللغة العربية بأسلوب احترافي جداً وصارم. 
-لا تخترع أرقاماً دقيقة للناتج المحلي أو البطالة إذا لم تكن متأكداً من أحدث الأرقام الحقيقية الموثقة، بل استخدم وصفاً دقيقاً (مثال: 'يسجل الاقتصاد نمواً إيجابياً'، 'معدلات البطالة مستقرة'). 
-يجب أن يكون التأثير على الذهب والدولار منطقياً جداً بناءً على المعطيات أعلاه.
-اكتب التقرير النهائي فقط دون أي مقدمات أو شروحات إضافية."""
+القاعدة: لا تكتب مقدمة. لا تضف نصاً خارج القالب. كل أرقام في القالب يجب أن تكون من البيانات المعطاة فقط."""
 
     for model_name in GROQ_MODELS:
         try:
             log.info(f"🤖 جاري توليد القالب الثاني (الاقتصاد الكلي) عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت خبير اقتصادي أمريكي ومحلل مالي كمي. لا تكتب أي نصوص إضافية خارج القالب المطلوب."},
+                    {"role": "system", "content": "أنت خبير اقتصادي كمي. اكتب تحليلاً مالياً دقيقاً محدداً. استخدم فقط الأرقام المعطاة. لا تكتب خارج القالب."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
-                temperature=0.2,
-                max_tokens=800,
+                temperature=0.15,
+                max_tokens=900,
             )
             return resp.choices[0].message.content
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الثاني: {e}")
             time.sleep(2)
             continue
-            
+
     return "⚠️ تعذر توليد تقرير الاقتصاد الكلي بسبب ضغط على سيرفرات الذكاء الاصطناعي."
+
 
 def _build_template_3(d: dict) -> str:
     """بناء القالب الثالث (تقرير شهية المخاطرة) عبر الذكاء الاصطناعي"""
@@ -2994,9 +3010,17 @@ def _build_template_0(d: dict) -> str:
         if not t: return "غير متوفر حالياً"
         return f"دخول: {t['entry']} | هدف: {t['t2']} | وقف: {t['sl']} | ({'شراء 🟢' if t['dir']=='buy' else 'بيع 🔴'})"
 
-    scalp = adv.get('scalp_buy') or adv.get('scalp_sell')
-    swing = adv.get('swing_buy') or adv.get('swing_sell')
-    rev = adv.get('rev_buy') or adv.get('rev_sell') # Zero reflection
+    scalp = (adv.get('scalp_5m_buy') or adv.get('scalp_5m_sell')
+             or adv.get('scalp_buy') or adv.get('scalp_sell'))
+    gold_now = d.get('gold', 0)
+    sw_b = adv.get('swing_buy')
+    sw_s = adv.get('swing_sell')
+    if sw_b and sw_s:
+        swing = sw_b if abs(sw_b['entry'] - gold_now) < abs(sw_s['entry'] - gold_now) else sw_s
+    else:
+        swing = sw_b or sw_s
+    rev = adv.get('rev_buy') or adv.get('rev_sell')
+
 
     scalp_str = _format_trade(scalp)
     swing_str = _format_trade(swing)

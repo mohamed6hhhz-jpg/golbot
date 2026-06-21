@@ -3403,6 +3403,7 @@ def run_bot():
     all_models_notified  = False
     last_report_date     = None
     market_closed_notified = False
+    has_sent_initial       = False
     day_names = ["اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت","أحد"]
 
     while True:
@@ -3418,7 +3419,7 @@ def run_bot():
                 heartbeat_sent_today[m] = False
             all_models_notified  = False
 
-        if False: # not is_market_open():
+        if not is_market_open() and has_sent_initial:
             if not market_closed_notified:
                 now_c    = cairo_now()
                 wday     = now_c.weekday()

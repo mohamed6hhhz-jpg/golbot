@@ -3165,15 +3165,13 @@ def _split_fixed_report(report_text: str, mode_label: str) -> list:
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache
 
-    log.info("⏳ [Futures] بانتظار القفل المشترك قبل بدء الإرسال...")
-    with SEND_LOCK:
-        log.info("🔒 [Futures] حصل على القفل — بدء توليد التقارير والإرسال...")
-        raw_reports = []
+    log.info("🤖 [Futures] بدء توليد التقارير (خارج القفل)...")
+    raw_reports = []
 
-        # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
-        if report_text:
-            for label, part in _split_fixed_report(report_text, "الآجل - Futures"):
-                raw_reports.append((label, part, None))
+    # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
+    if report_text:
+        for label, part in _split_fixed_report(report_text, "الآجل - Futures"):
+            raw_reports.append((label, part, None))
 
         # ── القوالب الذكية T0-T5 (كاملة بلا اختصار) ──
         t0, t1, t2, t3, t4, t5 = "", "", "", "", "", ""

@@ -627,7 +627,13 @@ def get_tf_4frame_label(tf_15m, tf_1h, tf_4h, tf_1d) -> str:
     return "⚪ تعارض بين الإطارات — حذر"
 
 
-def tf_gold_impact(score: int) -> str:
+def tf_gold_impact(score: int, rsi: float = 50) -> str:
+    # RSI الحاد يتغلب على الـ score العادي
+    if rsi < 20:   return "🟢 تشبع بيعي حاد (RSI<20) → ارتداد صعودي مرتقب بقوة للذهب"
+    if rsi > 80:   return "🔴 تشبع شرائي حاد (RSI>80) → تصحيح هبوطي حاد مرتقب للذهب"
+    if rsi < 28:   return "🟢 تشبع بيع (RSI<28) → الذهب مرشح لارتداد صعودًا"
+    if rsi > 72:   return "🔴 تشبع شراء (RSI>72) → الذهب مرشح لتصحيح هبوطًا"
+    # الحالات العادية بناءً على الـ score
     if score >= 3:  return "↑↑ دعم صعودي قوي → الذهب مرشح للصعود"
     if score >= 1:  return "↑ دعم صعودي خفيف → ميل إيجابي للذهب"
     if score <= -3: return "↓↓ ضغط هبوطي قوي → الذهب مرشح للهبوط"
@@ -1811,11 +1817,11 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🕐 الاتجاه العام (متعدد الإطارات): {d['tf_label']}
-   ⚡ {d['tf_15m'].get('bias','—')} | RSI={d['tf_15m'].get('rsi','—')} | {tf_gold_impact(d['tf_15m'].get('score',0))} [15د]
-   ⏱️ {d['tf_hourly'].get('bias','—')} | RSI={d['tf_hourly'].get('rsi','—')} | {tf_gold_impact(d['tf_hourly'].get('score',0))} [1س]
-   ⏰ {d['tf_4h'].get('bias','—')} | RSI={d['tf_4h'].get('rsi','—')} | {tf_gold_impact(d['tf_4h'].get('score',0))} [4س]
-   📅 {d['tf_daily'].get('bias','—')} | RSI={d['tf_daily'].get('rsi','—')} | {tf_gold_impact(d['tf_daily'].get('score',0))} [1ي]
-   📆 {d['tf_weekly'].get('bias','—')} | RSI={d['tf_weekly'].get('rsi','—')} | {tf_gold_impact(d['tf_weekly'].get('score',0))} [أسبوعي]
+   ⚡ {d['tf_15m'].get('bias','—')} | RSI={d['tf_15m'].get('rsi','—')} | {tf_gold_impact(d['tf_15m'].get('score',0), d['tf_15m'].get('rsi',50))} [15د]
+   ⏱️ {d['tf_hourly'].get('bias','—')} | RSI={d['tf_hourly'].get('rsi','—')} | {tf_gold_impact(d['tf_hourly'].get('score',0), d['tf_hourly'].get('rsi',50))} [1س]
+   ⏰ {d['tf_4h'].get('bias','—')} | RSI={d['tf_4h'].get('rsi','—')} | {tf_gold_impact(d['tf_4h'].get('score',0), d['tf_4h'].get('rsi',50))} [4س]
+   📅 {d['tf_daily'].get('bias','—')} | RSI={d['tf_daily'].get('rsi','—')} | {tf_gold_impact(d['tf_daily'].get('score',0), d['tf_daily'].get('rsi',50))} [1ي]
+   📆 {d['tf_weekly'].get('bias','—')} | RSI={d['tf_weekly'].get('rsi','—')} | {tf_gold_impact(d['tf_weekly'].get('score',0), d['tf_weekly'].get('rsi',50))} [أسبوعي]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📈 حركة السعر: {hist_line}

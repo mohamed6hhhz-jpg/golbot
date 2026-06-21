@@ -3079,7 +3079,7 @@ def run_bot():
             heartbeat_sent_today = False
             all_models_notified  = False
 
-        if not is_market_open():
+        if False: # not is_market_open():
             # — إرسال إشعار "سوق مغلق" مرة واحدة فقط لكل فترة إغلاق —
             if not market_closed_notified:
                 now_c    = cairo_now()

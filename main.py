@@ -10,8 +10,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 # Import the existing FastAPI app from python/main.py
 from python.main import app
 
-# Import the Goldbot monitoring function
-from Goldbot.bot import run_bot as run_goldbot
+# Import the Goldbot monitoring functions
+from Goldbot.bot_futures import run_bot as run_goldbot_futures
+from Goldbot.bot_spot import run_bot as run_goldbot_spot
 
 # Import the Auto_Sheets_Bot async function
 from Auto_Sheets_Bot.bot import start_sheets_bot
@@ -47,7 +48,7 @@ async def test_gold(secret: str = ""):
     def _run():
         result = {"steps": {}}
         try:
-            from Goldbot.bot import get_full_market_data, generate_report, send_to_telegram
+            from Goldbot.bot_spot import get_full_market_data, generate_report, send_to_telegram
 
             # الخطوة 1: جلب البيانات
             result["steps"]["fetch"] = "جاري..."
@@ -81,7 +82,7 @@ async def test_gold(secret: str = ""):
             result["error"]   = str(e)
             result["traceback"] = traceback.format_exc()[-1000:]
             try:
-                from Goldbot.bot import send_to_telegram
+                from Goldbot.bot_spot import send_to_telegram
                 send_to_telegram(f"❌ [TEST EXCEPTION]\n{str(e)[:300]}")
             except Exception:
                 pass
@@ -101,10 +102,14 @@ async def startup_event():
     """
     print("[Orchestrator] Starting background bots...")
 
-    # 1. Start Goldbot in a separate background thread (since it uses while True + time.sleep)
-    goldbot_thread = threading.Thread(target=run_goldbot, daemon=True)
-    goldbot_thread.start()
-    print("[Orchestrator] Goldbot thread started.")
+    # 1. Start Goldbot in separate background threads (since they use while True + time.sleep)
+    goldbot_futures_thread = threading.Thread(target=run_goldbot_futures, daemon=True)
+    goldbot_futures_thread.start()
+    print("[Orchestrator] Goldbot Futures thread started.")
+
+    goldbot_spot_thread = threading.Thread(target=run_goldbot_spot, daemon=True)
+    goldbot_spot_thread.start()
+    print("[Orchestrator] Goldbot Spot thread started.")
 
     # 2. Start auto-copy Telegram bot on the main asyncio event loop
     asyncio.create_task(start_telethon_bot())

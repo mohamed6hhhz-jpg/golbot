@@ -19,8 +19,6 @@ _CLIENT_LOCK  = threading.Lock()
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
-    "gemma2-9b-it",
-    "mixtral-8x7b-32768",
 ]
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
@@ -318,6 +316,7 @@ def calc_price_prediction(gold: float, atr: float, tf_15m: dict, tf_hourly: dict
 def calc_advanced_trades(d: dict, bias: str) -> dict:
     """6 أنواع صفقات متقدمة: سكالبينج | يومية | أسبوعية | شهرية | سوينج | انعكاس"""
     gold   = d['gold'];  atr = d['atr']
+    market_name = 'آجل (Futures)' if d.get('mode') == 'futures' else 'فوري (Spot)'
     s1, s2 = d['s1'], d['s2']
     r1, r2 = d['r1'], d['r2']
     pivot  = d['pivot']
@@ -356,12 +355,12 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     sl_sc = 8.0
     t = dict(entry=round(s_n, 2), sl=round(s_n - sl_sc, 2), risk=sl_sc,
              t1=round(s_n + 15, 2), t2=round(s_n + 28, 2), t3=round(s_n + 45, 2),
-             market='آجل (Futures)', tf='15د', typ='سكالبينج 🏹', dir='buy')
+             market=market_name, tf='15د', typ='سكالبينج 🏹', dir='buy')
     if bias in ('bull', 'neutral') and _rr(15, sl_sc) >= MIN_RR:
         trades['scalp_buy'] = t
     t = dict(entry=round(r_n, 2), sl=round(r_n + sl_sc, 2), risk=sl_sc,
              t1=round(r_n - 15, 2), t2=round(r_n - 28, 2), t3=round(r_n - 45, 2),
-             market='آجل (Futures)', tf='15د', typ='سكالبينج 🏹', dir='sell')
+             market=market_name, tf='15د', typ='سكالبينج 🏹', dir='sell')
     if bias in ('bear', 'neutral') and _rr(15, sl_sc) >= MIN_RR:
         trades['scalp_sell'] = t
 
@@ -373,12 +372,12 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     sell_entry_d = round(pivot if piv_valid else r_n, 2)
     t = dict(entry=buy_entry_d, sl=round(buy_entry_d - sl_d, 2), risk=sl_d,
              t1=r_n, t2=r_f, t3=round(r_f + atr * 0.3, 2),
-             market='آجل (Futures)', tf='1ي', typ='يومية 📅', dir='buy')
+             market=market_name, tf='1ي', typ='يومية 📅', dir='buy')
     if bias in ('bull', 'neutral') and _rr(r_n - buy_entry_d, sl_d) >= MIN_RR:
         trades['daily_buy'] = t
     t = dict(entry=sell_entry_d, sl=round(sell_entry_d + sl_d, 2), risk=sl_d,
              t1=s_n, t2=s_f, t3=round(s_f - atr * 0.3, 2),
-             market='آجل (Futures)', tf='1ي', typ='يومية 📅', dir='sell')
+             market=market_name, tf='1ي', typ='يومية 📅', dir='sell')
     if bias in ('bear', 'neutral') and _rr(sell_entry_d - s_n, sl_d) >= MIN_RR:
         trades['daily_sell'] = t
 
@@ -388,13 +387,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     t = dict(entry=round(s_n, 2), sl=round(pw_l - 5 if pw_l else s_n - atr, 2),
              risk=max(abs(sl_w_b), 10),
              t1=r_n, t2=r_f, t3=round(pw_h if pw_h else r_f + atr * 0.5, 2),
-             market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='buy')
+             market=market_name, tf='1أ', typ='أسبوعية 📆', dir='buy')
     if bias in ('bull', 'neutral') and _rr(r_n - s_n, max(abs(sl_w_b), 10)) >= MIN_RR:
         trades['weekly_buy'] = t
     t = dict(entry=round(r_n, 2), sl=round(pw_h + 5 if pw_h else r_n + atr, 2),
              risk=max(abs(sl_w_s), 10),
              t1=s_n, t2=s_f, t3=round(pw_l if pw_l else s_f - atr * 0.5, 2),
-             market='آجل (Futures)', tf='1أ', typ='أسبوعية 📆', dir='sell')
+             market=market_name, tf='1أ', typ='أسبوعية 📆', dir='sell')
     if bias in ('bear', 'neutral') and _rr(r_n - s_n, max(abs(sl_w_s), 10)) >= MIN_RR:
         trades['weekly_sell'] = t
 
@@ -403,13 +402,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     t = dict(entry=round(s_f, 2), sl=round(s_f - sl_m, 2), risk=sl_m,
              t1=r_n, t2=round((pm_h + r_n) / 2, 2) if pm_h else r_f,
              t3=round(pm_h, 2) if pm_h else round(r_f + atr * 0.5, 2),
-             market='آجل (Futures)', tf='1ش', typ='شهرية 🗓️', dir='buy')
+             market=market_name, tf='1ش', typ='شهرية 🗓️', dir='buy')
     if bias in ('bull', 'neutral') and _rr(r_n - s_f, sl_m) >= MIN_RR:
         trades['monthly_buy'] = t
     t = dict(entry=round(r_f, 2), sl=round(r_f + sl_m, 2), risk=sl_m,
              t1=s_n, t2=round((pm_l + s_n) / 2, 2) if pm_l else s_f,
              t3=round(pm_l, 2) if pm_l else round(s_f - atr * 0.5, 2),
-             market='آجل (Futures)', tf='1ش', typ='شهرية 🗓️', dir='sell')
+             market=market_name, tf='1ش', typ='شهرية 🗓️', dir='sell')
     if bias in ('bear', 'neutral') and _rr(r_f - s_n, sl_m) >= MIN_RR:
         trades['monthly_sell'] = t
 
@@ -418,13 +417,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     mid   = round((sw_h + sw_l) / 2, 2)
     t = dict(entry=round(sw_l, 2), sl=round(sw_l - sl_sw, 2), risk=sl_sw,
              t1=mid, t2=round(sw_h, 2), t3=round(sw_h + atr * 0.4, 2),
-             market='آجل (Futures)', tf='أسابيع', typ='سوينج 🌊', dir='buy')
-    if sw_l < gold and _rr(mid - sw_l, sl_sw) >= MIN_RR:
+             market=market_name, tf='أسابيع', typ='سوينج 🌊', dir='buy')
+    if bias in ('bull', 'neutral') and sw_l < gold and _rr(mid - sw_l, sl_sw) >= MIN_RR:
         trades['swing_buy'] = t
     t = dict(entry=round(sw_h, 2), sl=round(sw_h + sl_sw, 2), risk=sl_sw,
              t1=mid, t2=round(sw_l, 2), t3=round(sw_l - atr * 0.4, 2),
-             market='آجل (Futures)', tf='أسابيع', typ='سوينج 🌊', dir='sell')
-    if sw_h > gold and _rr(sw_h - mid, sl_sw) >= MIN_RR:
+             market=market_name, tf='أسابيع', typ='سوينج 🌊', dir='sell')
+    if bias in ('bear', 'neutral') and sw_h > gold and _rr(sw_h - mid, sl_sw) >= MIN_RR:
         trades['swing_sell'] = t
 
     # ── انعكاس (Counter-trend) ──
@@ -433,13 +432,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     if (has_div or rsi < 38) and bias != 'bull':
         t = dict(entry=round(gold, 2), sl=round(gold - sl_rev, 2), risk=sl_rev,
                  t1=round(pivot, 2), t2=r_n, t3=r_f,
-                 market='آجل (Futures)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
+                 market=market_name, tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
         if _rr(pivot - gold, sl_rev) >= MIN_RR:
             trades['rev_buy'] = t
     if (has_div or rsi > 62) and bias != 'bear':
         t = dict(entry=round(gold, 2), sl=round(gold + sl_rev, 2), risk=sl_rev,
                  t1=round(pivot, 2), t2=s_n, t3=s_f,
-                 market='آجل (Futures)', tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
+                 market=market_name, tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
         if _rr(gold - pivot, sl_rev) >= MIN_RR:
             trades['rev_sell'] = t
     # ── صفقة كل 5 دقائق (5min scalp) ──
@@ -450,13 +449,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
         t5m = dict(entry=round(gold, 2), sl=round(gold - sl_5m, 2), risk=sl_5m,
                    t1=round(gold + atr_5m*1.5, 2), t2=round(gold + atr_5m*2.5, 2),
                    t3=round(gold + atr_5m*4.0, 2),
-                   market='آجل (Futures)', tf='5د', typ='سكالبينج 5د ⚡', dir='buy')
+                   market=market_name, tf='5د', typ='سكالبينج 5د ⚡', dir='buy')
         if _rr(atr_5m*1.5, sl_5m) >= 1.5: trades['scalp_5m_buy'] = t5m
     elif sc_15m < 0:
         t5m = dict(entry=round(gold, 2), sl=round(gold + sl_5m, 2), risk=sl_5m,
                    t1=round(gold - atr_5m*1.5, 2), t2=round(gold - atr_5m*2.5, 2),
                    t3=round(gold - atr_5m*4.0, 2),
-                   market='آجل (Futures)', tf='5د', typ='سكالبينج 5د ⚡', dir='sell')
+                   market=market_name, tf='5د', typ='سكالبينج 5د ⚡', dir='sell')
         if _rr(atr_5m*1.5, sl_5m) >= 1.5: trades['scalp_5m_sell'] = t5m
 
     # ── سوينج طويل الأمد (Long-Term Swing) ──
@@ -467,13 +466,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
         lt_entry = round(min(s_f, sw_l * 1.001), 2)
         t_lt = dict(entry=lt_entry, sl=round(lt_entry - sl_lt, 2), risk=sl_lt,
                     t1=round(sw_h, 2), t2=round(pm_h_val, 2), t3=round(pm_h_val + atr*0.5, 2),
-                    market='آجل (Futures)', tf='شهور', typ='سوينج طويل 🌊⌚', dir='buy')
+                    market=market_name, tf='شهور', typ='سوينج طويل 🌊⌚', dir='buy')
         if _rr(sw_h - lt_entry, sl_lt) >= 1.5: trades['long_swing_buy'] = t_lt
     if bias in ('bear', 'neutral'):
         lt_entry = round(max(r_f, sw_h * 0.999), 2)
         t_lt = dict(entry=lt_entry, sl=round(lt_entry + sl_lt, 2), risk=sl_lt,
                     t1=round(sw_l, 2), t2=round(pm_l_val, 2), t3=round(pm_l_val - atr*0.5, 2),
-                    market='آجل (Futures)', tf='شهور', typ='سوينج طويل 🌊⌚', dir='sell')
+                    market=market_name, tf='شهور', typ='سوينج طويل 🌊⌚', dir='sell')
         if _rr(lt_entry - sw_l, sl_lt) >= 1.5: trades['long_swing_sell'] = t_lt
 
     # ── سكالبينج ضيق جداً (Tight Scalp) ──
@@ -483,13 +482,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
         t_ts = dict(entry=round(gold, 2), sl=round(gold - sl_tight, 2), risk=sl_tight,
                     t1=round(gold + sl_tight*2, 2), t2=round(gold + sl_tight*3.5, 2),
                     t3=round(gold + sl_tight*5, 2),
-                    market='آجل (Futures)', tf='10د', typ='سكالب ضيق 🎯', dir='buy')
+                    market=market_name, tf='10د', typ='سكالب ضيق 🎯', dir='buy')
         if _rr(sl_tight*2, sl_tight) >= 1.5: trades['tight_scalp_buy'] = t_ts
     elif sc_1h < 0 and bias in ('bear', 'neutral'):
         t_ts = dict(entry=round(gold, 2), sl=round(gold + sl_tight, 2), risk=sl_tight,
                     t1=round(gold - sl_tight*2, 2), t2=round(gold - sl_tight*3.5, 2),
                     t3=round(gold - sl_tight*5, 2),
-                    market='آجل (Futures)', tf='10د', typ='سكالب ضيق 🎯', dir='sell')
+                    market=market_name, tf='10د', typ='سكالب ضيق 🎯', dir='sell')
         if _rr(sl_tight*2, sl_tight) >= 1.5: trades['tight_scalp_sell'] = t_ts
 
     # ── لوت عالي (High Lot / Precision Entry) ──
@@ -503,12 +502,12 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     if hl_entry_b:
         t_hl = dict(entry=hl_entry_b, sl=round(hl_entry_b - sl_hl, 2), risk=sl_hl,
                     t1=round(hl_entry_b + 12, 2), t2=round(hl_entry_b + 22, 2), t3=round(hl_entry_b + 35, 2),
-                    market='آجل (Futures)', tf='<5د', typ='لوت عالي 💰', dir='buy')
+                    market=market_name, tf='<5د', typ='لوت عالي 💰', dir='buy')
         if _rr(12, sl_hl) >= 1.5: trades['high_lot_buy'] = t_hl
     if hl_entry_s:
         t_hl = dict(entry=hl_entry_s, sl=round(hl_entry_s + sl_hl, 2), risk=sl_hl,
                     t1=round(hl_entry_s - 12, 2), t2=round(hl_entry_s - 22, 2), t3=round(hl_entry_s - 35, 2),
-                    market='آجل (Futures)', tf='<5د', typ='لوت عالي 💰', dir='sell')
+                    market=market_name, tf='<5د', typ='لوت عالي 💰', dir='sell')
         if _rr(12, sl_hl) >= 1.5: trades['high_lot_sell'] = t_hl
 
     # ── هدف الـ 15 دقيقة القادمة ──
@@ -759,12 +758,23 @@ def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
     bias    = d['confluence']['bias']
 
     # 1. Trend alignment (20 pts)
-    if (is_buy and bias == 'bull') or (not is_buy and bias == 'bear'):
-        score += 20; reasons.append('maa_altrend')
-    elif bias == 'neutral':
-        score += 12; reasons.append('soq_motazabzab')
+    typ = t.get('typ', '')
+    is_rev = 'انعكاس' in typ or 'rev' in typ.lower()
+    is_hl  = 'لوت عالي' in typ
+    
+    if is_rev:
+        # صفقات الزيرو انعكاس بطبيعتها عكس الاتجاه، لذا نعطيها العلامة الكاملة في الترند لأنها مبرمجة لاصطياد الانعكاس
+        score += 20; reasons.append('tawaqu_inikas_qawi')
+    elif is_hl:
+        # اللوت العالي يعتمد على دقة الميلي (فيبوناتشي) وليس الترند بالضرورة
+        score += 18; reasons.append('dukhul_qannas_diqqa')
     else:
-        score += 3; reasons.append('aks_altrend')
+        if (is_buy and bias == 'bull') or (not is_buy and bias == 'bear'):
+            score += 20; reasons.append('maa_altrend')
+        elif bias == 'neutral':
+            score += 12; reasons.append('soq_motazabzab')
+        else:
+            score += 3; reasons.append('aks_altrend')
 
     # 2. Multi-timeframe 4-frame alignment (20 pts)
     tf_scores = [
@@ -774,8 +784,14 @@ def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
         d['tf_15m'].get('score', 0),
     ]
     aligned = sum(1 for s in tf_scores if s > 0) if is_buy else sum(1 for s in tf_scores if s < 0)
-    score += [0, 5, 10, 16, 20][aligned]
-    if aligned >= 3: reasons.append(f'tawafuq_{aligned}4_itarat')
+    
+    if is_rev or is_hl:
+        # نعطيها دفعة بناءً على مؤشرات أخرى لتعويض عدم التوافق الزمني
+        score += 16
+        if aligned >= 2: reasons.append(f'tawafuq_inikas_muhtamal')
+    else:
+        score += [0, 5, 10, 16, 20][aligned]
+        if aligned >= 3: reasons.append(f'tawafuq_{aligned}4_itarat')
 
     # 3. RSI smart scoring (15 pts)
     rsi = float(d['rsi'])
@@ -884,36 +900,20 @@ def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
         'rsi_tashabuo_shira': 'RSI تشبع شراء 🔴',
         'rsi_mantiqat_bay': 'RSI منطقة بيع',
         'macd_muayad': 'MACD مؤيد',
-        'obv_muayad': 'OBV مؤيد 🏦',
-        'qarib_min_daom': 'قريب من دعم قوي 📍',
-        'qarib_min_muqawama': 'عند مقاومة قوية 📍',
-        'tabayon_sauodi': 'تباين صعودي 💡',
-        'tabayon_huboti': 'تباين هبوطي ⚠️',
+        'daxy_muayad': 'DXY مؤيد للمسار',
+        'daxy_moarid': 'DXY معارض للمسار',
+        'tnx_muayad': 'العوائد مؤيدة',
+        'fibo_deaf': 'دعم/مقاومة فيبوناتشي قوي',
+        'vwap_qareeb': 'قريب من VWAP',
+        'tabayon_suudi': 'تباين شرائي',
+        'tabayon_huboti': 'تباين بيعي',
         'stoch_tashabuo_bay': 'Stoch تشبع بيع',
-        'stoch_tashabuo_shira': 'Stoch تشبع شراء',
+        'stoch_tashabuo_shira': 'Stoch تشبع شراء'
     }
 
-    def translate(r):
-        for k, v in ar_map.items():
-            if r.startswith(k.split('_')[0]):
-                return ar_map.get(k, r)
-        for k, v in ar_map.items():
-            if k in r: return v
-        return r
-
-    arabic_reasons = []
-    for r in reasons[:4]:
-        matched = False
-        for k, v in ar_map.items():
-            if r == k or r.startswith(k):
-                arabic_reasons.append(v); matched = True; break
-        if not matched:
-            arabic_reasons.append(r)
-
-    reason_str = '، '.join(arabic_reasons) if arabic_reasons else 'لا توجد مؤشرات قوية'
-    return pct, f'{emoji} {lbl}', reason_str
-
-
+    rs_text = " | ".join([ar_map.get(r, r) for r in reasons[:3]]) if reasons else "بدون إشارات قوية"
+    
+    return pct, emoji + " " + lbl, rs_text
 def calc_all_entries(d: dict, bias: str) -> dict:
     """
     3 صفقات شراء + 3 صفقات بيع مبنية على مستويات تقنية مُصفّاة ومُتحقَّق منها.
@@ -924,6 +924,7 @@ def calc_all_entries(d: dict, bias: str) -> dict:
     s2, r2 = d['s2'], d['r2']
     s3, r3 = d['s3'], d['r3']
     rn     = d['round_numbers']
+    market_name = 'آجل (Futures)' if d.get('mode') == 'futures' else 'فوري (Spot)'
 
     # ── مستويات مُصفّاة: مضمون أن المقاومة فوق السعر والدعم تحته ولا تتكرر ──
     def _valid_res(levels, exclude=None):
@@ -988,26 +989,26 @@ def calc_all_entries(d: dict, bias: str) -> dict:
                 "rr1": rr1, "rr2": rr2, "rr3": rr3, "is_buy": False}
 
     if bias == "bull":
-        buys  = [mb(gold,   TIGHT_SL, "آجل (Futures)",   "🔴 عدواني"),
-                 mb(s_near, STD_SL,   "آجل (Futures)", "🟡 معتدل — دعم قريب"),
-                 mb(s_far,  TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — دعم بعيد")]
-        sells = [ms(r_near, TIGHT_SL, "آجل (Futures)",   "🔴 عند مقاومة قريبة"),
-                 ms(r_far,  STD_SL,   "آجل (Futures)", "🟡 عند مقاومة ثانية"),
-                 ms(r_far2, TIGHT_SL, "آجل (Futures)",   "🟢 عند مقاومة بعيدة")]
+        buys  = [mb(gold,   TIGHT_SL, market_name,   "🔴 عدواني"),
+                 mb(s_near, STD_SL,   market_name, "🟡 معتدل — دعم قريب"),
+                 mb(s_far,  TIGHT_SL, market_name,   "🟢 محافظ — دعم بعيد")]
+        sells = [ms(r_near, TIGHT_SL, market_name,   "🔴 عند مقاومة قريبة"),
+                 ms(r_far,  STD_SL,   market_name, "🟡 عند مقاومة ثانية"),
+                 ms(r_far2, TIGHT_SL, market_name,   "🟢 عند مقاومة بعيدة")]
     elif bias == "bear":
-        sells = [ms(gold,   TIGHT_SL, "آجل (Futures)",   "🔴 عدواني"),
-                 ms(r_near, STD_SL,   "آجل (Futures)", "🟡 معتدل — مقاومة قريبة"),
-                 ms(r_far,  TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — مقاومة بعيدة")]
-        buys  = [mb(s_near, TIGHT_SL, "آجل (Futures)",   "🔴 عدواني — دعم قريب"),
-                 mb(s_far,  STD_SL,   "آجل (Futures)", "🟡 معتدل — دعم ثاني"),
-                 mb(s_far2, TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — دعم بعيد")]
+        sells = [ms(gold,   TIGHT_SL, market_name,   "🔴 عدواني"),
+                 ms(r_near, STD_SL,   market_name, "🟡 معتدل — مقاومة قريبة"),
+                 ms(r_far,  TIGHT_SL, market_name,   "🟢 محافظ — مقاومة بعيدة")]
+        buys  = [mb(s_near, TIGHT_SL, market_name,   "🔴 عدواني — دعم قريب"),
+                 mb(s_far,  STD_SL,   market_name, "🟡 معتدل — دعم ثاني"),
+                 mb(s_far2, TIGHT_SL, market_name,   "🟢 محافظ — دعم بعيد")]
     else:  # neutral
-        buys  = [mb(s_near, TIGHT_SL, "آجل (Futures)",   "🔴 دعم قريب — اختراق"),
-                 mb(s_far,  STD_SL,   "آجل (Futures)", "🟡 معتدل — دعم ثاني"),
-                 mb(s_far2, TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — دعم بعيد")]
-        sells = [ms(r_near, TIGHT_SL, "آجل (Futures)",   "🔴 مقاومة قريبة — اختراق"),
-                 ms(r_far,  STD_SL,   "آجل (Futures)", "🟡 معتدل — مقاومة ثانية"),
-                 ms(r_far2, TIGHT_SL, "آجل (Futures)",   "🟢 محافظ — مقاومة بعيدة")]
+        buys  = [mb(s_near, TIGHT_SL, market_name,   "🔴 دعم قريب — اختراق"),
+                 mb(s_far,  STD_SL,   market_name, "🟡 معتدل — دعم ثاني"),
+                 mb(s_far2, TIGHT_SL, market_name,   "🟢 محافظ — دعم بعيد")]
+        sells = [ms(r_near, TIGHT_SL, market_name,   "🔴 مقاومة قريبة — اختراق"),
+                 ms(r_far,  STD_SL,   market_name, "🟡 معتدل — مقاومة ثانية"),
+                 ms(r_far2, TIGHT_SL, market_name,   "🟢 محافظ — مقاومة بعيدة")]
 
     refs = {
         "above": r_near,
@@ -1095,13 +1096,18 @@ def _calc_price_forecasts(gold: float, atr: float, bias: str, tf_data: dict) -> 
 # ══════════════════════════════════════════════
 #  6. جلب كل بيانات السوق
 # ══════════════════════════════════════════════
-def get_full_market_data() -> dict | None:
-    log.info("📡 جلب البيانات — فوري + آجل + متعدد الإطارات...")
+def get_full_market_data(mode: str = "futures") -> dict | None:
+    log.info(f"📡 جلب البيانات ({mode.upper()}) — متعدد الإطارات...")
+
+    ticker = "GC=F"  # Yahoo Finance dropped XAUUSD=X, so we use GC=F for historical OHLCV data for both modes
 
     # ── الذهب: الآجل والفوري وإطارات متعددة ──
-    gold_daily  = _fetch("GC=F",     period="90d", interval="1d");  time.sleep(0.7)
-    gold_weekly = _fetch("GC=F",     period="2y",  interval="1wk"); time.sleep(0.7)
-    gold_hourly = _fetch("GC=F",     period="30d", interval="1h");  time.sleep(0.7)
+    gold_daily  = _fetch(ticker,     period="90d", interval="1d");  time.sleep(0.7)
+    gold_weekly = _fetch(ticker,     period="2y",  interval="1wk"); time.sleep(0.7)
+    gold_monthly = _fetch(ticker,    period="5y",  interval="1mo"); time.sleep(0.7)
+    gold_hourly = _fetch(ticker,     period="30d", interval="1h");  time.sleep(0.7)
+    gold_15m    = _fetch(ticker,     period="5d",  interval="15m"); time.sleep(0.7)
+    gold_5m     = _fetch(ticker,     period="5d",  interval="5m");  time.sleep(0.7)
     # ── الفوري: Twelve Data أولاً (ريل تايم 100%) ──
     gold_spot = None
     spot_date = None
@@ -1218,8 +1224,7 @@ def get_full_market_data() -> dict | None:
         except Exception:
             pass
 
-    # [11] 15m data for short-term trend
-    gold_15m  = _fetch("GC=F",     period="5d",  interval="15m"); time.sleep(0.5)
+    # [11] 15m data for short-term trend (moved to top)
 
     gold_futures, futures_date = _last_with_date(gold_daily)
     # لو كل مصادر الفوري فشلت — اعرض غير متاح (لا نستبدل بالآجل عشان يكونوا مختلفين دائماً)
@@ -1241,27 +1246,43 @@ def get_full_market_data() -> dict | None:
                          else "مقلوب ⚠️ خطر ركود" if yield_curve is not None
                          else "غير متاح")
 
-    if not all([gold_futures, dxy, tnx]):
+    if not all([gold_daily is not None, dxy, tnx]):
         return None
 
-    gold = gold_futures   # الأساس للحسابات هو الآجل
+    gold = gold_futures if mode == "futures" else gold_spot
+    if not gold:
+        gold = gold_daily['Close'].iloc[-1] if gold_daily is not None else 0
 
     # [11] تحليل 4 إطارات زمنية: 15m, 1h, 4h, 1d
     import pandas as pd
     gold_4h = None
     if gold_hourly is not None and len(gold_hourly) >= 16:
         try:
-            gold_4h = gold_hourly.resample('4h').agg(
-                {'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}
-            ).dropna()
-        except Exception:
-            gold_4h = None
+            gold_4h = gold_hourly.resample('4h').agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
+        except Exception: gold_4h = None
 
+    gold_10m = None
+    if gold_5m is not None and len(gold_5m) >= 4:
+        try:
+            gold_10m = gold_5m.resample('10min').agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
+        except Exception: gold_10m = None
+
+    gold_30m = None
+    if gold_15m is not None and len(gold_15m) >= 4:
+        try:
+            gold_30m = gold_15m.resample('30min').agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
+        except Exception: gold_30m = None
+
+    tf_5m     = analyze_timeframe(gold_5m,     "⚡ 5 دقائق")
+    tf_10m    = analyze_timeframe(gold_10m,    "🎯 10 دقائق")
     tf_15m    = analyze_timeframe(gold_15m,    "⋆ 15 دقيقة")
+    tf_30m    = analyze_timeframe(gold_30m,    "⏱️ 30 دقيقة")
     tf_hourly = analyze_timeframe(gold_hourly, "⏱️ ساعي")
     tf_4h     = analyze_timeframe(gold_4h,     "⏰ 4 ساعات")
     tf_daily  = analyze_timeframe(gold_daily,  "📅 يومي")
     tf_weekly = analyze_timeframe(gold_weekly, "📆 أسبوعي")
+    tf_monthly = analyze_timeframe(gold_monthly,"🗓️ شهري")
+    
     tf_label  = get_tf_4frame_label(tf_15m, tf_hourly, tf_4h, tf_daily)
 
     # ── المؤشرات على البيانات اليومية ──
@@ -1280,6 +1301,11 @@ def get_full_market_data() -> dict | None:
     rel_vol, rel_vol_label     = calc_relative_volume(gold_daily)
     atr                        = calc_atr(gold_daily)
     atr_reg                    = calc_atr_regime(gold_daily)
+    # حساب التباين (الانحراف المعياري) آخر 14 يوم
+    variance = 0.0
+    if gold_daily is not None and len(gold_daily) >= 14:
+        variance = round(float(np.std(gold_daily['Close'].values[-14:])), 2)
+    
     fib                        = calc_fibonacci(closes)
     divergence                 = calc_divergence(gold_daily)
     swing_high, swing_low      = find_swing_levels(gold_daily, lookback=20)
@@ -1325,7 +1351,22 @@ def get_full_market_data() -> dict | None:
         except Exception:
             pass
     inflation_est  = inflation_live if inflation_live else 2.3
-    real_yield_val = round(tnx - inflation_est, 2) if tnx else None
+    
+    # ── [إضافة] الفائدة الأمريكية (FEDFUNDS) ──
+    interest_rate = 5.33 # Default
+    try:
+        _fred_ff = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=FEDFUNDS"
+        _fr2 = requests.get(_fred_ff, timeout=6, headers={'User-Agent': 'Mozilla/5.0'})
+        if _fr2.status_code == 200:
+            for _line in reversed(_fr2.text.strip().split('\n')[1:]):
+                _parts = _line.split(',')
+                if len(_parts) == 2 and _parts[1].strip() not in ('.', '', 'NA'):
+                    try: interest_rate = round(float(_parts[1].strip()), 2); break
+                    except Exception: continue
+    except Exception:
+        pass
+
+    real_yield_val = round(interest_rate - inflation_est, 2)
     real_yield_signal = "غير متاح"
     real_yield_brief  = "⚪ العائد الحقيقي — بيانات غير متاحة"
     if tip_df is not None and not tip_df.empty and len(tip_df) >= 10:
@@ -1517,7 +1558,11 @@ def get_full_market_data() -> dict | None:
     contango    = round(gold_futures - gold_spot, 2) if gold_spot else None
 
     d = dict(
-        gold=gold, gold_futures=gold_futures, gold_spot=gold_spot,
+        mode=mode,
+        # Prices
+        gold=gold,
+        gold_futures=gold_futures,
+        gold_spot=gold_spot,
         futures_date=futures_date, spot_date=spot_date,
         contango=contango,
         silver=silver, oil=oil, dxy=dxy, tnx=tnx, twy=twy, tty=tty, vix=vix, sp500=sp500,
@@ -1530,7 +1575,7 @@ def get_full_market_data() -> dict | None:
         cci=cci, cci_label=cci_label, williams_r=williams_r, wr_label=wr_label,
         obv_val=obv_val, obv_trend=obv_trend,
         rel_vol=rel_vol, rel_vol_label=rel_vol_label,
-        atr=atr, atr_regime=atr_reg, fib=fib, divergence=divergence,
+        atr=atr, atr_regime=atr_reg, variance=variance, fib=fib, divergence=divergence,
         swing_high=swing_high, swing_low=swing_low,
         pivot=pivot, r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
         round_numbers=round_numbers, hist_ctx=hist_ctx,
@@ -1538,6 +1583,7 @@ def get_full_market_data() -> dict | None:
         real_yield_brief=real_yield_brief,
         tf_weekly=tf_weekly, tf_daily=tf_daily, tf_hourly=tf_hourly,
         tf_4h=tf_4h, tf_15m=tf_15m, tf_label=tf_label,
+        tf_5m=tf_5m, tf_10m=tf_10m, tf_30m=tf_30m, tf_monthly=tf_monthly,
         gs_ratio=gs_ratio, dxy_bias=dxy_bias, bond_bias=bond_bias,
         gold_pressure=gold_pres, vix_label=vix_label,
         # [4] مستويات محسّنة
@@ -1549,6 +1595,7 @@ def get_full_market_data() -> dict | None:
         # [5] تأثير المؤشرات
         ind_rsi_i=ind_rsi_i, ind_macd_i=ind_macd_i, ind_ema_i=ind_ema_i,
         ind_adx_i=ind_adx_i, ind_obv_i=ind_obv_i, ind_cci_i=ind_cci_i, ind_bb_i=ind_bb_i,
+        inflation_est=inflation_est, interest_rate=interest_rate,
     )
 
     
@@ -1672,14 +1719,19 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
     refs   = ent['refs']
     nums   = ("1️⃣","2️⃣","3️⃣")
-    bias_section = {"bull":"🎯 صفقات الاتجاه الصعودي (آجل GC=F)",
-                    "bear":"🎯 صفقات الاتجاه الهبوطي (آجل GC=F)",
-                    "neutral":"⚡ صفقات الاختراق المتذبذب (آجل GC=F)"}.get(ent['bias'],"🎯 الصفقات (آجل GC=F)")
+    market_suffix = "(آجل GC=F)" if d.get('mode') == 'futures' else "(فوري XAUUSD)"
+    bias_section = {"bull":f"🎯 صفقات الاتجاه الصعودي {market_suffix}",
+                    "bear":f"🎯 صفقات الاتجاه الهبوطي {market_suffix}",
+                    "neutral":f"⚡ صفقات الاختراق المتذبذب {market_suffix}"}.get(ent['bias'],f"🎯 الصفقات {market_suffix}")
 
-    def fmt_block(trades):
+    def fmt_block(trades, dir_label):
         lines = []
-        for i, t in enumerate(trades):
+        count = 1
+        for t in trades:
             pct, lbl, reason = calc_trade_confidence(d, t)
+            if pct < 65:
+                continue
+
             if pct >= 75:
                 entry_rule = f"✅ ادخل بثقة — (فرصة قوية مدعومة بالترند والسيولة)"
             elif pct >= 60:
@@ -1691,7 +1743,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
             
             lines.append(
                 f"\n   ╭─────────────────────────────╮\n"
-                f"   │ {nums[i]} {t['dir']}  ·  {t['style']}\n"
+                f"   │ {nums[count-1]} {t['dir']}  ·  {t['style']}\n"
                 f"   ├─────────────────────────────┤\n"
                 f"   │ 🏪 السوق  : {t['market']}\n"
                 f"   │ 📊 الثقة  : {pct}%  {lbl}\n"
@@ -1706,10 +1758,16 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
                 f"   │    T3 ← {t['t3']}$  (R: {t['rr3']}x)\n"
                 f"   ╰─────────────────────────────╯"
             )
+            count += 1
+            if count > len(nums):
+                break
+                
+        if not lines:
+            return f"\n   ❌ لا توجد صفقات {dir_label} مطابقة لمعيار الجودة الصارم (>65%).\n"
         return "\n".join(lines)
 
-    buy_block  = fmt_block(ent['buys'])
-    sell_block = fmt_block(ent['sells'])
+    buy_block  = fmt_block(ent['buys'], "شراء")
+    sell_block = fmt_block(ent['sells'], "بيع")
 
     # مستويات فيبوناتشي الرئيسية
     fib = d['fib']
@@ -1724,9 +1782,8 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 🕐 {date_now}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 أسعار الذهب
-   فوري  (XAU/USD) : {spot_label}
-   آجل   (GC=F)    : {futures_label}{contango_str}
+📍 السعر الحالي
+   سوق الآجل (Futures) : {futures_label}{contango_str}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 ملخص السوق
@@ -1768,7 +1825,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    CCI:{d['cci']}({d['cci_label'].split()[0]}) | W%R:{d['williams_r']} | ATR:{d['atr']}$
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔢 المستويات (مبنية على الآجل GC=F)
+🔢 المستويات (مبنية على الـ {market_suffix})
    🟣 مقاومة نفسية:{rn['nearest_resistance']}$(+{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(-{rn['dist_to_support']}$)
    📍 Swing H:{d['swing_high']}$ / L:{d['swing_low']}$ | VWAP:{f"{d['vwap']}$" if d['vwap'] else '—'}
    📅 PrevWk H:{f"{d['prev_wk_high']}$" if d['prev_wk_high'] else '—'} / L:{f"{d['prev_wk_low']}$" if d['prev_wk_low'] else '—'} | PrevMo H:{f"{d['prev_mo_high']}$" if d['prev_mo_high'] else '—'} / L:{f"{d['prev_mo_low']}$" if d['prev_mo_low'] else '—'}
@@ -1796,6 +1853,10 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
         # add is_buy key for confidence calc
         t2 = dict(t); t2['is_buy'] = (t['dir'] == 'buy'); t2['rr1'] = rr
         pct, lbl, rsn = calc_trade_confidence(d, t2)
+        if pct < 65:
+            return None
+        if t['typ'] in ['\u0644\u0648\u062a \u0639\u0627\u0644\u064a \U0001f4b0', '\u0632\u064a\u0631\u0648 \u0627\u0646\u0639\u0643\u0627\u0633 \U0001f504'] and pct < 90:
+            return None
         if pct >= 75:   dec = "\u2705 \u0627\u062f\u062e\u0644 \u0628\u062b\u0642\u0629"
         elif pct >= 60: dec = "\u26a0\ufe0f \u062f\u062e\u0648\u0644 \u0628\u062d\u0630\u0631"
         elif pct >= 45: dec = "\u26d4 \u0644\u0627 \u062a\u062f\u062e\u0644"
@@ -1836,20 +1897,28 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
          ['daily_buy','daily_sell','weekly_buy','weekly_sell']),
         ('\U0001f30a \u0633\u0648\u064a\u0646\u062c \u0637\u0648\u064a\u0644 \u0648\u0634\u0647\u0631\u064a',
          ['long_swing_buy','long_swing_sell','monthly_buy','monthly_sell','swing_buy','swing_sell']),
-        ('\U0001f4b0 \u0644\u0648\u062a \u0639\u0627\u0644\u064a \u0648\u0627\u0646\u0639\u0643\u0627\u0633\u0627\u062a',
-         ['high_lot_buy','high_lot_sell','rev_buy','rev_sell']),
+        ('\U0001f4b0 \u0635\u0641\u0642\u0627\u062a \u0644\u0648\u062a \u0639\u0627\u0644\u064a (\u0628\u0627\u0644\u0645\u064a\u0644\u064a - \u062c\u0648\u062f\u0629 > 90%)',
+         ['high_lot_buy','high_lot_sell']),
+        ('\U0001f504 \u0635\u0641\u0642\u0627\u062a \u0632\u064a\u0631\u0648 \u0627\u0646\u0639\u0643\u0627\u0633 (Counter-trend - \u062c\u0648\u062f\u0629 > 90%)',
+         ['rev_buy','rev_sell']),
     ]
     adv_blocks = []
     for grp_title, keys in order_groups:
         grp_lines = []
         for k in keys:
             if k in adv:
-                grp_lines.append(_fmt_adv(adv[k]))
+                formatted_trade = _fmt_adv(adv[k])
+                if formatted_trade is not None:
+                    grp_lines.append(formatted_trade)
         if grp_lines:
             adv_blocks.append(f"\n{grp_title}:\n" + "\n".join(grp_lines))
     adv_lines = adv_blocks
 
     adv_block = "\n".join(adv_lines) if adv_lines else "   \u0644\u0627 \u062a\u0648\u062c\u062f \u0635\u0641\u0642\u0627\u062a \u0645\u062a\u0642\u062f\u0645\u0629 \u0645\u062a\u0627\u062d\u0629"
+
+    d_forecast = d['tf_forecasts']['1d']
+    daily_range = round(d_forecast['high'] - d_forecast['low'], 2)
+    variance_val = d.get('variance', 0.0)
 
     part2 = f"""
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1861,6 +1930,10 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    📅 يوم    │ إغلاق: {d['tf_forecasts']['1d']['close']}$  │  قمة: {d['tf_forecasts']['1d']['high']}$  │  قاع: {d['tf_forecasts']['1d']['low']}$  │ جودة:{d['tf_forecasts']['1d'].get('quality','—')}%
    📆 أسبوع  │ إغلاق: {d['tf_forecasts']['1w']['close']}$  │  قمة: {d['tf_forecasts']['1w']['high']}$  │  قاع: {d['tf_forecasts']['1w']['low']}$  │ جودة:{d['tf_forecasts']['1w'].get('quality','—')}%
    🗓️ شهر    │ إغلاق: {d['tf_forecasts']['1mo']['close']}$ │  قمة: {d['tf_forecasts']['1mo']['high']}$ │  قاع: {d['tf_forecasts']['1mo']['low']}$ │ جودة:{d['tf_forecasts']['1mo'].get('quality','—')}%
+   ─────────────────────────
+   📖 شرح النطاق والتباين:
+   • النطاق اليومي المتوقع ({daily_range}$): هو المسافة بين القمة والقاع المتوقعين لليوم، ويُحسب بدمج متوسط الحركة (ATR) مع قوة الاتجاه (ADX). معناه: الذهب مرشح للتحرك صعوداً وهبوطاً ضمن هذا الهامش اليوم.
+   • التباين / الانحراف المعياري ({variance_val}$): يقيس درجة التشتت السعري لآخر 14 يوم. معناه: كلما زاد الرقم، دلّ على سيولة عنيفة واضطراب شديد للذهب، وكلما قل دلّ على تجميع وهدوء.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 صفقات متقدمة (آجل وفوري)
 {adv_block}
@@ -2249,35 +2322,30 @@ def _build_template_1(d: dict) -> str:
     if main_bias == 'bear' or main_bias == 'neutral':
         # نفضل البيع
         zone_color = "🔴"
-        zone_name = "منطقة البيع"
+        zone_name = "مستوى البيع"
         # المقاومات
         r1, r2 = d.get('r1', gold+10), d.get('r2', gold+20)
-        z1 = round(min(r1, r2), 2)
-        z2 = round(max(r1, r2), 2)
+        exact_zone = round(r1, 2)
         t1 = round(d.get('s1', gold-10), 2)
         t2 = round(d.get('s2', gold-20), 2)
         cont_action = "الهبوط لمستويات أقل"
         rev_color = "🟢"
         rev_zone = round(d.get('swing_high') or (r2 + atr), 2)
         rev_dir = "الصعود"
-        break_dir = "أعلاها"
+        break_dir = "أعلاه"
     else:
         # الشراء
         zone_color = "🟢"
-        zone_name = "منطقة الشراء"
+        zone_name = "مستوى الشراء"
         s1, s2 = d.get('s1', gold-10), d.get('s2', gold-20)
-        z1 = round(min(s1, s2), 2)
-        z2 = round(max(s1, s2), 2)
+        exact_zone = round(s1, 2)
         t1 = round(d.get('r1', gold+10), 2)
         t2 = round(d.get('r2', gold+20), 2)
         cont_action = "الصعود لمستويات أعلى"
         rev_color = "🔴"
         rev_zone = round(d.get('swing_low') or (s2 - atr), 2)
         rev_dir = "الهبوط"
-        break_dir = "أسفلها"
-
-    zone_start = min(z1, z2)
-    zone_end = max(z1, z2)
+        break_dir = "أسفله"
     
     # القالب كما طلبه العميل بالحرف
     template = f"""تحليل الذهب 🟡
@@ -2291,16 +2359,16 @@ def _build_template_1(d: dict) -> str:
 4H - 1H
 {context_text}
 
-{zone_color} {zone_name}: من {zone_start} إلى {zone_end}
+{zone_color} {zone_name}: {exact_zone}
 
-في حال احترام المنطقة، نتوقع استهداف:
+في حال احترام المستوى، نتوقع استهداف:
 {t1}
 {t2}
 
 وفي حالة كسر {t2}، سيستمر {cont_action}.
 
-{rev_color} أما إذا لم يحترم السعر منطقة {zone_end} وتمكن من اختراقها، فسيستهدف {rev_zone}.
-وتعتبر منطقة {rev_zone} هي المنطقة الذهبية الفاصلة بين الصعود والهبوط، وباختراقها والثبات {break_dir} يمكننا القول إن السعر بدأ يغير اتجاهه ويميل إلى {rev_dir}."""
+{rev_color} أما إذا لم يحترم السعر مستوى {exact_zone} وتمكن من اختراقه، فسيستهدف {rev_zone}.
+وتعتبر نقطة {rev_zone} هي النقطة الذهبية الفاصلة بين الصعود والهبوط، وباختراقها والثبات {break_dir} يمكننا القول إن السعر بدأ يغير اتجاهه ويميل إلى {rev_dir}."""
     
     return template
 
@@ -2443,12 +2511,12 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
             try:
                 await client.send_message(chat, text)
             except Exception as inner_e:
-                log.warning(f"⚠️ [Telethon Bot] فشل الإرسال للجروب {chat}: {inner_e}")
+                log.warning(f"⚠️ [Telethon Bot (Futures)] فشل الإرسال للجروب {chat}: {inner_e}")
                 
         await client.disconnect()
         return True
     except Exception as e:
-        log.warning(f"⚠️ [Telethon Bot] {e}")
+        log.warning(f"⚠️ [Telethon Bot (Futures)] {e}")
         return False
 
 
@@ -2457,7 +2525,7 @@ def _send_single(text: str, is_public_allowed: bool = True, chat_id=None) -> boo
     try:
         ok = asyncio.run(_telethon_bot_send(text, is_public_allowed, chat_id))
         if ok:
-            log.info("✅ [Telethon Bot] تم الإرسال بنجاح.")
+            log.info("✅ [Telethon Bot (Futures)] تم الإرسال بنجاح.")
             return True
     except RuntimeError:
         try:
@@ -2466,14 +2534,14 @@ def _send_single(text: str, is_public_allowed: bool = True, chat_id=None) -> boo
             ok = loop.run_until_complete(_telethon_bot_send(text, is_public_allowed, chat_id))
             loop.close()
             if ok:
-                log.info("✅ [Telethon Bot] تم الإرسال بنجاح.")
+                log.info("✅ [Telethon Bot (Futures)] تم الإرسال بنجاح.")
                 return True
         except Exception as e:
-            log.warning(f"⚠️ [Telethon Bot loop] {e}")
+            log.warning(f"⚠️ [Telethon Bot (Futures) loop] {e}")
     except Exception as e:
-        log.warning(f"⚠️ [Telethon Bot] {e}")
+        log.warning(f"⚠️ [Telethon Bot (Futures)] {e}")
 
-    log.warning("⚠️ [Telethon Bot] فشل — جاري المحاولة عبر HTTP...")
+    log.warning("⚠️ [Telethon Bot (Futures)] فشل — جاري المحاولة عبر HTTP...")
     if _http_send(text, is_public_allowed, chat_id):
         log.info("✅ [HTTP] تم الإرسال بنجاح.")
         return True
@@ -2706,6 +2774,9 @@ def _build_template_4(d: dict) -> str:
     tnx_dir = "ارتفع" if tnx_diff > 0 else "انخفض" if tnx_diff < 0 else "استقر"
     twy_dir = "ارتفع" if twy_diff > 0 else "انخفض" if twy_diff < 0 else "استقر"
 
+    real_yield = d.get('real_yield', 0.0)
+    cpi = d.get('cpi_yoy', 0.0)
+
     template = f"""📊 تقرير عوائد السندات الأمريكية | التحديث اليومي
 
 🇺🇸 عائد 10 سنوات:
@@ -2725,8 +2796,11 @@ def _build_template_4(d: dict) -> str:
 
 الفارق بين العشر سنوات والسنتين عند {diff_val} نقطة، [اكتب ماذا يعكس ذلك تجاه آفاق النمو]
 
+⚖️ العائد الحقيقي (Real Yield):
+العائد الحقيقي يبلغ {real_yield:.2f}% (الفائدة مطروحاً منها التضخم السنوي {cpi:.1f}%). [اكتب كيف يؤثر هذا العائد الحقيقي الإيجابي/السلبي على جاذبية الذهب]
+
 🟡 تأثير الذهب:
-[تأثير العوائد الحالية على الذهب]
+[تأثير العوائد الحالية والمعدل الحقيقي على الذهب]
 
 💵 تأثير الدولار:
 [تأثير العوائد الحالية على الدولار]
@@ -2796,6 +2870,10 @@ def _build_template_5(d: dict) -> str:
 السبب: [سبب ضعف هذه العملة]
 ⚡️ الزخم:
 [اكتب وصفاً لحالة الزخم وحركة الأسواق الحالية بناء على هذه الأرقام]
+💵 تأثير هذه العملات على مؤشر الدولار (DXY):
+[اشرح كيف يؤثر صعود العملات القوية أعلاه وهبوط الضعيفة على سلة الدولار DXY اليوم]
+🟡 التأثير على الذهب (XAU):
+[استنتج حركة الذهب المتوقعة بناءً على أداء الدولار والعملات المنافسة]
 🧭 الخلاصة:
 [خلاصة لهيمنة عملات معينة وضعف أخرى]"""
 
@@ -2830,13 +2908,18 @@ def _build_template_5(d: dict) -> str:
             
     return "⚠️ تعذر توليد تقرير قوة العملات بسبب ضغط على سيرفرات الذكاء الاصطناعي."
 
-def _build_template_6(d: dict, t1: str, t2: str, t3: str, t4: str, t5: str) -> str:
+def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: str, t4: str, t5: str) -> str:
     """بناء القالب السادس والأخير (الخلاصة الذكية) عبر الذكاء الاصطناعي"""
     client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
     if not client:
         return "⚠️ لا يمكن توليد تقرير الخلاصة لعدم توفر مفتاح Groq."
 
-    template = """🎯 خلاصة انحياز الذهب | التحديث المباشر
+    pivot_val = d.get('pivot', '---')
+
+    import re
+    clean_t0 = re.sub(r'[╭─╮├┤│╰╯]', '', t0) if t0 else ""
+    
+    template = f"""🎯 خلاصة انحياز الذهب | التحديث المباشر
 
 📈 نسبة الصعود: [النسبة المئوية]%
 📉 نسبة الهبوط: [النسبة المئوية]%
@@ -2844,16 +2927,23 @@ def _build_template_6(d: dict, t1: str, t2: str, t3: str, t4: str, t5: str) -> s
 🧭 الخلاصة:
 [سطرين أو ثلاثة فقط تلخص الموقف العام للذهب بناء على كل التقارير المرفقة مع إعطاء قرار نهائي واضح. اكتب بلغة يفهمها المبتدئون]
 
+📍 نقطة الفصل اليومية (Pivot):
+{pivot_val}$ [اشرح دلالة التداول حالياً فوق أو تحت هذا المستوى]
+
 📌 مستويات التداول الحالية:
-[انقل مستويات البيع والشراء (التي تحتوي على الدوائر 🔴 أو 🟢) من تقرير التحليل الفني المرفق وضعها هنا بدقة كما هي وبدون تغيير في أرقامها]"""
+[انقل مستويات البيع والشراء (التي تحتوي على الدوائر 🔴 أو 🟢 أو 🟡) من تقرير التحليل الفني المرفق وضعها هنا بدقة كما هي وبدون تغيير في أرقامها]"""
 
     prompt = f"""أنت "المحلل الأكبر" والمستشار المالي النهائي. 
-لقد قام فريقك بإعداد 5 تقارير مفصلة حول الذهب تشمل (التحليل الفني، الاقتصاد، المخاطرة، العوائد، والعملات).
+لقد قام فريقك بإعداد تقارير شاملة حول الذهب تشمل (الصفقات الأساسية، الصفقات المتقدمة، التحليل الفني، الاقتصاد، المخاطرة، العوائد، والعملات).
 الهدف الآن هو استخلاص عصارة هذه التقارير في "رسالة مختصرة ومباشرة للجمهور العام" تطابق هذا القالب بالضبط:
 
 {template}
 
-إليك التقارير الخمسة للتحليل:
+إليك جميع التقارير للتحليل:
+--- التقرير الأساسي (الصفقات ومستويات الدعم والمقاومة): ---
+{fixed_rep}
+--- تقرير الصفقات المتقدمة (زيرو انعكاس ولوت عالي): ---
+{clean_t0}
 --- التقرير 1 (الفني والزخم): ---
 {t1}
 --- التقرير 2 (الاقتصاد الكلي): ---
@@ -2866,10 +2956,10 @@ def _build_template_6(d: dict, t1: str, t2: str, t3: str, t4: str, t5: str) -> s
 {t5}
 
 المطلوب:
-1. اقرأ التقارير جميعها بعناية.
+1. اقرأ جميع التقارير والصفقات المرفقة بعناية فائقة.
 2. استنتج رقمين دقيقين لنسبة الصعود والهبوط (مجموعهما 100%).
-3. اكتب خلاصة مكثفة في سطرين أو ثلاثة كحد أقصى.
-4. ابحث في التقرير 1 عن "مناطق البيع" أو "مناطق الشراء" أو "المنطقة الذهبية" وانقلها كما هي نصياً في قسم المستويات. يجب أن تحافظ على الأرقام بدقة.
+3. اكتب خلاصة مكثفة في سطرين أو ثلاثة كحد أقصى للاتجاه العام.
+4. ابحث في التقارير المرفقة (خاصة التقرير الأساسي وتقرير الصفقات المتقدمة والفني) عن أبرز مناطق البيع 🔴 والشراء 🟢 وانقلها بأرقامها الدقيقة إلى قسم المستويات. لا تؤلف أرقاماً.
 5. لا تكتب أي مقدمات أو تحيات، فقط أخرج القالب المملوء."""
 
     for model_name in GROQ_MODELS:
@@ -2987,7 +3077,17 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
     raw_reports = []
     
     if report_text:
-        raw_reports.append(("👑 التقرير الكمي الشامل للذهب", report_text, None))
+        # Split the giant fixed report into exactly 5 sections to ensure we get EXACTLY 12/12 Telegram messages
+        sections = report_text.split("━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        
+        if len(sections) >= 6:
+            raw_reports.append(("👑 الأسعار وحالة السوق", sections[0] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[1] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[2], None))
+            raw_reports.append(("📌 القمم والقيعان الحالية", sections[3], None))
+            raw_reports.append(("🟢 صفقات الشراء الموصى بها", sections[4], None))
+            raw_reports.append(("🔴 صفقات البيع الموصى بها", sections[5], None))
+            raw_reports.append(("📉 الفنيات والمستويات", sections[6] if len(sections) > 6 else "", None))
+        else:
+            raw_reports.append(("👑 التقرير الكمي الشامل للذهب", report_text, None))
         
     t0, t1, t2, t3, t4, t5, t6 = "", "", "", "", "", "", ""
     try:
@@ -3021,7 +3121,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
     except Exception as e: log.error(f"Error 5: {e}")
 
     try:
-        t6 = _build_template_6(data, t1, t2, t3, t4, t5)
+        t6 = _build_template_6(data, report_text, t0, t1, t2, t3, t4, t5)
         if t6: raw_reports.append(("🏁 تقرير الخلاصة النهائية", t6, None))
     except Exception as e: log.error(f"Error 6: {e}")
 
@@ -3037,7 +3137,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
     global LAST_PUBLIC_REPORT_TIME
     now = time.time()
     is_public = False
-    if now - LAST_PUBLIC_REPORT_TIME >= 3500:
+    # الإرسال للجروب العام كل 4 ساعات (14000 ثانية تقريباً)
+    if now - LAST_PUBLIC_REPORT_TIME >= 14000:
         is_public = True
         LAST_PUBLIC_REPORT_TIME = now
         
@@ -3045,7 +3146,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
     
     for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
         subtitle = _get_subtitle(chunk, title)
-        final_text = f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب\n{subtitle}\n\n{chunk}"
+        final_text = f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الآجل - Futures)\n{subtitle}\n\n{chunk}"
         ok = _send_single(final_text, is_public, chat_id)
         log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
         time.sleep(2)
@@ -3054,17 +3155,17 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 #  9. الحلقة الرئيسية
 # ══════════════════════════════════════════════
 def run_bot():
-    log.info("🚀 Goldbot Pro+ v4 — Spot/Futures + هيكل ثابت + SL≤38$ + هدف مفتوح")
+    log.info("🚀 Goldbot Pro+ v4 — Spot/Futures Decoupled")
 
-    last_gold_price      = None
-    minutes_counter      = 0
-    morning_sent_today   = False
-    closing_sent_today   = False
-    heartbeat_sent_today = False
+    last_gold_price      = {'futures': None, 'spot': None}
+    minutes_counter      = {'futures': 0, 'spot': 0}
+    morning_sent_today   = {'futures': False, 'spot': False}
+    closing_sent_today   = {'futures': False, 'spot': False}
+    heartbeat_sent_today = {'futures': False, 'spot': False}
+    consec_failures      = {'futures': 0, 'spot': 0}
     all_models_notified  = False
     last_report_date     = None
-    consec_failures      = 0
-    market_closed_notified = False   # يُبعت إشعار الإغلاق مرة واحدة فقط
+    market_closed_notified = False
     day_names = ["اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت","أحد"]
 
     while True:
@@ -3074,29 +3175,23 @@ def run_bot():
         weekday    = now_cairo.weekday()
 
         if last_report_date != today:
-            morning_sent_today   = False
-            closing_sent_today   = False
-            heartbeat_sent_today = False
+            for m in ['futures', 'spot']:
+                morning_sent_today[m]   = False
+                closing_sent_today[m]   = False
+                heartbeat_sent_today[m] = False
             all_models_notified  = False
 
         if False: # not is_market_open():
-            # — إرسال إشعار "سوق مغلق" مرة واحدة فقط لكل فترة إغلاق —
             if not market_closed_notified:
                 now_c    = cairo_now()
                 wday     = now_c.weekday()
                 hr       = now_c.hour
-
-                # تحديد السبب
-                if wday == 5:                               # السبت
-                    reason   = "عطلة نهاية الأسبوع (السبت)"
+                if wday in (5, 6):
+                    reason   = "عطلة نهاية الأسبوع"
                     reopen   = "الاثنين 01:00 بتوقيت القاهرة"
                     details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
-                elif wday == 6:                             # الأحد
-                    reason   = "عطلة نهاية الأسبوع (الأحد)"
-                    reopen   = "الاثنين 01:00 بتوقيت القاهرة"
-                    details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
-                elif wday == 0 and hr < MARKET_OPEN_HOUR:  # الاثنين قبل الفتح
-                    reason   = "ما زلنا في ساعات الإغلاق (الاثنين قبل الفتح)"
+                elif wday == 0 and hr < MARKET_OPEN_HOUR:
+                    reason   = "ما زلنا في ساعات الإغلاق"
                     reopen   = f"الاثنين {MARKET_OPEN_HOUR:02d}:00 بتوقيت القاهرة"
                     details  = "أسواق الذهب تبدأ جلستها الأسبوعية يوم الاثنين فجراً."
                 else:
@@ -3119,82 +3214,87 @@ def run_bot():
                 log.info("📢 تم إرسال إشعار إغلاق السوق للقناة.")
 
             log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
-            last_gold_price = None
+            for m in ['futures', 'spot']: last_gold_price[m] = None
             time.sleep(30 * 60)
             continue
 
-        # السوق مفتوح — نعيد تهيئة الفلاج عشان الإغلاق الجاي يبعت إشعار تاني
         market_closed_notified = False
 
-        data = get_full_market_data()
+        for mode in ['futures']:
+            data = get_full_market_data(mode=mode)
+            if data and data["gold"]:
+                consec_failures[mode] = 0
+                all_models_notified = False
+                current_gold = data["gold"]
 
-        if data and data["gold"]:
-            consec_failures     = 0
-            all_models_notified = False
-            current_gold        = data["gold"]
-
-            if last_gold_price is None and last_report_date != today:
-                log.info("📊 إرسال التقرير الافتتاحي...")
-                report = generate_report(data, is_alert=False)
-                send_reports(data, report)
-                last_gold_price  = current_gold
-                last_report_date = today
-                minutes_counter  = 0
-
-            elif hour_cairo == HEARTBEAT_HOUR and not heartbeat_sent_today:
-                conf = data['confluence']
-                send_to_telegram(
-                    f"💚 [Goldbot Heartbeat] البوت يعمل بشكل طبيعي ✔️\n"
-                    f"💰 آجل: {data['gold_futures']:.2f}$"
-                    + (f" | فوري: {data['gold_spot']:.2f}$" if data['gold_spot'] else "") + "\n"
-                    f"🎯 {conf['verdict']}\n"
-                    f"🕐 {now_cairo.strftime('%H:%M قاهرة')}"
-                )
-                heartbeat_sent_today = True
-
-            elif hour_cairo == MORNING_HOUR_CAI and not morning_sent_today:
-                log.info("🌅 إرسال تقرير الصباح...")
-                report = generate_report(data, is_alert=False, is_morning=True)
-                if report:
+                if last_gold_price[mode] is None and last_report_date != today:
+                    log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
+                    report = generate_report(data, is_alert=False)
                     send_reports(data, report)
-                    morning_sent_today = True
-                    last_gold_price    = current_gold
-                    minutes_counter    = 0
+                    last_gold_price[mode] = current_gold
+                    last_report_date = today
+                    minutes_counter[mode] = 0
 
-            elif hour_cairo == CLOSING_HOUR_CAI and not closing_sent_today:
-                log.info("🌙 إرسال ملخص الجلسة...")
-                report = generate_report(data, is_alert=False)
-                if report:
-                    send_reports(data, report, "🌙 [ملخص جلسة اليوم — تقرير نهائي]\n")
-                    closing_sent_today = True
-                    last_gold_price    = current_gold
-                    minutes_counter    = 0
+                elif hour_cairo == HEARTBEAT_HOUR and not heartbeat_sent_today[mode]:
+                    conf = data['confluence']
+                    send_to_telegram(
+                        f"💚 [Goldbot Heartbeat - {mode.upper()}] البوت يعمل بشكل طبيعي ✔️\n"
+                        f"💰 السعر: {current_gold:.2f}$\n"
+                        f"🎯 {conf['verdict']}\n"
+                        f"🕐 {now_cairo.strftime('%H:%M قاهرة')}"
+                    )
+                    heartbeat_sent_today[mode] = True
 
-            else:
-                price_diff = current_gold - (last_gold_price or current_gold)
-                if abs(price_diff) >= ALERT_THRESHOLD:
-                    log.info(f"🚨 تحرك حاد {price_diff:+.2f}$")
-                    report = generate_report(data, is_alert=True, price_diff=price_diff)
+                elif hour_cairo == MORNING_HOUR_CAI and not morning_sent_today[mode]:
+                    log.info(f"🌅 إرسال تقرير الصباح ({mode})...")
+                    report = generate_report(data, is_alert=False, is_morning=True)
                     if report:
                         send_reports(data, report)
-                        last_gold_price = current_gold
-                        minutes_counter = 0
-                elif minutes_counter >= ROUTINE_MINUTES:
-                    log.info(f"⏰ مرت {ROUTINE_MINUTES} دقيقة — تقرير دوري...")
+                        morning_sent_today[mode] = True
+                        last_gold_price[mode] = current_gold
+                        minutes_counter[mode] = 0
+
+                elif hour_cairo == CLOSING_HOUR_CAI and not closing_sent_today[mode]:
+                    log.info(f"🌙 إرسال ملخص الجلسة ({mode})...")
                     report = generate_report(data, is_alert=False)
                     if report:
-                        send_reports(data, report)
-                        last_gold_price = current_gold
-                        minutes_counter = 0
-        else:
-            consec_failures += 1
-            log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures}.")
-            if consec_failures >= 3 and not all_models_notified:
-                send_to_telegram(
-                    "🚨 تحذير — جولدبوت يواجه مشكلة!\n"
-                    "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
-                )
-                all_models_notified = True
+                        send_reports(data, report, f"🌙 [ملخص جلسة اليوم - {mode.upper()}]\n")
+                        closing_sent_today[mode] = True
+                        last_gold_price[mode] = current_gold
+                        minutes_counter[mode] = 0
 
+                else:
+                    price_diff = current_gold - (last_gold_price[mode] or current_gold)
+                    if abs(price_diff) >= ALERT_THRESHOLD:
+                        log.info(f"🚨 تحرك حاد {price_diff:+.2f}$ ({mode})")
+                        report = generate_report(data, is_alert=True, price_diff=price_diff)
+                        if report:
+                            send_reports(data, report)
+                            last_gold_price[mode] = current_gold
+                            minutes_counter[mode] = 0
+                    elif minutes_counter[mode] >= ROUTINE_MINUTES:
+                        log.info(f"⏰ مرت {ROUTINE_MINUTES} دقيقة — تقرير دوري ({mode})...")
+                        report = generate_report(data, is_alert=False)
+                        if report:
+                            send_reports(data, report)
+                            last_gold_price[mode] = current_gold
+                            minutes_counter[mode] = 0
+            else:
+                consec_failures[mode] += 1
+                log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
+                if consec_failures[mode] >= 3 and not all_models_notified:
+                    send_to_telegram(
+                        f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
+                        "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
+                    )
+                    all_models_notified = True
+
+            minutes_counter[mode] += 1
+            
         time.sleep(60)
-        minutes_counter += 1
+
+if __name__ == "__main__":
+    try:
+        run_bot()
+    except KeyboardInterrupt:
+        print("\nBot stopped by user.")

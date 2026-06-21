@@ -2776,10 +2776,13 @@ def _build_template_4(d: dict) -> str:
 
     tnx = d.get('tnx_val', 0.0) or 0.0
     twy = d.get('twy_val', 0.0) or 0.0
+    tty = d.get('tty', 0.0) or 0.0
     tnx_diff = d.get('tnx_diff', 0)
     twy_diff = d.get('twy_diff', 0)
-    
-    diff_val = round(tnx - twy, 2)
+
+    diff_val    = round(tnx - twy, 2)
+    diff_30_10  = round(tty - tnx, 2) if tty else None
+
     if diff_val < -0.1:
         curve_state = "مقلوب (Inverted)"
     elif diff_val > 0.1:
@@ -2789,6 +2792,8 @@ def _build_template_4(d: dict) -> str:
 
     tnx_dir = "ارتفع" if tnx_diff > 0 else "انخفض" if tnx_diff < 0 else "استقر"
     twy_dir = "ارتفع" if twy_diff > 0 else "انخفض" if twy_diff < 0 else "استقر"
+    tty_str     = f"{tty:.2f}%" if tty else "—"
+    diff_30_10_str = f"{diff_30_10:+.2f}%" if diff_30_10 is not None else "—"
 
     real_yield = d.get('real_yield', 0.0)
     cpi = d.get('cpi_yoy', 0.0)
@@ -2801,19 +2806,25 @@ def _build_template_4(d: dict) -> str:
 الحركة:
 {tnx_dir} بمقدار {abs(tnx_diff)} نقطة أساس. [اكتب تحليلاً قصيراً جداً لهذه الحركة]
 
+🇺🇸 عائد 30 سنة:
+{tty_str}
+
+التحليل:
+عائد 30 سنة عند {tty_str}، الفارق مع 10 سنوات {diff_30_10_str}. [اكتب ماذا يعني هذا الفارق عن توقعات النمو بعيدة المدى]
+
 🇺🇸 عائد سنتين:
 {twy:.2f}%
 
 التوقعات:
 {twy_dir} بمقدار {abs(twy_diff)} نقطة أساس. [اكتب ماذا يشير ذلك بخصوص الفائدة]
 
-📈 منحنى العوائد:
-{curve_state}
+📈 منحنى العوائد الكامل (2Y → 10Y → 30Y):
+{curve_state} | 2Y:{twy:.2f}% | 10Y:{tnx:.2f}% | 30Y:{tty_str}
 
 الفارق بين العشر سنوات والسنتين عند {diff_val} نقطة، [اكتب ماذا يعكس ذلك تجاه آفاق النمو]
 
 ⚖️ العائد الحقيقي (Real Yield):
-العائد الحقيقي يبلغ {real_yield:.2f}% (الفائدة مطروحاً منها التضخم السنوي {cpi:.1f}%). [اكتب كيف يؤثر هذا العائد الحقيقي الإيجابي/السلبي على جاذبية الذهب]
+العائد الحقيقي يبلغ {real_yield:.2f}% (10Y {tnx:.2f}% مطروحاً منها التضخم {cpi:.1f}%). [اكتب كيف يؤثر هذا العائد الحقيقي الإيجابي/السلبي على جاذبية الذهب]
 
 🟡 تأثير الذهب:
 [تأثير العوائد الحالية والمعدل الحقيقي على الذهب]
@@ -2822,7 +2833,7 @@ def _build_template_4(d: dict) -> str:
 [تأثير العوائد الحالية على الدولار]
 
 🧭 الخلاصة:
-[خلاصة حركة العوائد وتأثيرها العام]"""
+[خلاصة حركة العوائد الثلاثة (2Y/10Y/30Y) وتأثيرها العام]"""
 
     prompt = f"""أنت محلل أسواق سندات محترف. طلب مني العميل تقرير عن 'عوائد السندات الأمريكية' يطابق هذا القالب بالضبط:
 
@@ -2833,27 +2844,28 @@ def _build_template_4(d: dict) -> str:
 مهمتك هي استبدال الأقواس المربعة [...] بتحليل مالي دقيق واحترافي بناءً على الأرقام الحالية.
 إذا كانت العوائد ترتفع بقوة، اذكر أن ذلك يشكل ضغطاً على الذهب ويدعم الدولار. وإذا انخفضت، اذكر العكس.
 إذا كان المنحنى مقلوباً، اذكر أنه يعكس مخاوف ركود.
-التزم بالقالب تماماً ولا تكتب أي نصوص إضافية أو مقدمات."""
+اترك جميع الأرقام والنسب المئوية كما هي تماماً. التزم بالقالب تماماً ولا تكتب أي نصوص إضافية أو مقدمات."""
 
     for model_name in GROQ_MODELS:
         try:
             log.info(f"🤖 جاري توليد القالب الرابع (عوائد السندات) عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه."},
+                    {"role": "system", "content": "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه. لا تغير الأرقام."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
                 temperature=0.2,
-                max_tokens=600,
+                max_tokens=750,
             )
             return resp.choices[0].message.content
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الرابع: {e}")
             time.sleep(2)
             continue
-            
+
     return "⚠️ تعذر توليد تقرير السندات بسبب ضغط على سيرفرات الذكاء الاصطناعي."
+
 
 def _build_template_5(d: dict) -> str:
     """بناء القالب الخامس (تقرير قوة العملات) عبر الذكاء الاصطناعي"""
@@ -3224,7 +3236,10 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             "report_text": report_text,
             "t0": t0, "t1": t1, "t2": t2,
             "t3": t3, "t4": t4, "t5": t5,
+            # score اليومي لحساب نسبة الصعود/الهبوط في الخلاصة المشتركة
+            "score": data.get('tf_daily', {}).get('score', 0),
         })
+
         log.info("💾 [Futures] تم حفظ بيانات الآجل — الفوري يستطيع الإرسال الآن.")
 
 

@@ -2779,10 +2779,13 @@ def _build_template_4(d: dict) -> str:
 
     tnx = d.get('tnx_val', 0.0) or 0.0
     twy = d.get('twy_val', 0.0) or 0.0
+    tty = d.get('tty', 0.0) or 0.0        # 30Y yield
     tnx_diff = d.get('tnx_diff', 0)
     twy_diff = d.get('twy_diff', 0)
-    
+
     diff_val = round(tnx - twy, 2)
+    diff_30_10 = round(tty - tnx, 2) if tty else None
+
     if diff_val < -0.1:
         curve_state = "مقلوب (Inverted)"
     elif diff_val > 0.1:
@@ -2792,6 +2795,8 @@ def _build_template_4(d: dict) -> str:
 
     tnx_dir = "ارتفع" if tnx_diff > 0 else "انخفض" if tnx_diff < 0 else "استقر"
     twy_dir = "ارتفع" if twy_diff > 0 else "انخفض" if twy_diff < 0 else "استقر"
+    tty_str = f"{tty:.2f}%" if tty else "—"
+    diff_30_10_str = f"{diff_30_10:+.2f}%" if diff_30_10 is not None else "—"
 
     real_yield = d.get('real_yield', 0.0)
     cpi = d.get('cpi_yoy', 0.0)
@@ -2804,19 +2809,25 @@ def _build_template_4(d: dict) -> str:
 الحركة:
 {tnx_dir} بمقدار {abs(tnx_diff)} نقطة أساس. [اكتب تحليلاً قصيراً جداً لهذه الحركة]
 
+🇺🇸 عائد 30 سنة:
+{tty_str}
+
+التحليل:
+عائد 30 سنة عند {tty_str}، الفارق مع 10 سنوات {diff_30_10_str}. [اكتب ماذا يعني هذا الفارق عن توقعات النمو بعيدة المدى]
+
 🇺🇸 عائد سنتين:
 {twy:.2f}%
 
 التوقعات:
 {twy_dir} بمقدار {abs(twy_diff)} نقطة أساس. [اكتب ماذا يشير ذلك بخصوص الفائدة]
 
-📈 منحنى العوائد:
-{curve_state}
+📈 منحنى العوائد الكامل (2Y → 10Y → 30Y):
+{curve_state} | 2Y:{twy:.2f}% | 10Y:{tnx:.2f}% | 30Y:{tty_str}
 
 الفارق بين العشر سنوات والسنتين عند {diff_val} نقطة، [اكتب ماذا يعكس ذلك تجاه آفاق النمو]
 
 ⚖️ العائد الحقيقي (Real Yield):
-العائد الحقيقي يبلغ {real_yield:.2f}% (الفائدة مطروحاً منها التضخم السنوي {cpi:.1f}%). [اكتب كيف يؤثر هذا العائد الحقيقي الإيجابي/السلبي على جاذبية الذهب]
+العائد الحقيقي يبلغ {real_yield:.2f}% (10Y {tnx:.2f}% مطروحاً منها التضخم {cpi:.1f}%). [اكتب كيف يؤثر هذا العائد الحقيقي الإيجابي/السلبي على جاذبية الذهب]
 
 🟡 تأثير الذهب:
 [تأثير العوائد الحالية والمعدل الحقيقي على الذهب]
@@ -2825,7 +2836,7 @@ def _build_template_4(d: dict) -> str:
 [تأثير العوائد الحالية على الدولار]
 
 🧭 الخلاصة:
-[خلاصة حركة العوائد وتأثيرها العام]"""
+[خلاصة حركة العوائد الثلاثة (2Y/10Y/30Y) وتأثيرها العام]"""
 
     prompt = f"""أنت محلل أسواق سندات محترف. طلب مني العميل تقرير عن 'عوائد السندات الأمريكية' يطابق هذا القالب بالضبط:
 
@@ -2836,27 +2847,30 @@ def _build_template_4(d: dict) -> str:
 مهمتك هي استبدال الأقواس المربعة [...] بتحليل مالي دقيق واحترافي بناءً على الأرقام الحالية.
 إذا كانت العوائد ترتفع بقوة، اذكر أن ذلك يشكل ضغطاً على الذهب ويدعم الدولار. وإذا انخفضت، اذكر العكس.
 إذا كان المنحنى مقلوباً، اذكر أنه يعكس مخاوف ركود.
-التزم بالقالب تماماً ولا تكتب أي نصوص إضافية أو مقدمات."""
+اترك جميع الأرقام والنسب المئوية كما هي تماماً. التزم بالقالب تماماً ولا تكتب أي نصوص إضافية أو مقدمات."""
 
     for model_name in GROQ_MODELS:
         try:
             log.info(f"🤖 جاري توليد القالب الرابع (عوائد السندات) عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه."},
+                    {"role": "system", "content": "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه. لا تغير الأرقام."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
                 temperature=0.2,
-                max_tokens=600,
+                max_tokens=750,
             )
             return resp.choices[0].message.content
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل في توليد القالب الرابع: {e}")
             time.sleep(2)
             continue
-            
+
     return "⚠️ تعذر توليد تقرير السندات بسبب ضغط على سيرفرات الذكاء الاصطناعي."
+
+
+
 
 def _build_template_5(d: dict) -> str:
     """بناء القالب الخامس (تقرير قوة العملات) عبر الذكاء الاصطناعي"""
@@ -3012,6 +3026,8 @@ def _build_combined_summary(
     spot_t2: str,
     futures_t0: str,
     spot_t0: str,
+    bull_pct: int = 50,
+    bear_pct: int = 50,
 ) -> str:
     """
     الخلاصة النهائية المشتركة — تصدر مرة واحدة فقط بعد انتهاء
@@ -3027,12 +3043,21 @@ def _build_combined_summary(
     pivot_spot    = spot_data.get('pivot', '---')
     gold_spot     = spot_data.get('gold', 0)
 
+    # تحديد الاتجاه الكلي بناءً على النسب المحسوبة
+    if bull_pct >= 60:
+        direction_label = "صعودي 📈"
+    elif bear_pct >= 60:
+        direction_label = "هبوطي 📉"
+    else:
+        direction_label = "متذبذب ⚖️"
+
     prompt = f"""أنت المحلل الأكبر. لقد انتهى فريقك للتو من إعداد تقارير شاملة لسوقَي الذهب:
 ① سوق الآجل (Futures/GC=F)
 ② سوق الفوري (Spot/XAUUSD)
 
 السعر الفوري الحالي: {gold_spot:,.2f}$
 نقطة الفصل اليومية (Pivot): {pivot_spot}$
+الاتجاه المحسوب رياضياً: {direction_label} (صعود {bull_pct}% / هبوط {bear_pct}%)
 
 ── ملخص التحليل الفني للآجل ──
 {clean(futures_t1)[:600]}
@@ -3050,28 +3075,30 @@ def _build_combined_summary(
 
 🏆 الخلاصة النهائية | آجل + فوري
 
-📈 نسبة الصعود: [X]%
-📉 نسبة الهبوط: [Y]%
+📈 نسبة الصعود: {bull_pct}%
+📉 نسبة الهبوط: {bear_pct}%
 
 🧭 القرار النهائي (3-4 أسطر):
-[اكتب حكماً واضحاً ومختصراً يجمع بين السوقين ويخبر القارئ ماذا يفعل الآن]
+[اكتب حكماً واضحاً ومختصراً يجمع بين السوقين ويخبر القارئ ماذا يفعل الآن بناءً على الاتجاه {direction_label}]
 
 📍 نقطة الفصل اليومية:
 {pivot_spot}$ — [اشرح دلالة التداول حالياً فوق أو تحت هذا المستوى بجملة واحدة]
 
 📌 أقوى صفقة الآن:
-[انقل أفضل صفقة موصى بها (آجل أو فوري أيهما أقوى) بالأرقام الدقيقة كما هي]"""
+[انقل أفضل صفقة موصى بها (آجل أو فوري أيهما أقوى) بالأرقام الدقيقة كما هي]
+
+قاعدة مهمة: لا تغير نسبة الصعود ({bull_pct}%) ولا نسبة الهبوط ({bear_pct}%) — هذه أرقام محسوبة رياضياً."""
 
     for model_name in GROQ_MODELS:
         try:
             log.info(f"🤖 [Combined] توليد الخلاصة المشتركة عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت المحلل المالي الأكبر. أصدر خلاصة نهائية موجزة ودقيقة تجمع بين سوقي الآجل والفوري. التزم بالقالب حرفياً."},
+                    {"role": "system", "content": "أنت المحلل المالي الأكبر. أصدر خلاصة نهائية موجزة ودقيقة تجمع بين سوقي الآجل والفوري. التزم بالقالب حرفياً. لا تغير النسب المئوية المعطاة."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
-                temperature=0.25,
+                temperature=0.2,
                 max_tokens=700,
             )
             return resp.choices[0].message.content
@@ -3081,6 +3108,8 @@ def _build_combined_summary(
             continue
 
     return "⚠️ تعذر توليد الخلاصة النهائية المشتركة."
+
+
 
 def _build_template_0(d: dict) -> str:
     """بناء القالب التمهيدي 0 (الصفقات المتقدمة والاتجاهات) عبر الذكاء الاصطناعي"""
@@ -3307,27 +3336,41 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         log.info("🏆 [Combined] توليد الخلاصة النهائية المشتركة (آجل + فوري)...")
         try:
             fc = _futures_cache  # بيانات الآجل المحفوظة
-            combined = _build_combined_summary(
-                spot_data=data,
-                futures_report=fc.get("report_text", ""),
-                spot_report=report_text,
-                futures_t1=fc.get("t1", ""),
-                futures_t2=fc.get("t2", ""),
-                spot_t1=t1,
-                spot_t2=t2,
-                futures_t0=fc.get("t0", ""),
-                spot_t0=t0,
-            )
-            if combined:
-                summary_msg = (
-                    "🏆 الخلاصة النهائية الشاملة | آجل + فوري\n"
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                    + combined
+            # تأكد إن بيانات الآجل موجودة فعلاً (مش أول دورة بعد restart)
+            if not fc or not fc.get("t1"):
+                log.warning("⚠️ [Combined] بيانات الآجل غير متاحة بعد — الخلاصة ستُؤجل للدورة القادمة.")
+            else:
+                # احسب الاتجاه المشترك من البوتين بشكل آلي
+                spot_score  = data.get('tf_daily', {}).get('score', 0)
+                fut_score   = fc.get('score', spot_score)  # بيانات الآجل
+                avg_score   = (spot_score + fut_score) / 2
+                bull_pct = max(0, min(100, round(50 + avg_score * 12)))
+                bear_pct = 100 - bull_pct
+
+                combined = _build_combined_summary(
+                    spot_data=data,
+                    futures_report=fc.get("report_text", ""),
+                    spot_report=report_text,
+                    futures_t1=fc.get("t1", ""),
+                    futures_t2=fc.get("t2", ""),
+                    spot_t1=t1,
+                    spot_t2=t2,
+                    futures_t0=fc.get("t0", ""),
+                    spot_t0=t0,
+                    bull_pct=bull_pct,
+                    bear_pct=bear_pct,
                 )
-                ok = _send_single(summary_msg, is_public, None)
-                log.info("✅ [Combined] تم إرسال الخلاصة المشتركة." if ok else "❌ [Combined] فشل إرسال الخلاصة المشتركة.")
+                if combined:
+                    summary_msg = (
+                        "🏆 الخلاصة النهائية الشاملة | آجل + فوري\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        + combined
+                    )
+                    ok = _send_single(summary_msg, is_public, None)
+                    log.info("✅ [Combined] تم إرسال الخلاصة المشتركة." if ok else "❌ [Combined] فشل إرسال الخلاصة المشتركة.")
         except Exception as e:
             log.error(f"❌ [Combined] خطأ في الخلاصة المشتركة: {e}")
+
 
         log.info("🔓 [Spot] أطلق القفل — انتهى الدورة الكاملة.")
 

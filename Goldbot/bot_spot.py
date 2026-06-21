@@ -3322,17 +3322,21 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             is_public = True
             LAST_PUBLIC_REPORT_TIME = now
 
-        log.info(f"📤 [Spot] إرسال {total} رسالة متسلسلة...")
+        log.info("⏳ [Spot] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
+        with SEND_LOCK:
+            log.info("🔒 [Spot] حصل على القفل — بدء إرسال الرسائل...")
+            log.info(f"📤 [Spot] إرسال {total} رسالة متسلسلة...")
 
-        for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
-            subtitle = _get_subtitle(chunk, title)
-            final_text = (
-                f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
-                f"{subtitle}\n\n{chunk}"
-            )
-            ok = _send_single(final_text, is_public, chat_id)
-            log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
-            time.sleep(2)
+            for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
+                subtitle = _get_subtitle(chunk, title)
+                final_text = (
+                    f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
+                    f"{subtitle}\n\n{chunk}"
+                )
+                ok = _send_single(final_text, is_public, chat_id)
+                log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
+                time.sleep(2)
+            log.info("🔓 [Spot] تم الإرسال، تحرير القفل لانتظار الخلاصة...")
 
         # ══════════════════════════════════════════════════════
         #  الخلاصة النهائية المشتركة — تأتي هنا بعد كل الرسائل

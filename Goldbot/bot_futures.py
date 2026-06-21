@@ -3222,29 +3222,33 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             is_public = True
             LAST_PUBLIC_REPORT_TIME = now
 
-        log.info(f"📤 [Futures] إرسال {total} رسالة متسلسلة...")
+        log.info("⏳ [Futures] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
+        with SEND_LOCK:
+            log.info("🔒 [Futures] حصل على القفل — بدء إرسال الرسائل وتحديث الكاش...")
+            log.info(f"📤 [Futures] إرسال {total} رسالة متسلسلة...")
 
-        for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
-            subtitle = _get_subtitle(chunk, title)
-            final_text = (
-                f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الآجل - Futures)\n"
-                f"{subtitle}\n\n{chunk}"
-            )
-            ok = _send_single(final_text, is_public, chat_id)
-            log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
-            time.sleep(2)
+            for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
+                subtitle = _get_subtitle(chunk, title)
+                final_text = (
+                    f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الآجل - Futures)\n"
+                    f"{subtitle}\n\n{chunk}"
+                )
+                ok = _send_single(final_text, is_public, chat_id)
+                log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
+                time.sleep(2)
 
-        # ── حفظ بيانات الآجل للخلاصة المشتركة اللاحقة ──
-        _futures_cache.clear()
-        _futures_cache.update({
-            "report_text": report_text,
-            "t0": t0, "t1": t1, "t2": t2,
-            "t3": t3, "t4": t4, "t5": t5,
-            # score اليومي لحساب نسبة الصعود/الهبوط في الخلاصة المشتركة
-            "score": data.get('tf_daily', {}).get('score', 0),
-        })
+            # ── حفظ بيانات الآجل للخلاصة المشتركة اللاحقة ──
+            _futures_cache.clear()
+            _futures_cache.update({
+                "report_text": report_text,
+                "t0": t0, "t1": t1, "t2": t2,
+                "t3": t3, "t4": t4, "t5": t5,
+                # score اليومي لحساب نسبة الصعود/الهبوط في الخلاصة المشتركة
+                "score": data.get('tf_daily', {}).get('score', 0),
+            })
 
-        log.info("💾 [Futures] تم حفظ بيانات الآجل — الفوري يستطيع الإرسال الآن.")
+            log.info("💾 [Futures] تم حفظ بيانات الآجل — الفوري يستطيع الإرسال الآن.")
+            log.info("🔓 [Futures] تم الإرسال، تحرير القفل.")
 
 
 

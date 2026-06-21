@@ -3071,93 +3071,94 @@ def _get_subtitle(chunk: str, default_title: str) -> str:
     return "تقرير ملخص البيانات"
 
 def send_reports(data: dict, report_text: str, prefix: str = ""):
-    VIP_CHAT = -1003775201576
-    PUB_CHAT = -1002922209855
-    
-    raw_reports = []
-    
-    if report_text:
-        # Split the giant fixed report into exactly 5 sections to ensure we get EXACTLY 12/12 Telegram messages
-        sections = report_text.split("━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    from Goldbot.send_lock import SEND_LOCK
+    log.info("⏳ [Spot] انتظار القفل المشترك...")
+    with SEND_LOCK:
+        log.info("🔒 [Spot] حصل على القفل — بدء توليد التقارير والإرسال...")
+        VIP_CHAT = -1003775201576
+        PUB_CHAT = -1002922209855
         
-        if len(sections) >= 6:
-            raw_reports.append(("👑 الأسعار وحالة السوق", sections[0] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[1] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[2], None))
-            raw_reports.append(("📌 القمم والقيعان الحالية", sections[3], None))
-            raw_reports.append(("🟢 صفقات الشراء الموصى بها", sections[4], None))
-            raw_reports.append(("🔴 صفقات البيع الموصى بها", sections[5], None))
-            raw_reports.append(("📉 الفنيات والمستويات", sections[6] if len(sections) > 6 else "", None))
-        else:
-            raw_reports.append(("👑 التقرير الكمي الشامل للذهب", report_text, None))
+        raw_reports = []
         
-    t0, t1, t2, t3, t4, t5, t6 = "", "", "", "", "", "", ""
-    try:
-        t0 = _build_template_0(data)
-        if t0: raw_reports.append(("🎯 تقرير الصفقات المتقدمة والزيرو انعكاس", t0, None))
-    except Exception as e: log.error(f"Error 0: {e}")
-    
-    try:
-        t1 = _build_template_1(data)
-        if t1: raw_reports.append(("📊 التقرير الفني المتقدم", t1, None))
-    except Exception as e: log.error(f"Error 1: {e}")
-
-    try:
-        t2 = _build_template_2(data)
-        if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي", t2, None))
-    except Exception as e: log.error(f"Error 2: {e}")
-
-    try:
-        t3 = _build_template_3(data)
-        if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة", t3, None))
-    except Exception as e: log.error(f"Error 3: {e}")
-
-    try:
-        t4 = _build_template_4(data)
-        if t4: raw_reports.append(("📈 تقرير عوائد السندات", t4, None))
-    except Exception as e: log.error(f"Error 4: {e}")
-
-    try:
-        t5 = _build_template_5(data)
-        if t5: raw_reports.append(("💱 تقرير قوة العملات", t5, None))
-    except Exception as e: log.error(f"Error 5: {e}")
-
-    try:
-        t6 = _build_template_6(data, report_text, t0, t1, t2, t3, t4, t5)
-        if t6: raw_reports.append(("🏁 تقرير الخلاصة النهائية", t6, None))
-    except Exception as e: log.error(f"Error 6: {e}")
-
-    # تفكيك جميع التقارير إلى أجزاء صغيرة (chunks) ووضعها في قائمة مسطحة
-    flat_chunks = []
-    for title, text, chat_id in raw_reports:
-        chunks = _split_message(text)
-        for chunk in chunks:
-            flat_chunks.append((title, chunk, chat_id))
+        if report_text:
+            sections = report_text.split("━━━━━━━━━━━━━━━━━━━━━━━━━━")
             
-    total = len(flat_chunks)
-    
-    global LAST_PUBLIC_REPORT_TIME
-    now = time.time()
-    is_public = False
-    # الإرسال للجروب العام كل 4 ساعات (14000 ثانية تقريباً)
-    if now - LAST_PUBLIC_REPORT_TIME >= 14000:
-        is_public = True
-        LAST_PUBLIC_REPORT_TIME = now
+            if len(sections) >= 6:
+                raw_reports.append(("👑 الأسعار وحالة السوق", sections[0] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[1] + "━━━━━━━━━━━━━━━━━━━━━━━━━━" + sections[2], None))
+                raw_reports.append(("📌 القمم والقيعان الحالية", sections[3], None))
+                raw_reports.append(("🟢 صفقات الشراء الموصى بها", sections[4], None))
+                raw_reports.append(("🔴 صفقات البيع الموصى بها", sections[5], None))
+                raw_reports.append(("📉 الفنيات والمستويات", sections[6] if len(sections) > 6 else "", None))
+            else:
+                raw_reports.append(("👑 التقرير الكمي الشامل للذهب", report_text, None))
+            
+        t0, t1, t2, t3, t4, t5, t6 = "", "", "", "", "", "", ""
+        try:
+            t0 = _build_template_0(data)
+            if t0: raw_reports.append(("🎯 تقرير الصفقات المتقدمة والزيرو انعكاس", t0, None))
+        except Exception as e: log.error(f"Error 0: {e}")
         
-    log.info(f"📤 إرسال {total} رسالة مسطحة بشكل متسلسل...")
-    
-    for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
-        subtitle = _get_subtitle(chunk, title)
-        final_text = f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n{subtitle}\n\n{chunk}"
-        ok = _send_single(final_text, is_public, chat_id)
-        log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
-        time.sleep(2)
+        try:
+            t1 = _build_template_1(data)
+            if t1: raw_reports.append(("📊 التقرير الفني المتقدم", t1, None))
+        except Exception as e: log.error(f"Error 1: {e}")
+
+        try:
+            t2 = _build_template_2(data)
+            if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي", t2, None))
+        except Exception as e: log.error(f"Error 2: {e}")
+
+        try:
+            t3 = _build_template_3(data)
+            if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة", t3, None))
+        except Exception as e: log.error(f"Error 3: {e}")
+
+        try:
+            t4 = _build_template_4(data)
+            if t4: raw_reports.append(("📈 تقرير عوائد السندات", t4, None))
+        except Exception as e: log.error(f"Error 4: {e}")
+
+        try:
+            t5 = _build_template_5(data)
+            if t5: raw_reports.append(("💱 تقرير قوة العملات", t5, None))
+        except Exception as e: log.error(f"Error 5: {e}")
+
+        try:
+            t6 = _build_template_6(data, report_text, t0, t1, t2, t3, t4, t5)
+            if t6: raw_reports.append(("🏁 تقرير الخلاصة النهائية", t6, None))
+        except Exception as e: log.error(f"Error 6: {e}")
+
+        flat_chunks = []
+        for title, text, chat_id in raw_reports:
+            chunks = _split_message(text)
+            for chunk in chunks:
+                flat_chunks.append((title, chunk, chat_id))
+                
+        total = len(flat_chunks)
+        
+        global LAST_PUBLIC_REPORT_TIME
+        now = time.time()
+        is_public = False
+        if now - LAST_PUBLIC_REPORT_TIME >= 14000:
+            is_public = True
+            LAST_PUBLIC_REPORT_TIME = now
+            
+        log.info(f"📤 [Spot] إرسال {total} رسالة بشكل متسلسل...")
+        
+        for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
+            subtitle = _get_subtitle(chunk, title)
+            final_text = f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n{subtitle}\n\n{chunk}"
+            ok = _send_single(final_text, is_public, chat_id)
+            log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
+            time.sleep(2)
+        
+        log.info("🔓 [Spot] أطلق القفل.")
 
 # ══════════════════════════════════════════════
 #  9. الحلقة الرئيسية
 # ══════════════════════════════════════════════
 def run_bot():
-    log.info("🚀 Goldbot Pro+ v4 — Spot/Futures Decoupled")
-    log.info("⏳ تأخير مقصود لنسخة الفوري (Spot) لمنع التداخل مع الآجل وتخفيف الضغط على سيرفرات الذكاء الاصطناعي...")
-    time.sleep(120)
+    log.info("🚀 [Spot] Goldbot Pro+ v4 — نسخة الفوري")
 
     last_gold_price      = {'futures': None, 'spot': None}
     minutes_counter      = {'futures': 0, 'spot': 0}

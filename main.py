@@ -105,6 +105,21 @@ async def trigger_v5(secret: str = ""):
         "message": "🚀 تم إعطاء الأمر لمحرك الجيل الخامس V5 بالبدء فوراً! ستصلك التقارير على قنوات التيليجرام خلال دقائق."
     }
 
+@app.get("/test_tg")
+async def test_tg(secret: str = ""):
+    if secret != "gold2026vip":
+        return {"error": "Invalid secret"}
+    try:
+        from telethon import TelegramClient
+        session_path = "Goldbot/goldbot_bot_session"
+        client = TelegramClient(session_path, 34105911, 'b444ab6b4eeba8a66db4143b934dc540')
+        await client.connect()
+        auth = await client.is_user_authorized()
+        await client.disconnect()
+        return {"status": "ok", "authorized": auth, "session": session_path}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 
 
 @app.on_event("startup")

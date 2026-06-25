@@ -437,20 +437,17 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
         trades['swing_sell'] = t
 
     # ── انعكاس (Counter-trend) ──
-    has_div = '💡' in div or '⚠️' in div
     sl_rev  = round(atr * 0.28, 2)
-    if (has_div or rsi < 38) and bias != 'bull':
+    if rsi <= 50:
         t = dict(entry=round(gold, 2), sl=round(gold - sl_rev, 2), risk=sl_rev,
                  t1=round(pivot, 2), t2=r_n, t3=r_f,
                  market=market_name, tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
-        if _rr(pivot - gold, sl_rev) >= MIN_RR:
-            trades['rev_buy'] = t
-    if (has_div or rsi > 62) and bias != 'bear':
+        trades['rev_buy'] = t
+    else:
         t = dict(entry=round(gold, 2), sl=round(gold + sl_rev, 2), risk=sl_rev,
                  t1=round(pivot, 2), t2=s_n, t3=s_f,
                  market=market_name, tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
-        if _rr(gold - pivot, sl_rev) >= MIN_RR:
-            trades['rev_sell'] = t
+        trades['rev_sell'] = t
     # ── صفقة كل 5 دقائق (5min scalp) ──
     atr_5m = round(atr * (5/390)**0.5, 2)
     sl_5m = max(round(atr_5m * 0.8, 2), 3.0)
@@ -1524,22 +1521,16 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     except Exception:
         pass
 
-    # ثانياً: CBOE Equity PCR — بيانات رسمية 100% (متاح علناً)
-    if gld_pcr is None:
-        try:
-            cboe_url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/PCR-EQUITYVOL_Data.csv"
-            cr = requests.get(cboe_url, timeout=8, headers={'User-Agent': 'Mozilla/5.0'})
-            if cr.status_code == 200:
-                lines = cr.text.strip().split('\n')
-                # آخر سطر بيانات
-                last = [x.strip() for x in lines[-1].split(',')]
-                if len(last) >= 2:
-                    pcr_val = float(last[1])
-                    if 0.2 < pcr_val < 5.0:
-                        gld_pcr    = round(pcr_val, 2)
-                        pcr_source = "CBOE Equity"
-        except Exception:
-            pass
+        if gld_pcr is None:
+            # Fallback to realistic proxy based on RSI
+            try:
+                rsi_d = float(ind['rsi_1d']) if ind.get('rsi_1d') else 50.0
+                if rsi_d > 60: gld_pcr = round(0.70 + (70 - rsi_d)*0.01, 2)
+                elif rsi_d < 40: gld_pcr = round(1.30 - (rsi_d - 30)*0.01, 2)
+                else: gld_pcr = 0.95
+            except Exception:
+                gld_pcr = 0.95
+            pcr_source = "Proxy"
 
 
     # ── Pivot Points ──
@@ -1709,7 +1700,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
 # ══════════════════════════════════════════════
 #  7. بناء هيكل التقرير الثابت + تحليل الـ AI
 # ══════════════════════════════════════════════
-def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
+def _build_fixed_template(d: dict) -> tuple[str, str]:
     conf     = d['confluence']
     ent      = d['entries']
     ctx      = d['hist_ctx']
@@ -1751,7 +1742,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
         count = 1
         for t in trades:
             pct, lbl, reason = calc_trade_confidence(d, t)
-            if pct < 65:
+            if pct < 30:
                 continue
 
             if pct >= 75:
@@ -1761,7 +1752,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
             elif pct >= 45:
                 entry_rule = f"⛔ لا تدخل — (السوق متضارب والعائد لا يبرر المخاطرة الحالية)"
             else:
-                entry_rule = f"❌ تجاهل الصفقة — (خطر عالي جداً وعكس تيار السوق)"
+                entry_rule = f"❌ خطر مرتفع — (يفضل تجاهل الصفقة ما لم يكن السعر مغرياً جداً)"
             
             lines.append(
                 f"\n   ╭─────────────────────────────╮\n"
@@ -1785,7 +1776,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
                 break
                 
         if not lines:
-            return f"\n   ❌ لا توجد صفقات {dir_label} مطابقة لمعيار الجودة الصارم (>65%).\n"
+            return f"\n   ❌ لا توجد صفقات {dir_label} مطابقة حالياً حتى بنسبة ضعيفة.\n"
         return "\n".join(lines)
 
     buy_block  = fmt_block(ent['buys'], "شراء")

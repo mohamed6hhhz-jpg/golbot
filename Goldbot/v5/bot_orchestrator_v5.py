@@ -38,6 +38,23 @@ async def orchestrate_v5():
 
     macro = data['macro']
     
+    # Calculate mathematically precise levels to prevent hallucinations
+    def get_levels(df_1d):
+        if df_1d is None or df_1d.empty: return "لا تتوفر مستويات دقيقة."
+        last_row = df_1d.iloc[-2] if len(df_1d) > 1 else df_1d.iloc[-1]
+        h, l, c = last_row['High'], last_row['Low'], last_row['Close']
+        pivot = (h + l + c) / 3
+        r1 = (2 * pivot) - l
+        r2 = pivot + (h - l)
+        s1 = (2 * pivot) - h
+        s2 = pivot - (h - l)
+        fib_38 = h - (h - l) * 0.382
+        fib_61 = h - (h - l) * 0.618
+        return f"Pivot: {pivot:.2f}$ | R1: {r1:.2f}$ | R2: {r2:.2f}$ | S1: {s1:.2f}$ | S2: {s2:.2f}$ | Fib38: {fib_38:.2f}$ | Fib61: {fib_61:.2f}$"
+        
+    spot_levels = get_levels(data['spot_dfs'].get('1d'))
+    futures_levels = get_levels(data['futures_dfs'].get('1d'))
+    
     # 2. Build Contexts
     spot_context = f"""
     -- البيانات الاقتصادية --
@@ -50,6 +67,9 @@ async def orchestrate_v5():
     الضخ: {data['spot_whales']['recent_injection_dir']}
     سيولة بيعية: {data['spot_whales']['sell_liquidity_zones']}
     سيولة شرائية: {data['spot_whales']['buy_liquidity_zones']}
+    
+    -- المستويات الرياضية الدقيقة للفوري --
+    {spot_levels}
     
     -- التحليل الفني متعدد الأطر --
     {build_multi_timeframe_context(data['spot_dfs'])}
@@ -66,6 +86,9 @@ async def orchestrate_v5():
     الضخ: {data['futures_whales']['recent_injection_dir']}
     سيولة بيعية: {data['futures_whales']['sell_liquidity_zones']}
     سيولة شرائية: {data['futures_whales']['buy_liquidity_zones']}
+    
+    -- المستويات الرياضية الدقيقة للآجل --
+    {futures_levels}
     
     -- التحليل الفني متعدد الأطر --
     {build_multi_timeframe_context(data['futures_dfs'])}

@@ -27,7 +27,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(na
 logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ياهو المزعجة
 log = logging.getLogger(__name__)
 
-GROQ_API_KEY        = os.environ.get("GROQ_API_KEY", "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")
+_hf_key = os.environ.get("GROQ_API_KEY", "").strip()
+GROQ_API_KEY = _hf_key if _hf_key else "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"
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
 TARGET_CHATS = [-1003775201576]

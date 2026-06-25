@@ -15,7 +15,7 @@ requests
 numpy
 
 # Telethon Bots Dependencies
-telethon==1.36.0
+telethon==1.44.0
 
 # Auto Sheets Bot Dependencies
 google-api-python-client

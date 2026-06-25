@@ -3274,13 +3274,18 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
         async def _generate_all():
             async def wrap(idx, func, data):
-                await asyncio.sleep(idx * 15)  # Stagger by 15 seconds to completely avoid 429 rate limit
+                await asyncio.sleep(idx * 18)  # Stagger by 18 seconds to safely avoid 429 rate limit
                 for attempt in range(3):
                     try:
-                        return await asyncio.to_thread(func, data)
+                        res = await asyncio.to_thread(func, data)
+                        if "تعذر توليد" in str(res) or "⚠️" in str(res):
+                            log.warning(f"Rate limit or failure hit for T{idx}, attempt {attempt+1}/3. Waiting 25s...")
+                            await asyncio.sleep(25)
+                            continue
+                        return res
                     except Exception as e:
                         if "429" in str(e):
-                            log.warning(f"Rate limit hit for T{idx}, waiting 25s...")
+                            log.warning(f"Exception 429 hit for T{idx}, waiting 25s...")
                             await asyncio.sleep(25)
                         else:
                             return f"⚠️ خطأ: {e}"

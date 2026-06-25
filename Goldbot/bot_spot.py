@@ -27,7 +27,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(na
 logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ياهو المزعجة
 log = logging.getLogger(__name__)
 
-GROQ_API_KEY = "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"
+import random
+GROQ_KEYS = [
+    "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",
+    "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",
+    "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"
+]
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN  = "8135586080:AAFS1ZI2XcsPrnjtTvAPlXxlTMrSO_Lu3Qc"
 TARGET_CHATS = [-1003775201576]
@@ -2386,7 +2391,7 @@ def _build_template_1(d: dict) -> str:
     return template
 
 def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is_morning: bool = False) -> str | None:
-    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
         return None
 
@@ -2582,7 +2587,7 @@ def send_to_telegram(message: str, chat_id=None) -> bool:
 
 def _build_template_2(d: dict) -> str:
     """بناء القالب الثاني (مؤشر صحة الاقتصاد الأمريكي) عبر الذكاء الاصطناعي"""
-    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
         return "⚠️ لا يمكن توليد تقرير الاقتصاد الكلي لعدم توفر مفتاح Groq."
 
@@ -2656,7 +2661,7 @@ def _build_template_2(d: dict) -> str:
 
 def _build_template_3(d: dict) -> str:
     """بناء القالب الثالث (تقرير شهية المخاطرة) عبر الذكاء الاصطناعي"""
-    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
         return "⚠️ لا يمكن توليد تقرير المخاطرة لعدم توفر مفتاح Groq."
 
@@ -2768,7 +2773,7 @@ DXY: {dxy_p} ({sign_dx}{dxy_pct}%)
 
 def _build_template_4(d: dict) -> str:
     """بناء القالب الرابع (تقرير عوائد السندات الأمريكية) عبر الذكاء الاصطناعي"""
-    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
         return "⚠️ لا يمكن توليد تقرير عوائد السندات لعدم توفر مفتاح Groq."
 
@@ -2869,7 +2874,7 @@ def _build_template_4(d: dict) -> str:
 
 def _build_template_5(d: dict) -> str:
     """بناء القالب الخامس (تقرير قوة العملات) عبر الذكاء الاصطناعي"""
-    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
         return "⚠️ لا يمكن توليد تقرير قوة العملات لعدم توفر مفتاح Groq."
 
@@ -2938,7 +2943,7 @@ def _build_template_5(d: dict) -> str:
 
 def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: str, t4: str, t5: str) -> str:
     """بناء القالب السادس والأخير (الخلاصة الذكية) عبر الذكاء الاصطناعي"""
-    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
         return "⚠️ لا يمكن توليد تقرير الخلاصة لعدم توفر مفتاح Groq."
 
@@ -3028,7 +3033,7 @@ def _build_combined_summary(
     الخلاصة النهائية المشتركة — تصدر مرة واحدة فقط بعد انتهاء
     كلا البوتين (الآجل والفوري)، وتجمع القرار النهائي من السوقين.
     """
-    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
         return "⚠️ لا يمكن توليد الخلاصة المشتركة لعدم توفر مفتاح Groq."
 
@@ -3108,7 +3113,7 @@ def _build_combined_summary(
 
 def _build_template_0(d: dict) -> str:
     """بناء القالب التمهيدي 0 (الصفقات المتقدمة والاتجاهات) عبر الذكاء الاصطناعي"""
-    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
         return "⚠️ لا يمكن توليد تقرير الصفقات المتقدمة لعدم توفر مفتاح Groq."
 

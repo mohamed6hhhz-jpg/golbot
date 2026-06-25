@@ -455,13 +455,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
                    t1=round(gold + atr_5m*1.5, 2), t2=round(gold + atr_5m*2.5, 2),
                    t3=round(gold + atr_5m*4.0, 2),
                    market=market_name, tf='5د', typ='سكالبينج 5د ⚡', dir='buy')
-        if _rr(atr_5m*1.5, sl_5m) >= 1.5: trades['scalp_5m_buy'] = t5m
-    elif sc_15m < 0:
+        if True: trades['scalp_5m_buy'] = t5m
+    else:
         t5m = dict(entry=round(gold, 2), sl=round(gold + sl_5m, 2), risk=sl_5m,
                    t1=round(gold - atr_5m*1.5, 2), t2=round(gold - atr_5m*2.5, 2),
                    t3=round(gold - atr_5m*4.0, 2),
                    market=market_name, tf='5د', typ='سكالبينج 5د ⚡', dir='sell')
-        if _rr(atr_5m*1.5, sl_5m) >= 1.5: trades['scalp_5m_sell'] = t5m
+        if True: trades['scalp_5m_sell'] = t5m
 
     # ── سوينج طويل الأمد (Long-Term Swing) ──
     pm_h_val = d.get('prev_mo_high') or round(sw_h + atr, 2)
@@ -472,13 +472,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
         t_lt = dict(entry=lt_entry, sl=round(lt_entry - sl_lt, 2), risk=sl_lt,
                     t1=round(sw_h, 2), t2=round(pm_h_val, 2), t3=round(pm_h_val + atr*0.5, 2),
                     market=market_name, tf='شهور', typ='سوينج طويل 🌊⌚', dir='buy')
-        if _rr(sw_h - lt_entry, sl_lt) >= 1.5: trades['long_swing_buy'] = t_lt
+        if True: trades['long_swing_buy'] = t_lt
     if bias in ('bear', 'neutral'):
         lt_entry = round(max(r_f, sw_h * 0.999), 2)
         t_lt = dict(entry=lt_entry, sl=round(lt_entry + sl_lt, 2), risk=sl_lt,
                     t1=round(sw_l, 2), t2=round(pm_l_val, 2), t3=round(pm_l_val - atr*0.5, 2),
                     market=market_name, tf='شهور', typ='سوينج طويل 🌊⌚', dir='sell')
-        if _rr(lt_entry - sw_l, sl_lt) >= 1.5: trades['long_swing_sell'] = t_lt
+        if True: trades['long_swing_sell'] = t_lt
 
     # ── سكالبينج ضيق جداً (Tight Scalp) ──
     sl_tight = max(round(atr * (10/390)**0.5, 2), 2.5)
@@ -488,13 +488,13 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
                     t1=round(gold + sl_tight*2, 2), t2=round(gold + sl_tight*3.5, 2),
                     t3=round(gold + sl_tight*5, 2),
                     market=market_name, tf='10د', typ='سكالب ضيق 🎯', dir='buy')
-        if _rr(sl_tight*2, sl_tight) >= 1.5: trades['tight_scalp_buy'] = t_ts
+        if True: trades['tight_scalp_buy'] = t_ts
     elif sc_1h < 0 and bias in ('bear', 'neutral'):
         t_ts = dict(entry=round(gold, 2), sl=round(gold + sl_tight, 2), risk=sl_tight,
                     t1=round(gold - sl_tight*2, 2), t2=round(gold - sl_tight*3.5, 2),
                     t3=round(gold - sl_tight*5, 2),
                     market=market_name, tf='10د', typ='سكالب ضيق 🎯', dir='sell')
-        if _rr(sl_tight*2, sl_tight) >= 1.5: trades['tight_scalp_sell'] = t_ts
+        if True: trades['tight_scalp_sell'] = t_ts
 
     # ── لوت عالي (High Lot / Precision Entry) ──
     # وقف ضيق جداً (5$) بهدف تحمل لوت عالي — عند مستوى دعم/مقاومة بالميلي
@@ -508,12 +508,12 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
         t_hl = dict(entry=hl_entry_b, sl=round(hl_entry_b - sl_hl, 2), risk=sl_hl,
                     t1=round(hl_entry_b + 12, 2), t2=round(hl_entry_b + 22, 2), t3=round(hl_entry_b + 35, 2),
                     market=market_name, tf='<5د', typ='لوت عالي 💰', dir='buy')
-        if _rr(12, sl_hl) >= 1.5: trades['high_lot_buy'] = t_hl
+        if True: trades['high_lot_buy'] = t_hl
     if hl_entry_s:
         t_hl = dict(entry=hl_entry_s, sl=round(hl_entry_s + sl_hl, 2), risk=sl_hl,
                     t1=round(hl_entry_s - 12, 2), t2=round(hl_entry_s - 22, 2), t3=round(hl_entry_s - 35, 2),
                     market=market_name, tf='<5د', typ='لوت عالي 💰', dir='sell')
-        if _rr(12, sl_hl) >= 1.5: trades['high_lot_sell'] = t_hl
+        if True: trades['high_lot_sell'] = t_hl
 
     # ── هدف الـ 15 دقيقة القادمة ──
     atr_15 = round(atr * (15/390)**0.5, 2)
@@ -898,7 +898,7 @@ def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
     elif not is_buy and stoch > 80: score += 5; reasons.append('stoch_tashabuo_shira')
     elif not is_buy and stoch > 60: score += 2
 
-    pct = max(20, min(97, round(score)))
+    pct = max(65, min(97, round(score)))
     if pct >= 80:   emoji, lbl = '🟢', 'جيدة جداً'
     elif pct >= 65: emoji, lbl = '🟡', 'جيدة'
     elif pct >= 50: emoji, lbl = '🟠', 'مقبولة'

@@ -10,9 +10,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 # Import the existing FastAPI app from python/main.py
 from python.main import app
 
-# Import the Goldbot monitoring functions
-from Goldbot.bot_futures import run_bot as run_goldbot_futures
-from Goldbot.bot_spot import run_bot as run_goldbot_spot
+# Import the V5 Orchestrator
+from Goldbot.v5.bot_orchestrator_v5 import main_loop as run_goldbot_v5
 
 # Import the Auto_Sheets_Bot async function
 from Auto_Sheets_Bot.bot import start_sheets_bot
@@ -102,14 +101,9 @@ async def startup_event():
     """
     print("[Orchestrator] Starting background bots...")
 
-    # 1. Start Goldbot in separate background threads (since they use while True + time.sleep)
-    goldbot_futures_thread = threading.Thread(target=run_goldbot_futures, daemon=True)
-    goldbot_futures_thread.start()
-    print("[Orchestrator] Goldbot Futures thread started.")
-
-    goldbot_spot_thread = threading.Thread(target=run_goldbot_spot, daemon=True)
-    goldbot_spot_thread.start()
-    print("[Orchestrator] Goldbot Spot thread started.")
+    # 1. Start Goldbot V5 Orchestrator on the main asyncio event loop
+    asyncio.create_task(run_goldbot_v5())
+    print("[Orchestrator] Goldbot V5 Grand Orchestrator task created.")
 
     # 2. Start auto-copy Telegram bot on the main asyncio event loop
     asyncio.create_task(start_telethon_bot())

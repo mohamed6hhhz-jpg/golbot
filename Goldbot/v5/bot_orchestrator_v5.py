@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-import time
+from datetime import datetime
 
 from Goldbot.v5.config import TARGET_CHATS_SPOT, TARGET_CHATS_FUTURES
 from Goldbot.v5.data_fetcher import fetch_all_data_v5
@@ -14,6 +14,47 @@ log = logging.getLogger(__name__)
 
 # Semaphores to prevent Groq API rate limits when generating 20+ reports
 concurrent_requests = asyncio.Semaphore(2)
+
+def build_data_template_v5(data: dict, is_spot: bool) -> str:
+    market_full = "الفوري - Spot" if is_spot else "الآجل - Futures"
+    price = data.get('spot_price' if is_spot else 'futures_price', 0.0)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M القاهرة")
+    
+    macro = data.get('macro', {})
+    whales = data.get('spot_whales' if is_spot else 'futures_whales', {})
+    
+    # Calculate some safe defaults
+    dxy = macro.get('dxy', 0.0)
+    y10 = macro.get('yield_10y', 0.0)
+    y30 = macro.get('yield_30y', 0.0)
+    
+    inj = whales.get('recent_injection_dir', 'غير محدد')
+    
+    if "صاعد" in inj or "شراء" in inj: liquidity = "🟢 سيولة شرائية تدعم الصعود"
+    elif "هابط" in inj or "بيع" in inj: liquidity = "🔴 سيولة بيعية تضغط للهبوط"
+    else: liquidity = "⚪ سيولة متوازنة"
+
+    return f"""👑 التقرير الكمي الشامل للذهب ({market_full})
+👑 الأسعار والأسواق والاتجاه ({market_full})
+
+👑 📊 التقرير الكمي الشامل للذهب
+🕐 {now_str}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 السعر الحالي
+   سوق {market_full} : {price:,.2f}$  
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 ملخص السوق
+   السيولة (الحيتان) : {liquidity}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📡 الأسواق والاقتصاد
+   مؤشر الدولار (DXY): {dxy:.1f}
+   عائد السندات 10Y: {y10:.2f}%
+   عائد السندات 30Y: {y30:.2f}%
+   العائد الحقيقي: {macro.get('real_yield', 0.0):.2f}%
+"""
 
 async def generate_section_async(sec_id: str, sec_title: str, context: str, is_spot: bool):
     async with concurrent_requests:
@@ -138,15 +179,15 @@ async def orchestrate_v5():
     
     # Build Lists
     spot_reports_list = []
-    spot_data_str = f"السعر الحالي: {data['spot_price']}$\nالسيولة: {data['spot_whales']['recent_injection_dir']}"
-    spot_reports_list.append(f"[1/11] 👑 التقرير الكمي والبيانات\n\n{spot_data_str}")
+    spot_data_str = build_data_template_v5(data, True)
+    spot_reports_list.append(f"[1/11]\n{spot_data_str}")
     for index, (t, r) in enumerate(spot_results):
         spot_reports_list.append(f"[{index+2}/11] 👑 {t}\n\n{r}")
     spot_reports_list.append(f"[11/11] 🎯 الخلاصة النهائية\n\n{grand_conclusion[1]}")
     
     futures_reports_list = []
-    futures_data_str = f"السعر الحالي: {data['futures_price']}$\nالسيولة: {data['futures_whales']['recent_injection_dir']}"
-    futures_reports_list.append(f"[1/11] 👑 التقرير الكمي والبيانات\n\n{futures_data_str}")
+    futures_data_str = build_data_template_v5(data, False)
+    futures_reports_list.append(f"[1/11]\n{futures_data_str}")
     for index, (t, r) in enumerate(futures_results):
         futures_reports_list.append(f"[{index+2}/11] 👑 {t}\n\n{r}")
     futures_reports_list.append(f"[11/11] 🎯 الخلاصة النهائية\n\n{grand_conclusion[1]}")

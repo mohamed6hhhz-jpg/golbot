@@ -11,13 +11,9 @@ SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
 async def publish_report_to_telegram(report_text: str, target_chats: list):
     log.info(f"📱 محاولة الاتصال بتيليجرام لنشر التقرير إلى {target_chats}...")
     
-    # We will use the existing session file if StringSession is empty
-    if SESSION_STRING:
-        from telethon.sessions import StringSession
-        client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-    else:
-        # Fallback to local file session which works for the existing V4 bot
-        client = TelegramClient("c:\\Users\\lenovo\\Desktop\\alltoools\\Goldbot\\goldbot_bot_session", API_ID, API_HASH)
+    # Always use the local file session since StringSession threw AuthKeyDuplicatedError
+    session_path = "Goldbot/goldbot_bot_session"
+    client = TelegramClient(session_path, API_ID, API_HASH)
         
     await client.connect()
     if not await client.is_user_authorized():

@@ -32,27 +32,37 @@ def generate_ai_section(section_name: str, title: str, context_str: str, is_spot
 
     for model_name in GROQ_MODELS:
         try:
-            log.info(f"🤖 [{model_name}] جاري توليد {title}...")
-            resp = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                model=model_name,
-                temperature=0.3,
-                max_tokens=2048,
-            )
-            content = resp.choices[0].message.content
-            # Quick sanity check for crossover
-            if is_spot and "آجل" in content:
-                content = content.replace("آجل", "[فوري]") # Force correction if hallucinated
-            elif not is_spot and "فوري" in content:
-                content = content.replace("فوري", "[آجل]")
+            for attempt in range(3):
+                try:
+                    log.info(f"🤖 [{model_name}] جاري توليد {title}...")
+                    resp = client.chat.completions.create(
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        model=model_name,
+                        temperature=0.3,
+                        max_tokens=2048,
+                    )
+                    content = resp.choices[0].message.content
+                    # Quick sanity check for crossover
+                    if is_spot and "آجل" in content:
+                        content = content.replace("آجل", "[فوري]") # Force correction if hallucinated
+                    elif not is_spot and "فوري" in content:
+                        content = content.replace("فوري", "[آجل]")
 
-            return content.strip()
+                    return content.strip()
+                except Exception as e:
+                    err_str = str(e).lower()
+                    if 'rate limit' in err_str or '429' in err_str:
+                        log.warning(f"⏳ [{model_name}] Rate Limit! الانتظار 25 ثانية ثم إعادة المحاولة...")
+                        time.sleep(25)
+                        continue
+                    else:
+                        log.warning(f"⚠️ [{model_name}] فشل توليد {title}: {e}")
+                        time.sleep(2)
+                        break # Break out of attempt loop to try next model
         except Exception as e:
-            log.warning(f"⚠️ [{model_name}] فشل توليد {title}: {e}")
-            time.sleep(5)
-            continue
+            pass
             
     return f"⚠️ جميع النماذج فشلت في توليد {title}"

@@ -59,9 +59,12 @@ async def orchestrate_v5():
     spot_context = f"""
     -- البيانات الاقتصادية --
     السعر الفوري الحالي: {data['spot_price']}$
-    العائد الحقيقي: {macro['real_yield']}%
-    عائد 30 سنة: {macro['yield_30y']}%
-    مؤشر الدولار: {macro['dxy']}
+    التضخم السنوي: {macro.get('inflation_annual', 2.5)}%
+    الفائدة الفيدرالية: {macro.get('fed_funds_rate', 5.25)}%
+    عائد 10 سنوات: {macro.get('yield_10y', 4.2)}%
+    عائد 30 سنة: {macro.get('yield_30y', 4.5)}%
+    العائد الحقيقي: {macro.get('real_yield', 2.75)}%
+    مؤشر الدولار: {macro.get('dxy', 104.5)}
     
     -- سيولة الحيتان (الفوري) --
     الضخ: {data['spot_whales']['recent_injection_dir']}
@@ -78,9 +81,12 @@ async def orchestrate_v5():
     futures_context = f"""
     -- البيانات الاقتصادية --
     سعر الآجل الحالي: {data['futures_price']}$
-    العائد الحقيقي: {macro['real_yield']}%
-    عائد 30 سنة: {macro['yield_30y']}%
-    مؤشر الدولار: {macro['dxy']}
+    التضخم السنوي: {macro.get('inflation_annual', 2.5)}%
+    الفائدة الفيدرالية: {macro.get('fed_funds_rate', 5.25)}%
+    عائد 10 سنوات: {macro.get('yield_10y', 4.2)}%
+    عائد 30 سنة: {macro.get('yield_30y', 4.5)}%
+    العائد الحقيقي: {macro.get('real_yield', 2.75)}%
+    مؤشر الدولار: {macro.get('dxy', 104.5)}
     
     -- سيولة الحيتان (الآجل) --
     الضخ: {data['futures_whales']['recent_injection_dir']}

@@ -35,7 +35,7 @@ GROQ_KEYS = [
 ]
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN  = "8135586080:AAFS1ZI2XcsPrnjtTvAPlXxlTMrSO_Lu3Qc"
-TARGET_CHATS = [-1003775201576]
+TARGET_CHATS = ["@spotGol"]
 LAST_PUBLIC_REPORT_TIME = 0
 
 API_ID   = 34105911
@@ -445,12 +445,12 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     sl_rev  = round(atr * 0.28, 2)
     if rsi <= 50:
         t = dict(entry=round(gold, 2), sl=round(gold - sl_rev, 2), risk=sl_rev,
-                 t1=round(pivot, 2), t2=r_n, t3=r_f,
+                 t1=round(gold + atr*0.4, 2), t2=round(gold + atr*0.8, 2), t3=round(gold + atr*1.5, 2),
                  market=market_name, tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
         trades['rev_buy'] = t
     else:
         t = dict(entry=round(gold, 2), sl=round(gold + sl_rev, 2), risk=sl_rev,
-                 t1=round(pivot, 2), t2=s_n, t3=s_f,
+                 t1=round(gold - atr*0.4, 2), t2=round(gold - atr*0.8, 2), t3=round(gold - atr*1.5, 2),
                  market=market_name, tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
         trades['rev_sell'] = t
     # ── صفقة كل 5 دقائق (5min scalp) ──
@@ -3361,52 +3361,52 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         # ══════════════════════════════════════════════════════
         #  الخلاصة النهائية المشتركة — تأتي هنا بعد كل الرسائل
         # ══════════════════════════════════════════════════════
-        log.info("🏆 [Combined] توليد الخلاصة النهائية المشتركة (آجل + فوري)...")
-        try:
-            fc = _futures_cache  # بيانات الآجل المحفوظة
-            # لو بيانات الآجل مش موجودة، ننتظر حتى 15 دقيقة ريحة 30 ثانية
-            if not fc or not fc.get("t1"):
-                log.info("⏳ [Combined] Futures لم ينتهِ بعد — ننتظر حتى 15 دقيقة...")
-                for _ in range(30):  # 30 × 30 ثانية = 15 دقيقة
-                    time.sleep(30)
-                    fc = _futures_cache
-                    if fc and fc.get("t1"):
-                        log.info("✅ [Combined] بيانات الآجل وصلت — نبني الخلاصة الآن.")
-                        break
-                else:
-                    log.warning("⚠️ [Combined] انتهى وقت الانتظار — الخلاصة مؤجلة.")
-            if fc and fc.get("t1"):
-                # احسب الاتجاه المشترك من البوتين بشكل آلي
-                spot_score  = data.get('tf_daily', {}).get('score', 0)
-                fut_score   = fc.get('score', spot_score)  # بيانات الآجل
-                avg_score   = (spot_score + fut_score) / 2
-                bull_pct = max(0, min(100, round(50 + avg_score * 12)))
-                bear_pct = 100 - bull_pct
-
-                combined = _build_combined_summary(
-                    spot_data=data,
-                    futures_report=fc.get("report_text", ""),
-                    spot_report=report_text,
-                    futures_t1=fc.get("t1", ""),
-                    futures_t2=fc.get("t2", ""),
-                    spot_t1=t1,
-                    spot_t2=t2,
-                    futures_t0=fc.get("t0", ""),
-                    spot_t0=t0,
-                    bull_pct=bull_pct,
-                    bear_pct=bear_pct,
-                )
-                if combined:
-                    summary_msg = (
-                        "🏆 الخلاصة النهائية الشاملة | آجل + فوري\n"
-                        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                        + combined
-                    )
-                    ok = _send_single(summary_msg, is_public, None)
-                    log.info("✅ [Combined] تم إرسال الخلاصة المشتركة." if ok else "❌ [Combined] فشل إرسال الخلاصة المشتركة.")
-        except Exception as e:
-            log.error(f"❌ [Combined] خطأ في الخلاصة المشتركة: {e}")
-
+#         log.info("🏆 [Combined] توليد الخلاصة النهائية المشتركة (آجل + فوري)...")
+#         try:
+#             fc = _futures_cache  # بيانات الآجل المحفوظة
+#             # لو بيانات الآجل مش موجودة، ننتظر حتى 15 دقيقة ريحة 30 ثانية
+#             if not fc or not fc.get("t1"):
+#                 log.info("⏳ [Combined] Futures لم ينتهِ بعد — ننتظر حتى 15 دقيقة...")
+#                 for _ in range(30):  # 30 × 30 ثانية = 15 دقيقة
+#                     time.sleep(30)
+#                     fc = _futures_cache
+#                     if fc and fc.get("t1"):
+#                         log.info("✅ [Combined] بيانات الآجل وصلت — نبني الخلاصة الآن.")
+#                         break
+#                 else:
+#                     log.warning("⚠️ [Combined] انتهى وقت الانتظار — الخلاصة مؤجلة.")
+#             if fc and fc.get("t1"):
+#                 # احسب الاتجاه المشترك من البوتين بشكل آلي
+#                 spot_score  = data.get('tf_daily', {}).get('score', 0)
+#                 fut_score   = fc.get('score', spot_score)  # بيانات الآجل
+#                 avg_score   = (spot_score + fut_score) / 2
+#                 bull_pct = max(0, min(100, round(50 + avg_score * 12)))
+#                 bear_pct = 100 - bull_pct
+# 
+#                 combined = _build_combined_summary(
+#                     spot_data=data,
+#                     futures_report=fc.get("report_text", ""),
+#                     spot_report=report_text,
+#                     futures_t1=fc.get("t1", ""),
+#                     futures_t2=fc.get("t2", ""),
+#                     spot_t1=t1,
+#                     spot_t2=t2,
+#                     futures_t0=fc.get("t0", ""),
+#                     spot_t0=t0,
+#                     bull_pct=bull_pct,
+#                     bear_pct=bear_pct,
+#                 )
+#                 if combined:
+#                     summary_msg = (
+#                         "🏆 الخلاصة النهائية الشاملة | آجل + فوري\n"
+#                         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+#                         + combined
+#                     )
+#                     ok = _send_single(summary_msg, is_public, None)
+#                     log.info("✅ [Combined] تم إرسال الخلاصة المشتركة." if ok else "❌ [Combined] فشل إرسال الخلاصة المشتركة.")
+#         except Exception as e:
+#             log.error(f"❌ [Combined] خطأ في الخلاصة المشتركة: {e}")
+# 
 
         log.info("🔓 [Spot] أطلق القفل — انتهى الدورة الكاملة.")
 

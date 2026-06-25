@@ -443,12 +443,12 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     sl_rev  = round(atr * 0.28, 2)
     if rsi <= 50:
         t = dict(entry=round(gold, 2), sl=round(gold - sl_rev, 2), risk=sl_rev,
-                 t1=round(pivot, 2), t2=r_n, t3=r_f,
+                 t1=round(gold + atr*0.4, 2), t2=round(gold + atr*0.8, 2), t3=round(gold + atr*1.5, 2),
                  market=market_name, tf='1-4س', typ='زيرو انعكاس 🔄', dir='buy')
         trades['rev_buy'] = t
     else:
         t = dict(entry=round(gold, 2), sl=round(gold + sl_rev, 2), risk=sl_rev,
-                 t1=round(pivot, 2), t2=s_n, t3=s_f,
+                 t1=round(gold - atr*0.4, 2), t2=round(gold - atr*0.8, 2), t3=round(gold - atr*1.5, 2),
                  market=market_name, tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
         trades['rev_sell'] = t
     # ── صفقة كل 5 دقائق (5min scalp) ──

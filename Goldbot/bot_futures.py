@@ -3182,13 +3182,26 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         async def _gen_t5(): return _build_template_5(data)
 
         async def _generate_all():
+            async def wrap(idx, func, data):
+                await asyncio.sleep(idx * 15)  # Stagger by 15 seconds to completely avoid 429 rate limit
+                for attempt in range(3):
+                    try:
+                        return await asyncio.to_thread(func, data)
+                    except Exception as e:
+                        if "429" in str(e):
+                            log.warning(f"Rate limit hit for T{idx}, waiting 25s...")
+                            await asyncio.sleep(25)
+                        else:
+                            return f"⚠️ خطأ: {e}"
+                return "⚠️ تعذر توليد التقرير بسبب الضغط على السيرفر."
+
             return await asyncio.gather(
-                asyncio.to_thread(_build_template_0, data),
-                asyncio.to_thread(_build_template_1, data),
-                asyncio.to_thread(_build_template_2, data),
-                asyncio.to_thread(_build_template_3, data),
-                asyncio.to_thread(_build_template_4, data),
-                asyncio.to_thread(_build_template_5, data),
+                wrap(0, _build_template_0, data),
+                wrap(1, _build_template_1, data),
+                wrap(2, _build_template_2, data),
+                wrap(3, _build_template_3, data),
+                wrap(4, _build_template_4, data),
+                wrap(5, _build_template_5, data),
                 return_exceptions=True
             )
 

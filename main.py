@@ -91,6 +91,20 @@ async def test_gold(secret: str = ""):
     result = await loop.run_in_executor(None, _run)
     return result
 
+@app.get("/trigger_v5")
+async def trigger_v5(secret: str = ""):
+    if secret != "gold2026vip":
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid secret key")
+    
+    from Goldbot.v5.bot_orchestrator_v5 import orchestrate_v5
+    # Run in background so it doesn't block the HTTP request timeout
+    asyncio.create_task(orchestrate_v5())
+    
+    return {
+        "status": "success", 
+        "message": "🚀 تم إعطاء الأمر لمحرك الجيل الخامس V5 بالبدء فوراً! ستصلك التقارير على قنوات التيليجرام خلال دقائق."
+    }
+
 
 
 @app.on_event("startup")

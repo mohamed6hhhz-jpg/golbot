@@ -171,8 +171,8 @@ async def main_loop():
         except Exception as e:
             log.error(f"❌ خطأ فادح في دورة التشغيل: {e}")
         
-        log.info("⏳ انتظار 4 ساعات للدورة القادمة...")
-        await asyncio.sleep(4 * 3600)
+        log.info("⏳ انتظار ساعة واحدة للدورة القادمة...")
+        await asyncio.sleep(1 * 3600)
 
 if __name__ == "__main__":
     asyncio.run(main_loop())

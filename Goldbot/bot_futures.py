@@ -3156,6 +3156,58 @@ def _split_fixed_report(report_text: str, mode_label: str) -> list:
     return result
 
 
+
+def _build_summary_template(d: dict, report_text: str, mode_label: str) -> str:
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client: return ""
+    prompt = f"""أنت المحلل المالي الأكبر. بناءً على التقرير التالي، قم باستخراج خلاصة محورية دقيقة.
+التقرير:
+{report_text}
+
+استخرج ونسق البيانات بنفس هذا القالب بالضبط:
+
+الخلاصة المحورية
+
+🎯 خلاصة انحياز الذهب | {mode_label} | التحديث المباشر
+
+📈 نسبة الصعود: [استخرج النسبة]%
+📉 نسبة الهبوط: [استخرج النسبة]%
+
+🧭 الخلاصة:
+[فقرة قصيرة جداً من سطرين تلخص وضع السوق والـ RSI والسيولة والقرار المناسب كما جاء في التقرير]
+
+📍 نقطة الفصل اليومية (Pivot):
+[السعر]$ [تعليق قصير من التقرير]
+
+📌 مستويات التداول الحالية:
+🟢 مستويات الشراء {mode_label}: S1=[السعر]$ | S2=[السعر]$ | أقرب فيبو=[السعر]$
+🔴 مستويات البيع {mode_label}: R1=[السعر]$ | R2=[السعر]$ | أقرب فيبو=[السعر]$
+
+✅ أقوى صفقة شراء {mode_label}:
+دخول: [السعر]$ | وقف: [السعر]$ | T1: [السعر]$ | T2: [السعر]$ | T3: [السعر]$
+   الثقة: [الثقة]% [التقييم] | السبب: [السبب]
+
+✅ أقوى صفقة بيع {mode_label}:
+دخول: [السعر]$ | وقف: [السعر]$ | T1: [السعر]$ | T2: [السعر]$ | T3: [السعر]$
+   الثقة: [الثقة]% [التقييم] | السبب: [السبب]
+
+تنبيه هام: التزم بهذا الهيكل بحذافيره دون زيادة أو نقصان. استخرج جميع الأرقام من التقرير المرفق."""
+    
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 جاري توليد الخلاصة المحورية (القالب 6) عبر {model_name}...")
+            resp = client.chat.completions.create(
+                messages=[{"role": "system", "content": "أنت المحلل المالي. اصدر الخلاصة المطلوبة بالقالب الحرفي."}, {"role": "user", "content": prompt}],
+                model=model_name, temperature=0.2, max_tokens=800
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f"⚠️ [{model_name}] فشل في توليد الخلاصة: {e}")
+            import time
+            time.sleep(5)
+            continue
+    return ""
+
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache
 
@@ -3178,11 +3230,11 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         async def _gen_t5(): return _build_template_5(data)
 
         async def _generate_all():
-            async def wrap(idx, func, data):
+            async def wrap(idx, func, *args):
                 await asyncio.sleep(idx * 18)  # Stagger by 18 seconds to safely avoid 429 rate limit
                 for attempt in range(3):
                     try:
-                        res = await asyncio.to_thread(func, data)
+                        res = await asyncio.to_thread(func, *args)
                         if "تعذر توليد" in str(res) or "⚠️" in str(res):
                             log.warning(f"Rate limit or failure hit for T{idx}, attempt {attempt+1}/3. Waiting 25s...")
                             await asyncio.sleep(25)
@@ -3203,6 +3255,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 wrap(3, _build_template_3, data),
                 wrap(4, _build_template_4, data),
                 wrap(5, _build_template_5, data),
+                wrap(6, _build_summary_template, data, report_text, "الآجل"),
                 return_exceptions=True
             )
 
@@ -3216,7 +3269,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 log.error(f"Error T{i}: {res}")
                 results[i] = ""
                 
-        t0, t1, t2, t3, t4, t5 = results
+        t0, t1, t2, t3, t4, t5, t6 = results
 
         if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الآجل)", t0, None))
         if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الآجل)", t1, None))
@@ -3224,6 +3277,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الآجل)", t3, None))
         if t4: raw_reports.append(("📈 تقرير عوائد السندات (الآجل)", t4, None))
         if t5: raw_reports.append(("💱 تقرير قوة العملات (الآجل)", t5, None))
+        if t6: raw_reports.append(("الخلاصة المحورية", t6, None))
 
         # ── لا خلاصة هنا — ستأتي مشتركة بعد انتهاء الفوري ──
 

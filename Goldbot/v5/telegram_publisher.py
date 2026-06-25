@@ -8,10 +8,9 @@ API_ID = 34105911
 API_HASH = 'b444ab6b4eeba8a66db4143b934dc540'
 SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
 
-async def publish_report_to_telegram(report_text: str, target_chats: list):
+async def publish_report_to_telegram(reports_list: list, target_chats: list):
     log.info(f"📱 محاولة الاتصال بتيليجرام لنشر التقرير إلى {target_chats}...")
     
-    # Always use the local file session since StringSession threw AuthKeyDuplicatedError
     session_path = "Goldbot/goldbot_bot_session"
     client = TelegramClient(session_path, API_ID, API_HASH)
         
@@ -22,24 +21,26 @@ async def publish_report_to_telegram(report_text: str, target_chats: list):
 
     log.info("✅ تم الاتصال بنجاح. جاري النشر للقنوات...")
     
-    # Split message if it exceeds Telegram's 4096 character limit
-    parts = []
-    while len(report_text) > 4000:
-        split_idx = report_text.rfind('\n', 0, 4000)
-        if split_idx == -1: split_idx = 4000
-        parts.append(report_text[:split_idx])
-        report_text = report_text[split_idx:]
-    if report_text:
-        parts.append(report_text)
-        
     for chat in target_chats:
         try:
-            for i, part in enumerate(parts):
-                msg = part
-                if len(parts) > 1:
-                    msg = f"📄 الجزء {i+1}/{len(parts)}\n" + msg
-                await client.send_message(chat, msg)
-            log.info(f"✅ تم إرسال التقرير إلى {chat}")
+            for index, report_text in enumerate(reports_list):
+                if not report_text.strip():
+                    continue
+                # Split if a single template somehow exceeds 4000
+                parts = []
+                temp_text = report_text
+                while len(temp_text) > 4000:
+                    split_idx = temp_text.rfind('\n', 0, 4000)
+                    if split_idx == -1: split_idx = 4000
+                    parts.append(temp_text[:split_idx])
+                    temp_text = temp_text[split_idx:]
+                if temp_text:
+                    parts.append(temp_text)
+                    
+                for msg in parts:
+                    await client.send_message(chat, msg)
+                    await asyncio.sleep(1) # Sleep slightly between messages to avoid flood
+            log.info(f"✅ تم إرسال {len(reports_list)} قوالب بنجاح إلى {chat}")
         except Exception as e:
             log.error(f"❌ فشل إرسال التقرير إلى {chat}: {e}")
             

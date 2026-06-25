@@ -136,33 +136,30 @@ async def orchestrate_v5():
     
     grand_conclusion = await generate_section_async("final_conclusion", "الخلاصة المركزية", grand_context, True)
     
-    # 6. Build and Publish Separate Reports
-    spot_full_report = "="*50 + "\n🔥 تقارير الفوري 🔥\n" + "="*50 + "\n"
-    for t, r in spot_results:
-        spot_full_report += f"\n[{t}]\n{r}\n"
-    spot_full_report += "\n" + "="*50 + "\n🎯 الخلاصة النهائية 🎯\n" + "="*50 + "\n"
-    spot_full_report += grand_conclusion[1]
-        
-    futures_full_report = "="*50 + "\n🔥 تقارير الآجل 🔥\n" + "="*50 + "\n"
-    for t, r in futures_results:
-        futures_full_report += f"\n[{t}]\n{r}\n"
-    futures_full_report += "\n" + "="*50 + "\n🎯 الخلاصة النهائية 🎯\n" + "="*50 + "\n"
-    futures_full_report += grand_conclusion[1]
-
-    with open("V5_GRAND_REPORT_SPOT.txt", "w", encoding="utf-8") as f:
-        f.write(spot_full_report)
-    with open("V5_GRAND_REPORT_FUTURES.txt", "w", encoding="utf-8") as f:
-        f.write(futures_full_report)
+    # Build Lists
+    spot_reports_list = []
+    spot_data_str = f"السعر الحالي: {data['spot_price']}$\nالسيولة: {data['spot_whales']['recent_injection_dir']}"
+    spot_reports_list.append(f"[1/11] 👑 التقرير الكمي والبيانات\n\n{spot_data_str}")
+    for index, (t, r) in enumerate(spot_results):
+        spot_reports_list.append(f"[{index+2}/11] 👑 {t}\n\n{r}")
+    spot_reports_list.append(f"[11/11] 🎯 الخلاصة النهائية\n\n{grand_conclusion[1]}")
+    
+    futures_reports_list = []
+    futures_data_str = f"السعر الحالي: {data['futures_price']}$\nالسيولة: {data['futures_whales']['recent_injection_dir']}"
+    futures_reports_list.append(f"[1/11] 👑 التقرير الكمي والبيانات\n\n{futures_data_str}")
+    for index, (t, r) in enumerate(futures_results):
+        futures_reports_list.append(f"[{index+2}/11] 👑 {t}\n\n{r}")
+    futures_reports_list.append(f"[11/11] 🎯 الخلاصة النهائية\n\n{grand_conclusion[1]}")
 
     log.info("✅ اكتمل توليد الجيل الخامس! جاري النشر لتيليجرام...")
     
     # Send Spot Report
     if TARGET_CHATS_SPOT:
-        await publish_report_to_telegram(spot_full_report, TARGET_CHATS_SPOT)
+        await publish_report_to_telegram(spot_reports_list, TARGET_CHATS_SPOT)
         
     # Send Futures Report
     if TARGET_CHATS_FUTURES:
-        await publish_report_to_telegram(futures_full_report, TARGET_CHATS_FUTURES)
+        await publish_report_to_telegram(futures_reports_list, TARGET_CHATS_FUTURES)
 
 async def main_loop():
     while True:

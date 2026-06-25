@@ -3206,7 +3206,7 @@ def _build_summary_template(d: dict, report_text: str, mode_label: str) -> str:
             import time
             time.sleep(5)
             continue
-    return ""
+    return "⚠️ تعذر توليد الخلاصة"
 
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache

@@ -115,8 +115,18 @@ async def test_tg(secret: str = ""):
         client = TelegramClient(session_path, 34105911, 'b444ab6b4eeba8a66db4143b934dc540')
         await client.connect()
         auth = await client.is_user_authorized()
+        
+        sent = False
+        error_msg = ""
+        if auth:
+            try:
+                await client.send_message('@spotGol', 'TEST MESSAGE FROM HUGGINGFACE 🚀')
+                sent = True
+            except Exception as e:
+                error_msg = str(e)
+                
         await client.disconnect()
-        return {"status": "ok", "authorized": auth, "session": session_path}
+        return {"status": "ok", "authorized": auth, "sent": sent, "error_msg": error_msg}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

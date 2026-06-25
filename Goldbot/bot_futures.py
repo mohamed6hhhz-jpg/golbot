@@ -3171,37 +3171,45 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         for label, part in _split_fixed_report(report_text, "الآجل - Futures"):
             raw_reports.append((label, part, None))
 
-        # ── القوالب الذكية T0-T5 (كاملة بلا اختصار) ──
+        # ── القوالب الذكية T0-T5 (بالتوازي لتوفير الوقت) ──
         t0, t1, t2, t3, t4, t5 = "", "", "", "", "", ""
-        try:
-            t0 = _build_template_0(data)
-            if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الآجل)", t0, None))
-        except Exception as e: log.error(f"Error T0: {e}")
+        
+        async def _gen_t0(): return _build_template_0(data)
+        async def _gen_t1(): return _build_template_1(data)
+        async def _gen_t2(): return _build_template_2(data)
+        async def _gen_t3(): return _build_template_3(data)
+        async def _gen_t4(): return _build_template_4(data)
+        async def _gen_t5(): return _build_template_5(data)
 
-        try:
-            t1 = _build_template_1(data)
-            if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الآجل)", t1, None))
-        except Exception as e: log.error(f"Error T1: {e}")
+        async def _generate_all():
+            return await asyncio.gather(
+                asyncio.to_thread(_build_template_0, data),
+                asyncio.to_thread(_build_template_1, data),
+                asyncio.to_thread(_build_template_2, data),
+                asyncio.to_thread(_build_template_3, data),
+                asyncio.to_thread(_build_template_4, data),
+                asyncio.to_thread(_build_template_5, data),
+                return_exceptions=True
+            )
 
-        try:
-            t2 = _build_template_2(data)
-            if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الآجل)", t2, None))
-        except Exception as e: log.error(f"Error T2: {e}")
+        log.info("🤖 [Futures] جاري توليد القوالب الذكية الستة بالتوازي...")
+        loop = asyncio.new_event_loop()
+        results = loop.run_until_complete(_generate_all())
+        loop.close()
 
-        try:
-            t3 = _build_template_3(data)
-            if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الآجل)", t3, None))
-        except Exception as e: log.error(f"Error T3: {e}")
+        for i, res in enumerate(results):
+            if isinstance(res, Exception):
+                log.error(f"Error T{i}: {res}")
+                results[i] = ""
+                
+        t0, t1, t2, t3, t4, t5 = results
 
-        try:
-            t4 = _build_template_4(data)
-            if t4: raw_reports.append(("📈 تقرير عوائد السندات (الآجل)", t4, None))
-        except Exception as e: log.error(f"Error T4: {e}")
-
-        try:
-            t5 = _build_template_5(data)
-            if t5: raw_reports.append(("💱 تقرير قوة العملات (الآجل)", t5, None))
-        except Exception as e: log.error(f"Error T5: {e}")
+        if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الآجل)", t0, None))
+        if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الآجل)", t1, None))
+        if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الآجل)", t2, None))
+        if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الآجل)", t3, None))
+        if t4: raw_reports.append(("📈 تقرير عوائد السندات (الآجل)", t4, None))
+        if t5: raw_reports.append(("💱 تقرير قوة العملات (الآجل)", t5, None))
 
         # ── لا خلاصة هنا — ستأتي مشتركة بعد انتهاء الفوري ──
 

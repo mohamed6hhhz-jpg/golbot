@@ -10,8 +10,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 # Import the existing FastAPI app from python/main.py
 from python.main import app
 
-# Import the V5 Orchestrator
-from Goldbot.v5.bot_orchestrator_v5 import main_loop as run_goldbot_v5
+# Import V4 Bots
+from Goldbot.bot_spot import run_bot as run_spot
+from Goldbot.bot_futures import run_bot as run_futures
 
 # Import the Auto_Sheets_Bot async function
 from Auto_Sheets_Bot.bot import start_sheets_bot
@@ -96,9 +97,24 @@ async def trigger_v5(secret: str = ""):
     if secret != "gold2026vip":
         raise HTTPException(status_code=403, detail="Forbidden: Invalid secret key")
     
-    from Goldbot.v5.bot_orchestrator_v5 import orchestrate_v5
-    # Run in background so it doesn't block the HTTP request timeout
-    asyncio.create_task(orchestrate_v5())
+    # Run in background
+    def run_now():
+        from Goldbot.bot_spot import get_full_market_data as spot_data, generate_report as spot_gen, send_reports as spot_send
+        from Goldbot.bot_futures import get_full_market_data as fut_data, generate_report as fut_gen, send_reports as fut_send
+        
+        # Spot
+        d_spot = spot_data(mode='spot')
+        if d_spot:
+            r_spot = spot_gen(d_spot, is_alert=False)
+            if r_spot: spot_send(d_spot, r_spot)
+            
+        # Futures
+        d_fut = fut_data(mode='futures')
+        if d_fut:
+            r_fut = fut_gen(d_fut, is_alert=False)
+            if r_fut: fut_send(d_fut, r_fut)
+
+    asyncio.get_event_loop().run_in_executor(None, run_now)
     
     return {
         "status": "success", 
@@ -140,8 +156,9 @@ async def startup_event():
     """
     print("[Orchestrator] Starting background bots...")
 
-    # 1. Start Goldbot V5 Orchestrator on the main asyncio event loop
-    asyncio.create_task(run_goldbot_v5())
+    # Start Goldbots V4
+    threading.Thread(target=run_spot, daemon=True, name="Goldbot-Spot").start()
+    threading.Thread(target=run_futures, daemon=True, name="Goldbot-Futures").start()
     print("[Orchestrator] Goldbot V5 Grand Orchestrator task created.")
 
     # 2. Start auto-copy Telegram bot on the main asyncio event loop

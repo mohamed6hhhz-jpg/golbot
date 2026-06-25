@@ -1705,7 +1705,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
 # ══════════════════════════════════════════════
 #  7. بناء هيكل التقرير الثابت + تحليل الـ AI
 # ══════════════════════════════════════════════
-def _build_fixed_template(d: dict) -> tuple[str, str]:
+def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     conf     = d['confluence']
     ent      = d['entries']
     ctx      = d['hist_ctx']

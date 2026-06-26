@@ -3329,7 +3329,7 @@ def _build_summary_template(d: dict, report_text: str, mode_label: str) -> str:
     if not client: return ""
     prompt = f"""أنت المحلل المالي الأكبر. بناءً على التقرير التالي، قم باستخراج خلاصة محورية دقيقة.
 التقرير:
-{report_text}
+{report_text[:4000]} ... {report_text[-3000:]}
 
 استخرج ونسق البيانات بنفس هذا القالب بالضبط:
 
@@ -3398,7 +3398,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
         async def _generate_all():
             async def wrap(idx, func, *args):
-                await asyncio.sleep(idx * 6)  # Stagger by 18 seconds to safely avoid 429 rate limit
+                await asyncio.sleep(idx * 25)  # Stagger by 18 seconds to safely avoid 429 rate limit
                 for attempt in range(3):
                     try:
                         res = await asyncio.to_thread(func, *args)

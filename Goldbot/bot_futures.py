@@ -3160,6 +3160,7 @@ def _split_fixed_report(report_text: str, mode_label: str) -> list:
 
 
 
+
 def _build_template_7(d: dict) -> str:
     """قالب الصفقات المتخصصة والفريمات الزمنية (اللوت العالي وزيرو انعكاس)"""
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
@@ -3168,39 +3169,54 @@ def _build_template_7(d: dict) -> str:
     adv = d.get('adv_trades', {})
     def _t(k):
         v = adv.get(k)
-        return f"دخول: {v['entry']} | هدف: {v['t2']} | وقف: {v['sl']} | ({'شراء 🟢' if v['dir']=='buy' else 'بيع 🔴'})" if v else "غير متوفر"
+        return f"{v['entry']}$ | هدف: {v['t2']}$ | وقف: {v['sl']}$ | ({'شراء 🟢' if v['dir']=='buy' else 'بيع 🔴'})" if v else "غير متوفر"
 
     gold = d.get('gold', 0)
-    prompt = f"""أنت مستشار تداول آلي خبير. قم بتوليد 'مصفوفة الصفقات المتخصصة' للذهب.
-السعر الحالي: {gold}
-بيانات الصفقات المتاحة:
-- سكالبينج: {_t('scalp_5m_buy')} أو {_t('scalp_5m_sell')}
-- سوينج: {_t('swing_buy')} أو {_t('swing_sell')}
-- زيرو انعكاس: {_t('rev_buy')} أو {_t('rev_sell')}
+    prompt = f"""اكتب 'مصفوفة الصفقات المتخصصة للذهب' بناءً على البيانات التالية حصراً.
+استخدم لغة الأرقام فقط ولا تكتب أي مقدمات أو شروحات (مثل: استخدمت بيانات كذا أو استنتجت كذا).
 
-المطلوب صياغة التقرير بالعربية بالهيكل التالي بدقة:
+البيانات المتاحة:
+السكالبينج: {_t('scalp_5m_buy')} أو {_t('scalp_5m_sell')}
+السوينج: {_t('swing_buy')} أو {_t('swing_sell')}
+زيرو انعكاس: {_t('rev_buy')} أو {_t('rev_sell')}
+
+المطلوب إخراج القالب بهذا الشكل الحرفي (بدون تغيير العناوين):
+
 🎯 صفقات اللوت العالي (High Lot)
-(استنتج صفقة ذات أهداف سريعة ووقف ضيق جداً بناءً على السكالبينج، واشترط جودة > 90% مع ذكر الفريم الزمني)
+(صفقة سكالبينج مستنتجة سريعة الأهداف بوقف ضيق، جودة > 90%. الفريم: 5 دقائق)
+- دخول: [الرقم]
+- هدف: [الرقم]
+- وقف: [الرقم]
+- الاتجاه: [شراء/بيع]
 
 🎯 صفقات زيرو انعكاس (القناص)
-(استخدم بيانات زيرو انعكاس المتاحة، واشترط دقة > 90%، واذكر الفريم الزمني 1-4 ساعات)
+(صفقة من بيانات زيرو انعكاس، دقة > 90%. الفريم: 1-4 ساعات)
+- دخول: [الرقم]
+- هدف: [الرقم]
+- وقف: [الرقم]
+- الاتجاه: [شراء/بيع]
 
 🌊 صفقات السوينج (مدى أبعد)
-(استخدم بيانات السوينج، واذكر الفريمات: يومي وأسبوعي)
+(صفقة من بيانات السوينج. الفريم: يومي وأسبوعي)
+- دخول: [الرقم]
+- هدف: [الرقم]
+- وقف: [الرقم]
+- الاتجاه: [شراء/بيع]
 
 ⚡ مصفوفة السكالبينج
-(استخدم بيانات السكالبينج، واذكر الفريمات: 5د، 10د، 15د، 30د)
+(صفقة من بيانات السكالبينج. الفريمات: 5د، 10د، 15د، 30د)
+- دخول: [الرقم]
+- هدف: [الرقم]
+- وقف: [الرقم]
+- الاتجاه: [شراء/بيع]
 
-قوانين صارمة:
-- لا تقم بتوليد أي صفقة جودتها أقل من 65%.
-- اذكر الفريم الزمني لكل قسم بوضوح.
-- لا تضع مقدمات أو خاتمات."""
+تحذير: لا تضف أي نص خارج الأقواس. استبدل الأقواس بالأرقام فقط. إذا لم تتوفر صفقة اكتب "لا توجد فرصة حالية"."""
     
     for model_name in GROQ_MODELS:
         try:
             resp = client.chat.completions.create(
-                messages=[{"role": "system", "content": "أنت خبير أسواق كمي."}, {"role": "user", "content": prompt}],
-                model=model_name, temperature=0.1, max_tokens=600
+                messages=[{"role": "system", "content": "أنت روبوت صفقات. نفذ القالب بالأرقام فقط بدون رغي نهائياً."}, {"role": "user", "content": prompt}],
+                model=model_name, temperature=0.05, max_tokens=600
             )
             return resp.choices[0].message.content
         except: pass
@@ -3214,29 +3230,43 @@ def _build_template_8(d: dict) -> str:
     gold = d.get('gold', 0)
     atr = d.get('atr', 20)
     vol_state = d.get('gold_daily', {}).get('Volume', [0])
-    last_vol = vol_state[-1] if len(vol_state) > 0 else "غير متاح"
+    last_vol = vol_state[-1] if len(vol_state) > 0 else 0
+    if last_vol == 0:
+        vol_text = "البيانات الكمية غير مكتملة المصدر، يتم الاعتماد على زخم السيولة السعرية (ATR Proxy)."
+    else:
+        vol_text = f"{last_vol}"
+        
+    liq_buy1 = round(gold - atr * 1.5, 2)
+    liq_buy2 = round(gold - atr * 2.5, 2)
+    liq_sell1 = round(gold + atr * 1.5, 2)
+    liq_sell2 = round(gold + atr * 2.5, 2)
     
     prompt = f"""اكتب 'تقرير تأثير الأسواق والمؤسسات (الحيتان)' للذهب بناءً على الأرقام:
-السعر: {gold} | الفوليوم اليومي: {last_vol} | التقلب ATR: {atr}
-العائد الحقيقي: {d.get('real_yield')} | VIX: {d.get('vix')}
+السعر: {gold}$ | الفوليوم: {vol_text} | التقلب ATR: {atr}$
+العائد الحقيقي: {d.get('real_yield')}% | VIX: {d.get('vix')}
 
-الرجاء الالتزام بهذا الهيكل تماماً:
+تمركزات الحيتان (Liquidity Voids) المحسوبة رياضياً:
+- سيولة شرائية أسفل السعر: من {liq_buy1}$ إلى {liq_buy2}$
+- سيولة بيعية أعلى السعر: من {liq_sell1}$ إلى {liq_sell2}$
+
+الرجاء الالتزام بهذا الهيكل تماماً بدون مقدمات ولا شروحات لكيفية حسابك:
 🐋 متابعة سيولة الحيتان:
-(حلل الفوليوم الحالي والسيولة، وهل يوجد ضخ بيعي أم شرائي متوقع)
+- (سطر واحد عن الفوليوم وحالة الضخ)
 
 🎯 تمركزات الحيتان (Liquidity Voids):
-(حدد بناء على الـ ATR مناطق السيولة الشرائية أسفل السعر ومناطق السيولة البيعية أعلى السعر)
+- السيولة الشرائية: بين مستويات [الرقم] و [الرقم]
+- السيولة البيعية: بين مستويات [الرقم] و [الرقم]
 
 🌍 تأثير الأسواق المترابطة:
-(حلل تأثير الفضة، السندات، وعقود الخيارات (باستخدام VIX كدليل) على الذهب)
-
-قاعدة: استخدم لغة تقريرية جافة. لا تكتب مقدمات."""
+- الفضة: (جملة واحدة)
+- السندات: (جملة واحدة بناء على العائد الحقيقي)
+- عقود الخيارات (VIX): (جملة واحدة بناء على VIX)"""
 
     for model_name in GROQ_MODELS:
         try:
             resp = client.chat.completions.create(
-                messages=[{"role": "system", "content": "أنت محلل مؤسسات وحيتان."}, {"role": "user", "content": prompt}],
-                model=model_name, temperature=0.15, max_tokens=600
+                messages=[{"role": "system", "content": "أنت محلل مؤسسات مالي محترف. لا تكتب مقدمات ولا تستخدم عبارات مثل 'بناء على الأرقام'."}, {"role": "user", "content": prompt}],
+                model=model_name, temperature=0.1, max_tokens=600
             )
             return resp.choices[0].message.content
         except: pass
@@ -3244,7 +3274,6 @@ def _build_template_8(d: dict) -> str:
 
 def _build_template_9(d: dict) -> str:
     """تقرير اتجاه الذهب اليومي (قالب رياضي ثابت)"""
-    # قالب رياضي جاف
     tf_15 = d.get('tf_15m', {}).get('bias', '—')
     tf_1h = d.get('tf_hourly', {}).get('bias', '—')
     tf_4h = d.get('tf_4h', {}).get('bias', '—')
@@ -3269,23 +3298,25 @@ def _build_template_10(d: dict) -> str:
     w_bias = d.get('tf_weekly', {}).get('bias', '—')
     w_rsi = d.get('tf_weekly', {}).get('rsi', 50)
     
-    prompt = f"""اكتب 'التقرير الأسبوعي للذهب' بناءً على:
-الاتجاه الأسبوعي: {w_bias} | مؤشر RSI الأسبوعي: {w_rsi} | السعر: {d.get('gold')}
+    prompt = f"""اكتب 'التقرير الأسبوعي للذهب'.
+المعطيات: الاتجاه الأسبوعي ({w_bias}) | مؤشر RSI ({w_rsi}) | السعر ({d.get('gold')}$)
 
-الرجاء الالتزام بهذا الهيكل تماماً:
+المطلوب إخراج التقرير جافاً بدون "بغبغة" لتعليماتي. لا تكتب "يبدو أن السوق..." أو "بناءً على...". اعطني النتيجة مباشرة:
+
 📅 الهيكل الأسبوعي الكلي:
-(حلل الاتجاه العام للسوق على المدى المتوسط والبعيد)
+- (تحليل مباشر للاتجاه العام في سطر واحد)
 
 📊 الزخم ومؤشرات المدى الطويل:
-(حلل وضع مؤشر الـ RSI وتأثيره)
+- مؤشر RSI: {w_rsi}
+- (دلالة هذا المؤشر فنياً في سطر واحد)
 
 🎯 تأثير ذلك على صفقات السوينج:
-(ما هي الاستراتيجية الأفضل للمتداولين على المدى البعيد هذا الأسبوع؟)"""
+- (استراتيجية السوينج الموصى بها هذا الأسبوع في سطر واحد)"""
 
     for model_name in GROQ_MODELS:
         try:
             resp = client.chat.completions.create(
-                messages=[{"role": "system", "content": "أنت خبير أسواق."}, {"role": "user", "content": prompt}],
+                messages=[{"role": "system", "content": "أنت خبير أسواق كمي. التزم بالأوامر حرفياً بدون أي إطالة أو تكرار للتعليمات."}, {"role": "user", "content": prompt}],
                 model=model_name, temperature=0.1, max_tokens=500
             )
             return resp.choices[0].message.content
@@ -3367,7 +3398,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
         async def _generate_all():
             async def wrap(idx, func, *args):
-                await asyncio.sleep(idx * 18)  # Stagger by 18 seconds to safely avoid 429 rate limit
+                await asyncio.sleep(idx * 24)  # Stagger by 18 seconds to safely avoid 429 rate limit
                 for attempt in range(3):
                     try:
                         res = await asyncio.to_thread(func, *args)

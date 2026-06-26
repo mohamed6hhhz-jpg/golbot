@@ -38,6 +38,7 @@ TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916
 TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
 TARGET_CHATS = ["@GooldFut"]
 LAST_PUBLIC_REPORT_TIME = 0
+LAST_4H_REPORT_TIME = 0
 
 MASTER_SYSTEM_PROMPT = """أنت خبير مالي سينيور متخصص في سوق الذهب. مهمتك إنتاج تقرير احترافي، متناسق، ومكتمل بدون أي أخطاء أو تناقضات.
 قواعد صارمة يجب الالتزام بها:
@@ -3495,12 +3496,17 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
         total = len(flat_chunks)
 
-        global LAST_PUBLIC_REPORT_TIME
+        global LAST_PUBLIC_REPORT_TIME, LAST_4H_REPORT_TIME
         now = time.time()
         is_public = False
         if now - LAST_PUBLIC_REPORT_TIME >= 14000:
             is_public = True
             LAST_PUBLIC_REPORT_TIME = now
+            
+        send_to_4h_channel = False
+        if now - LAST_4H_REPORT_TIME >= 4 * 3600:
+            send_to_4h_channel = True
+            LAST_4H_REPORT_TIME = now
 
         log.info("⏳ [Futures] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
         with SEND_LOCK:
@@ -3514,6 +3520,11 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     f"{subtitle}\n\n{chunk}"
                 )
                 ok = _send_single(final_text, is_public, chat_id)
+                
+                # Send to SovereignMaaregFund if 4 hours have passed
+                if send_to_4h_channel and not chat_id:
+                    _send_single(final_text, is_public, "@SovereignMaaregFund")
+                    
                 log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
                 time.sleep(2)
 

@@ -3401,7 +3401,7 @@ def _build_template_10(d: dict) -> str:
     prompt = f"""اكتب 'التقرير الأسبوعي للذهب'.
 المعطيات: الاتجاه الأسبوعي ({w_bias}) | مؤشر RSI ({w_rsi}) | السعر ({d.get('gold')}$)
 
-المطلوب إخراج التقرير جافاً بدون "بغبغة" لتعليماتي. لا تكتب "يبدو أن السوق..." أو "بناءً على...". اعطني النتيجة مباشرة:
+المطلوب إخراج التقرير جافاً بدون "بغبغة" لتعليماتي. لا تكتب "يبدو أن السوق..." أو "بناءً على...". اعطني النتيجة مباشرة كنص عادي (Plain Text). يمنع استخدام أي أكواد برمجية (مثل Java أو Python) أو تنسيقات Markdown معقدة:
 
 📅 الهيكل الأسبوعي الكلي:
 - (تحليل مباشر للاتجاه العام في سطر واحد)
@@ -3498,7 +3498,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
         async def _generate_all():
             async def wrap(idx, func, *args):
-                await asyncio.sleep(idx * 24)  # Stagger by 18 seconds to safely avoid 429 rate limit
+                await asyncio.sleep(idx * 6)  # Stagger by 18 seconds to safely avoid 429 rate limit
                 for attempt in range(3):
                     try:
                         res = await asyncio.to_thread(func, *args)

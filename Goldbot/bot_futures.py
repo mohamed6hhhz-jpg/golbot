@@ -3329,7 +3329,7 @@ def _build_summary_template(d: dict, report_text: str, mode_label: str) -> str:
     if not client: return ""
     prompt = f"""أنت المحلل المالي الأكبر. بناءً على التقرير التالي، قم باستخراج خلاصة محورية دقيقة.
 التقرير:
-{report_text[:4000]} ... {report_text[-3000:]}
+{report_text}
 
 استخرج ونسق البيانات بنفس هذا القالب بالضبط:
 

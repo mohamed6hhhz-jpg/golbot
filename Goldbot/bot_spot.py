@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 
 import random
 GROQ_KEYS = [
+    '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',
     "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",
     "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",
     "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"
@@ -3427,53 +3428,70 @@ def _build_template_10(d: dict) -> str:
 def _build_summary_template(d: dict, report_text: str, mode_label: str) -> str:
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client: return ""
-    prompt = f"""أنت المحلل المالي الأكبر. بناءً على التقرير التالي، قم باستخراج خلاصة محورية دقيقة.
-التقرير:
-{report_text}
+    
+    gold = d.get('gold', 0)
+    rsi = d.get('tf_daily', {}).get('rsi', 50)
+    macd_val = d.get('tf_daily', {}).get('macd', 0)
+    ry = d.get('real_yield', 0)
+    bias_d = d.get('tf_daily', {}).get('bias', 'محايد')
+    bias_w = d.get('tf_weekly', {}).get('bias', 'محايد')
+    pivot = d.get('pivot', 0)
+    s1, s2 = d.get('s1', 0), d.get('s2', 0)
+    r1, r2 = d.get('r1', 0), d.get('r2', 0)
+    
+    adv = d.get('adv_trades', {})
+    best_buy = adv.get('monthly_buy') or adv.get('swing_buy') or adv.get('rev_buy') or adv.get('weekly_buy')
+    best_sell = adv.get('monthly_sell') or adv.get('swing_sell') or adv.get('rev_sell') or adv.get('weekly_sell')
+    
+    def format_trade(t):
+        if not t: return "غير متوفر حالياً."
+        return f"دخول: {t['entry']}$ | هدف: {t['t2']}$ | وقف: {t['sl']}$"
 
-استخرج ونسق البيانات بنفس هذا القالب بالضبط:
+    prompt = f"""أنت خبير مالي كمي. بناءً على هذه الأرقام اللحظية، استخرج 'الخلاصة المحورية' لسوق {mode_label}.
+السعر: {gold}$ | المحور(Pivot): {pivot}$ | الاتجاه اليومي: {bias_d} | الأسبوعي: {bias_w}
+RSI: {rsi} | MACD: {macd_val} | العائد الحقيقي: {ry}%
+
+أقوى صفقة شراء: {format_trade(best_buy)}
+أقوى صفقة بيع: {format_trade(best_sell)}
+دعوم: S1={s1}, S2={s2}
+مقاومات: R1={r1}, R2={r2}
+
+استخرج ونسق البيانات بنفس هذا القالب بالضبط بدون أي ديباجة إضافية (أرقام فقط كالمطلوب):
 
 الخلاصة المحورية
 
 🎯 خلاصة انحياز الذهب | {mode_label} | التحديث المباشر
 
-📈 نسبة الصعود: [استخرج النسبة]%
-📉 نسبة الهبوط: [استخرج النسبة]%
+📈 نسبة الصعود: [توقعك كنسبة]%
+📉 نسبة الهبوط: [توقعك كنسبة]%
 
 🧭 الخلاصة:
-[فقرة قصيرة جداً من سطرين تلخص وضع السوق والـ RSI والسيولة والقرار المناسب كما جاء في التقرير]
+[فقرة قصيرة جداً من سطرين تلخص وضع السوق والقرار المناسب بناء على الأرقام أعلاه]
 
 📍 نقطة الفصل اليومية (Pivot):
-[السعر]$ [تعليق قصير من التقرير]
+{pivot}$ [تعليق قصير]
 
 📌 مستويات التداول الحالية:
-🟢 مستويات الشراء {mode_label}: S1=[السعر]$ | S2=[السعر]$ | أقرب فيبو=[السعر]$
-🔴 مستويات البيع {mode_label}: R1=[السعر]$ | R2=[السعر]$ | أقرب فيبو=[السعر]$
+🟢 مستويات الشراء {mode_label}: S1={s1}$ | S2={s2}$
+🔴 مستويات البيع {mode_label}: R1={r1}$ | R2={r2}$
 
 ✅ أقوى صفقة شراء {mode_label}:
-دخول: [السعر]$ | وقف: [السعر]$ | T1: [السعر]$ | T2: [السعر]$ | T3: [السعر]$
-   الثقة: [الثقة]% [التقييم] | السبب: [السبب]
+{format_trade(best_buy)}
+   الثقة: [تقييم]% | السبب: [سبب فني قصير]
 
 ✅ أقوى صفقة بيع {mode_label}:
-دخول: [السعر]$ | وقف: [السعر]$ | T1: [السعر]$ | T2: [السعر]$ | T3: [السعر]$
-   الثقة: [الثقة]% [التقييم] | السبب: [السبب]
+{format_trade(best_sell)}
+   الثقة: [تقييم]% | السبب: [سبب فني قصير]"""
 
-تنبيه هام: التزم بهذا الهيكل بحذافيره دون زيادة أو نقصان. استخرج جميع الأرقام من التقرير المرفق."""
-    
     for model_name in GROQ_MODELS:
         try:
-            log.info(f"🤖 جاري توليد الخلاصة المحورية (القالب 6) عبر {model_name}...")
             resp = client.chat.completions.create(
-                messages=[{"role": "system", "content": "أنت المحلل المالي. اصدر الخلاصة المطلوبة بالقالب الحرفي."}, {"role": "user", "content": prompt}],
-                model=model_name, temperature=0.2, max_tokens=800
+                messages=[{"role": "system", "content": "أنت محلل كمي. التزم بالقالب الحرفي للأرقام بدون أي ديباجة."}, {"role": "user", "content": prompt}],
+                model=model_name, temperature=0.1, max_tokens=600
             )
             return resp.choices[0].message.content
-        except Exception as e:
-            log.warning(f"⚠️ [{model_name}] فشل في توليد الخلاصة: {e}")
-            import time
-            time.sleep(5)
-            continue
-    return "⚠️ تعذر توليد الخلاصة"
+        except: pass
+    return "⚠️ تعذر توليد الخلاصة المحورية بسبب الضغط على السيرفر."
 
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache

@@ -1387,7 +1387,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         pass
 
     # العائد الحقيقي = عائد السندات 10 سنوات − التضخم (وليس فائدة الفيد)
-    real_yield_val = round((tnx if tnx else 4.5) - inflation_est, 2)
+    real_yield_val = round((interest_rate if interest_rate else 5.5) - inflation_est, 2)
     real_yield_signal = "غير متاح"
     real_yield_brief  = "⚪ العائد الحقيقي — بيانات غير متاحة"
     if tip_df is not None and not tip_df.empty and len(tip_df) >= 10:
@@ -1427,7 +1427,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📐 تحليل العائد الحقيقي (أهم مؤشر للذهب)\n"
             f"   📈 منحنى العوائد: 2سنة:{_twy_str} | 10سنوات:{tnx:.2f}% | 30سنة:{_tty_str}\n"
-            f"   🔢 الحساب: عائد اسمي(10Y) {tnx:.2f}% − تضخم {inflation_est}% = عائد حقيقي {ryv:+.2f}%\n"
+            f"   🔢 الحساب: معدل الفائدة {interest_rate:.2f}% − تضخم {inflation_est}% = عائد حقيقي {ryv:+.2f}%\n"
             f"   📊 المستوى: {ry_level}\n"
             f"   📖 ما هو؟ هو العائد الفعلي الذي يكسبه المستثمر من السندات بعد خصم التضخم\n"
             f"   🔍 لماذا يتحرك؟ {ry_why}\n"
@@ -1657,6 +1657,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     # حفظ العائد الحقيقي والتضخم لاستخدامهما في القالب 4
     d['real_yield']  = real_yield_val
     d['cpi_yoy']     = inflation_est
+    d['interest_rate'] = interest_rate
 
 
     # ── [مؤشر قوة العملات للقالب 5] ──
@@ -1747,7 +1748,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
         count = 1
         for t in trades:
             pct, lbl, reason = calc_trade_confidence(d, t)
-            if pct < 30:
+            if pct < 65:
                 continue
 
             if pct >= 75:
@@ -1789,7 +1790,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
     # مستويات فيبوناتشي الرئيسية
     fib = d['fib']
-    fib_line = (f"فيبو: 78.6%={fib['78.6%']}$ | 61.8%={fib['61.8%']}$ | "
+    fib_line = (f"فيبوناتشي (فوري): 78.6%={fib['78.6%']}$ | 61.8%={fib['61.8%']}$ | "
                 f"50.0%={fib['50.0%']}$ | 38.2%={fib['38.2%']}$ | 23.6%={fib['23.6%']}$")
     # نطاق اليوم المتوقع من ATR
     exp_low  = round(gold - d['atr'] * 0.65, 2)
@@ -1988,7 +1989,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 بيانات السوق:
 سعر الذهب = {gold:.2f}$ | RSI={d['rsi']} | ADX={d['adx']} | MACD={d['macd_hist']}
 الإطارات: أسبوعي RSI={d['tf_weekly']['rsi']} | يومي RSI={d['tf_daily']['rsi']} | ساعي RSI={d['tf_hourly'].get('rsi','--')}
-فيبو: 78.6%={d['fib']['78.6%']}$ | 61.8%={d['fib']['61.8%']}$ | 50%={d['fib']['50.0%']}$
+فيبوناتشي (فوري): 78.6%={d['fib']['78.6%']}$ | 61.8%={d['fib']['61.8%']}$ | 50%={d['fib']['50.0%']}$
 الدعم القريب={d['s1']}$ | المقاومة={d['r1']}$ | ATR={d['atr']}$
 التباين: {d['divergence']}
 التوافق: {d['tf_label']}
@@ -2599,8 +2600,9 @@ def _build_template_2(d: dict) -> str:
     vix_pct    = d.get('vix_pct', 0.0)
     sp500_pct  = d.get('sp500_pct', 0.0)
     nasdaq_pct = d.get('nasdaq_pct', 0.0)
-    inflation  = d.get('inflation_est', 2.5)
-    real_yield = d.get('real_yield', round(tnx - inflation, 2))
+    inflation  = d.get('cpi_yoy', 2.5)
+    interest_rate = d.get('interest_rate', 5.5)
+    real_yield = d.get('real_yield', round(interest_rate - inflation, 2))
     yield_curve = round(tnx - twy, 2) if tnx and twy else 0
 
     # تحديد حالة البيئة الاقتصادية بشكل آلي لإعطاء الـ AI سياقاً محدداً
@@ -2621,7 +2623,7 @@ def _build_template_2(d: dict) -> str:
 [تحليل 2 جملة: منحنى العوائد ({yc_state}، فارق {yield_curve:+.2f}%) وتأثيره على الائتمان والنمو]
 
 🏦 التضخم والفائدة:
-[تحليل 2 جملة: التضخم {inflation:.2f}%، عائد 10Y={tnx:.2f}%، العائد الحقيقي={real_yield:+.2f}% ({ry_bias})]
+[تحليل 2 جملة: التضخم {inflation:.2f}%، معدل الفائدة={interest_rate:.2f}%، العائد الحقيقي={real_yield:+.2f}% ({ry_bias})]
 
 👷 سوق العمل:
 [جملة واحدة عن دلالة الأسواق الحالية على سوق العمل: VIX={vix:.1f}({vix_state})، أسهم {sp500_pct:+.2f}%]
@@ -3257,6 +3259,140 @@ def _split_fixed_report(report_text: str, mode_label: str) -> list:
 
 
 
+
+def _build_template_7(d: dict) -> str:
+    """قالب الصفقات المتخصصة والفريمات الزمنية (اللوت العالي وزيرو انعكاس)"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client: return "⚠️ تعذر توليد التقرير."
+    
+    adv = d.get('adv_trades', {})
+    def _t(k):
+        v = adv.get(k)
+        return f"دخول: {v['entry']} | هدف: {v['t2']} | وقف: {v['sl']} | ({'شراء 🟢' if v['dir']=='buy' else 'بيع 🔴'})" if v else "غير متوفر"
+
+    gold = d.get('gold', 0)
+    prompt = f"""أنت مستشار تداول آلي خبير. قم بتوليد 'مصفوفة الصفقات المتخصصة' للذهب.
+السعر الحالي: {gold}
+بيانات الصفقات المتاحة:
+- سكالبينج: {_t('scalp_5m_buy')} أو {_t('scalp_5m_sell')}
+- سوينج: {_t('swing_buy')} أو {_t('swing_sell')}
+- زيرو انعكاس: {_t('rev_buy')} أو {_t('rev_sell')}
+
+المطلوب صياغة التقرير بالعربية بالهيكل التالي بدقة:
+🎯 صفقات اللوت العالي (High Lot)
+(استنتج صفقة ذات أهداف سريعة ووقف ضيق جداً بناءً على السكالبينج، واشترط جودة > 90% مع ذكر الفريم الزمني)
+
+🎯 صفقات زيرو انعكاس (القناص)
+(استخدم بيانات زيرو انعكاس المتاحة، واشترط دقة > 90%، واذكر الفريم الزمني 1-4 ساعات)
+
+🌊 صفقات السوينج (مدى أبعد)
+(استخدم بيانات السوينج، واذكر الفريمات: يومي وأسبوعي)
+
+⚡ مصفوفة السكالبينج
+(استخدم بيانات السكالبينج، واذكر الفريمات: 5د، 10د، 15د، 30د)
+
+قوانين صارمة:
+- لا تقم بتوليد أي صفقة جودتها أقل من 65%.
+- اذكر الفريم الزمني لكل قسم بوضوح.
+- لا تضع مقدمات أو خاتمات."""
+    
+    for model_name in GROQ_MODELS:
+        try:
+            resp = client.chat.completions.create(
+                messages=[{"role": "system", "content": "أنت خبير أسواق كمي."}, {"role": "user", "content": prompt}],
+                model=model_name, temperature=0.1, max_tokens=600
+            )
+            return resp.choices[0].message.content
+        except: pass
+    return "⚠️ تعذر توليد قالب الصفقات المتخصصة."
+
+def _build_template_8(d: dict) -> str:
+    """قالب تأثير الأسواق والمؤسسات (الحيتان)"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client: return "⚠️ تعذر توليد التقرير."
+    
+    gold = d.get('gold', 0)
+    atr = d.get('atr', 20)
+    vol_state = d.get('gold_daily', {}).get('Volume', [0])
+    last_vol = vol_state[-1] if len(vol_state) > 0 else "غير متاح"
+    
+    prompt = f"""اكتب 'تقرير تأثير الأسواق والمؤسسات (الحيتان)' للذهب بناءً على الأرقام:
+السعر: {gold} | الفوليوم اليومي: {last_vol} | التقلب ATR: {atr}
+العائد الحقيقي: {d.get('real_yield')} | VIX: {d.get('vix')}
+
+الرجاء الالتزام بهذا الهيكل تماماً:
+🐋 متابعة سيولة الحيتان:
+(حلل الفوليوم الحالي والسيولة، وهل يوجد ضخ بيعي أم شرائي متوقع)
+
+🎯 تمركزات الحيتان (Liquidity Voids):
+(حدد بناء على الـ ATR مناطق السيولة الشرائية أسفل السعر ومناطق السيولة البيعية أعلى السعر)
+
+🌍 تأثير الأسواق المترابطة:
+(حلل تأثير الفضة، السندات، وعقود الخيارات (باستخدام VIX كدليل) على الذهب)
+
+قاعدة: استخدم لغة تقريرية جافة. لا تكتب مقدمات."""
+
+    for model_name in GROQ_MODELS:
+        try:
+            resp = client.chat.completions.create(
+                messages=[{"role": "system", "content": "أنت محلل مؤسسات وحيتان."}, {"role": "user", "content": prompt}],
+                model=model_name, temperature=0.15, max_tokens=600
+            )
+            return resp.choices[0].message.content
+        except: pass
+    return "⚠️ تعذر توليد قالب الحيتان."
+
+def _build_template_9(d: dict) -> str:
+    """تقرير اتجاه الذهب اليومي (قالب رياضي ثابت)"""
+    # قالب رياضي جاف
+    tf_15 = d.get('tf_15m', {}).get('bias', '—')
+    tf_1h = d.get('tf_hourly', {}).get('bias', '—')
+    tf_4h = d.get('tf_4h', {}).get('bias', '—')
+    tf_1d = d.get('tf_daily', {}).get('bias', '—')
+    
+    return f"""📊 تقرير اتجاه الذهب اليومي
+
+الترند الحالي:
+⋆ 15 دقيقة: {tf_15}
+⏱️ 1 ساعة: {tf_1h}
+⏰ 4 ساعات: {tf_4h}
+📅 يومي: {tf_1d}
+
+الخلاصة: 
+(الاتجاه مبني رياضياً على توافق الإطارات الزمنية ولا يعكس بالضرورة الانعكاسات اللحظية المفاجئة)."""
+
+def _build_template_10(d: dict) -> str:
+    """التقرير الأسبوعي الشامل"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client: return "⚠️ تعذر توليد التقرير."
+    
+    w_bias = d.get('tf_weekly', {}).get('bias', '—')
+    w_rsi = d.get('tf_weekly', {}).get('rsi', 50)
+    
+    prompt = f"""اكتب 'التقرير الأسبوعي للذهب' بناءً على:
+الاتجاه الأسبوعي: {w_bias} | مؤشر RSI الأسبوعي: {w_rsi} | السعر: {d.get('gold')}
+
+الرجاء الالتزام بهذا الهيكل تماماً:
+📅 الهيكل الأسبوعي الكلي:
+(حلل الاتجاه العام للسوق على المدى المتوسط والبعيد)
+
+📊 الزخم ومؤشرات المدى الطويل:
+(حلل وضع مؤشر الـ RSI وتأثيره)
+
+🎯 تأثير ذلك على صفقات السوينج:
+(ما هي الاستراتيجية الأفضل للمتداولين على المدى البعيد هذا الأسبوع؟)"""
+
+    for model_name in GROQ_MODELS:
+        try:
+            resp = client.chat.completions.create(
+                messages=[{"role": "system", "content": "أنت خبير أسواق."}, {"role": "user", "content": prompt}],
+                model=model_name, temperature=0.1, max_tokens=500
+            )
+            return resp.choices[0].message.content
+        except: pass
+    return "⚠️ تعذر توليد التقرير الأسبوعي."
+
+
 def _build_summary_template(d: dict, report_text: str, mode_label: str) -> str:
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client: return ""
@@ -3355,6 +3491,10 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 wrap(3, _build_template_3, data),
                 wrap(4, _build_template_4, data),
                 wrap(5, _build_template_5, data),
+                wrap(7, _build_template_7, data),
+                wrap(8, _build_template_8, data),
+                wrap(9, _build_template_9, data),
+                wrap(10, _build_template_10, data),
                 wrap(6, _build_summary_template, data, report_text, "الفوري"),
                 return_exceptions=True
             )
@@ -3369,7 +3509,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 log.error(f"Error T{i}: {res}")
                 results[i] = ""
                 
-        t0, t1, t2, t3, t4, t5, t6 = results
+        t0, t1, t2, t3, t4, t5, t7, t8, t9, t10, t6 = results
 
         if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الفوري)", t0, None))
         if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الفوري)", t1, None))
@@ -3377,6 +3517,10 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الفوري)", t3, None))
         if t4: raw_reports.append(("📈 تقرير عوائد السندات (الفوري)", t4, None))
         if t5: raw_reports.append(("💱 تقرير قوة العملات (الفوري)", t5, None))
+        if t7: raw_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7, None))
+        if t8: raw_reports.append(("🐋 تأثير الأسواق والمؤسسات (الفوري)", t8, None))
+        if t9: raw_reports.append(("📊 تقرير اتجاه الذهب اليومي (الفوري)", t9, None))
+        if t10: raw_reports.append(("📆 التقرير الأسبوعي الشامل (الفوري)", t10, None))
         if t6: raw_reports.append(("الخلاصة المحورية", t6, None))
 
         # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──

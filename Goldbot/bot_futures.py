@@ -39,6 +39,19 @@ TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
 TARGET_CHATS = ["@GooldFut"]
 LAST_PUBLIC_REPORT_TIME = 0
 
+MASTER_SYSTEM_PROMPT = """أنت خبير مالي سينيور متخصص في سوق الذهب. مهمتك إنتاج تقرير احترافي، متناسق، ومكتمل بدون أي أخطاء أو تناقضات.
+قواعد صارمة يجب الالتزام بها:
+1. الاكتمال (أولوية قصوى): التقرير يجب أن يكون مكتمل 100%. ممنوع قطع أي قسم في منتصف الجملة أو ترك أي جزء ناقص. كل قسم يجب أن يكون مكتوب بالكامل حتى النهاية.
+2. التناسق (Consistency): التقرير يجب أن يكون متناسق تماماً في الاتجاه. ممنوع وجود تناقض بين الأقسام. تأكد من أن الخلاصة تتوافق مع باقي التقرير.
+3. تقليل التكرار بشدة: ممنوع تكرار نفس الصفقات أو الأفكار في أكثر من قسم. كل قسم يجب أن يضيف قيمة جديدة.
+4. الدقة والحقائق: ممنوع كتابة معلومات خاطئة أو غير منطقية. التحليل مدعوم بمنطق واضح ودقيق.
+5. تحسين الأقسام الضعيفة: الأقسام مثل تأثير الأسواق وقوة العملات يجب أن تكون دقيقة ومترابطة مع الذهب بشكل صحيح.
+6. الثقة والصفقات: الثقة منطقية (يفضل بين 60% و 75%). الصفقات متنوعة وغير مكررة.
+7. الهيكل والصياغة: منظم وواضح، تجنب الجمل المقطوعة.
+
+"""
+
+
 API_ID   = 34105911
 API_HASH = 'b444ab6b4eeba8a66db4143b934dc540'
 SESSION_STRING = (
@@ -2408,7 +2421,7 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
             log.info(f"🤖 جاري الاتصال بـ Groq — {model_name}")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت محلل ذهب كمي. اكتب فقط ما طُلب منك بالعربية الفصحى. لا تكتب أي شيء خارج الأقسام المطلوبة."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل ذهب كمي. اكتب فقط ما طُلب منك بالعربية الفصحى. لا تكتب أي شيء خارج الأقسام المطلوبة."},
                     {"role": "user",   "content": ai_instructions},
                 ],
                 model=model_name,
@@ -2643,7 +2656,7 @@ def _build_template_2(d: dict) -> str:
             log.info(f"🤖 جاري توليد القالب الثاني (الاقتصاد الكلي) عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت خبير اقتصادي كمي. اكتب تحليلاً مالياً دقيقاً محدداً. استخدم فقط الأرقام المعطاة. لا تكتب خارج القالب."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت خبير اقتصادي كمي. اكتب تحليلاً مالياً دقيقاً محدداً. استخدم فقط الأرقام المعطاة. لا تكتب خارج القالب."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
@@ -2756,7 +2769,7 @@ DXY: {dxy_p} ({sign_dx}{dxy_pct}%)
             log.info(f"🤖 جاري توليد القالب الثالث (شهية المخاطرة) عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
@@ -2854,7 +2867,7 @@ def _build_template_4(d: dict) -> str:
             log.info(f"🤖 جاري توليد القالب الرابع (عوائد السندات) عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه. لا تغير الأرقام."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت خبير أسواق مالية. التزم بالقالب حرفياً ولا تضف شيئاً خارجه. لا تغير الأرقام."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
@@ -2924,7 +2937,7 @@ def _build_template_5(d: dict) -> str:
             log.info(f"🤖 جاري توليد القالب الخامس (قوة العملات) عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت خبير أسواق عملات (Forex). التزم بالقالب حرفياً ولا تضف شيئاً خارجه."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت خبير أسواق عملات (Forex). التزم بالقالب حرفياً ولا تضف شيئاً خارجه."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
@@ -2998,7 +3011,7 @@ def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: st
             log.info(f"🤖 جاري توليد الخلاصة النهائية (القالب 6) عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت المحلل المالي الأكبر. اصدر حكماً نهائياً قصيراً ودقيقاً للجمهور والتزم بالقالب الحرفي."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت المحلل المالي الأكبر. اصدر حكماً نهائياً قصيراً ودقيقاً للجمهور والتزم بالقالب الحرفي."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
@@ -3077,7 +3090,7 @@ def _build_template_0(d: dict) -> str:
             log.info(f"🤖 جاري توليد القالب التمهيدي 0 (الصفقات المتقدمة) عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "أنت خبير أسواق. التزم بالقالب الحرفي ولا تضف مقدمات. لا تغير الأرقام نهائياً."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت خبير أسواق. التزم بالقالب الحرفي ولا تضف مقدمات. لا تغير الأرقام نهائياً."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
@@ -3216,7 +3229,7 @@ def _build_template_7(d: dict) -> str:
     for model_name in GROQ_MODELS:
         try:
             resp = client.chat.completions.create(
-                messages=[{"role": "system", "content": "أنت روبوت صفقات. نفذ القالب بالأرقام فقط بدون رغي نهائياً."}, {"role": "user", "content": prompt}],
+                messages=[{"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت روبوت صفقات. نفذ القالب بالأرقام فقط بدون رغي نهائياً."}, {"role": "user", "content": prompt}],
                 model=model_name, temperature=0.05, max_tokens=600
             )
             return resp.choices[0].message.content
@@ -3266,7 +3279,7 @@ def _build_template_8(d: dict) -> str:
     for model_name in GROQ_MODELS:
         try:
             resp = client.chat.completions.create(
-                messages=[{"role": "system", "content": "أنت محلل مؤسسات مالي محترف. لا تكتب مقدمات ولا تستخدم عبارات مثل 'بناء على الأرقام'."}, {"role": "user", "content": prompt}],
+                messages=[{"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل مؤسسات مالي محترف. لا تكتب مقدمات ولا تستخدم عبارات مثل 'بناء على الأرقام'."}, {"role": "user", "content": prompt}],
                 model=model_name, temperature=0.1, max_tokens=600
             )
             return resp.choices[0].message.content
@@ -3317,7 +3330,7 @@ def _build_template_10(d: dict) -> str:
     for model_name in GROQ_MODELS:
         try:
             resp = client.chat.completions.create(
-                messages=[{"role": "system", "content": "أنت خبير أسواق كمي. التزم بالأوامر حرفياً بدون أي إطالة أو تكرار للتعليمات."}, {"role": "user", "content": prompt}],
+                messages=[{"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت خبير أسواق كمي. التزم بالأوامر حرفياً بدون أي إطالة أو تكرار للتعليمات."}, {"role": "user", "content": prompt}],
                 model=model_name, temperature=0.1, max_tokens=500
             )
             return resp.choices[0].message.content
@@ -3386,7 +3399,7 @@ RSI: {rsi} | MACD: {macd_val} | العائد الحقيقي: {ry}%
     for model_name in GROQ_MODELS:
         try:
             resp = client.chat.completions.create(
-                messages=[{"role": "system", "content": "أنت محلل كمي. التزم بالقالب الحرفي للأرقام بدون أي ديباجة."}, {"role": "user", "content": prompt}],
+                messages=[{"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل كمي. التزم بالقالب الحرفي للأرقام بدون أي ديباجة."}, {"role": "user", "content": prompt}],
                 model=model_name, temperature=0.1, max_tokens=600
             )
             return resp.choices[0].message.content

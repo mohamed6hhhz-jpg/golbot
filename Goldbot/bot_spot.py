@@ -2578,31 +2578,48 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
         return False
 
 
-def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
-    """الإرسال للبوت الثاني عبر HTTP API"""
-    url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN_2}/sendMessage"
-    headers = {
-        "Connection": "close",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-    success = True
-    targets = [chat_id] if chat_id else TARGET_CHATS
-    for chat in targets:
-        payload = {"chat_id": str(chat), "text": text}
-        chat_success = False
-        for attempt in range(4):
+async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
+    """MTProto للبوت الثاني — يتجاوز حجب HTTP على HuggingFace تماماً"""
+    try:
+        client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        for chat in targets:
             try:
-                import requests, time
-                r = requests.post(url, json=payload, headers=headers, timeout=45)
-                r.raise_for_status()
-                chat_success = True
-                break
-            except Exception as e:
-                wait = 2 ** attempt
-                log.warning(f"⚠️ [HTTP Bot 2] {attempt+1}/4 — {e} — انتظار {wait}s")
-                time.sleep(wait)
-        if not chat_success: success = False
-    return success
+                await client.send_message(chat, text)
+            except Exception as inner_e:
+                log.warning(f"[Bot2 Telethon] فشل الإرسال للجروب {chat}: {inner_e}")
+        await client.disconnect()
+        return True
+    except Exception as e:
+        log.warning(f"[Bot2 Telethon] {e}")
+        return False
+
+
+def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+    """الإرسال للبوت الثاني عبر Telethon MTProto (بدلاً من HTTP المحجوب على HuggingFace)"""
+    try:
+        ok = asyncio.run(_telethon_bot2_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot2] تم الإرسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot2_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot2] تم الإرسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"[Telethon Bot2 loop] {e}")
+    except Exception as e:
+        log.warning(f"[Telethon Bot2] {e}")
+    log.error("[Bot2] فشل الإرسال عبر Telethon.")
+    return False
+
+
 
 def _send_single(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     """إرسال عبر MTProto (Bot) أولاً للهروب من مشاكل Timeout، والـ HTTP كاحتياطي."""

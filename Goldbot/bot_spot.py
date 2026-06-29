@@ -35,8 +35,9 @@ GROQ_KEYS = [
     "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"
 ]
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
-TELEGRAM_BOT_TOKEN  = "8135586080:AAFS1ZI2XcsPrnjtTvAPlXxlTMrSO_Lu3Qc"
+TELEGRAM_BOT_TOKEN   = "8135586080:AAFS1ZI2XcsPrnjtTvAPlXxlTMrSO_Lu3Qc"
 TELEGRAM_BOT_TOKEN_2 = "8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ"
+TELEGRAM_BOT_TOKEN_3 = "8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA"  # @Dsssoppp78_bot — القوالب الفورية S1-S12
 
 TARGET_CHATS = ["@spotGol"]
 LAST_PUBLIC_REPORT_TIME = 0
@@ -2597,7 +2598,7 @@ async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
 
 
 def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
-    """الإرسال للبوت الثاني عبر Telethon MTProto (بدلاً من HTTP المحجوب على HuggingFace)"""
+    """الإرسال للبوت الثاني عبر Telethon MTProto"""
     try:
         ok = asyncio.run(_telethon_bot2_send(text, chat_id))
         if ok:
@@ -2617,6 +2618,48 @@ def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -
     except Exception as e:
         log.warning(f"[Telethon Bot2] {e}")
     log.error("[Bot2] فشل الإرسال عبر Telethon.")
+    return False
+
+
+async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
+    """MTProto للبوت الثالث @Dsssoppp78_bot — خاص بالقوالب الفورية S1-S12"""
+    try:
+        client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        for chat in targets:
+            try:
+                await client.send_message(chat, text)
+            except Exception as inner_e:
+                log.warning(f"[Bot3 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
+        await client.disconnect()
+        return True
+    except Exception as e:
+        log.warning(f"[Bot3 Telethon] {e}")
+        return False
+
+
+def _send_single_bot3(text: str, chat_id=None) -> bool:
+    """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot3_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot3] تم الارسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot3_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot3] تم الارسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"[Telethon Bot3 loop] {e}")
+    except Exception as e:
+        log.warning(f"[Telethon Bot3] {e}")
+    log.error("[Bot3] فشل الارسال عبر Telethon.")
     return False
 
 
@@ -4657,20 +4700,22 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         if 't12' in locals() and t12: bot2_reports.append(("🏦 تقرير المشتقات وصناديق الاستثمار", t12, None))
         if 't13' in locals() and t13: bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13, None))
 
-        # القوالب الفورية الخاصة S1-S12 (رياضية 100% - صفر AI)
+        # القوالب الفورية S1-S12 — البوت الثالث @Dsssoppp78_bot
+        bot3_reports = []
         try:
-            bot2_reports.append(("[فوري] 1/12 الاسعار والفيبوناتشي",       _build_spot_s1(data),  None))
-            bot2_reports.append(("[فوري] 2/12 الاطارات الزمنية",            _build_spot_s2(data),  None))
-            bot2_reports.append(("[فوري] 3/12 زيرو انعكاس",                 _build_spot_s3(data),  None))
-            bot2_reports.append(("[فوري] 4/12 السكالبينج",                   _build_spot_s4(data),  None))
-            bot2_reports.append(("[فوري] 5/12 السوينج",                      _build_spot_s5(data),  None))
-            bot2_reports.append(("[فوري] 6/12 اللوت العالي",                 _build_spot_s6(data),  None))
-            bot2_reports.append(("[فوري] 7/12 التحليل الفني والزخم",         _build_spot_s7(data),  None))
-            bot2_reports.append(("[فوري] 8/12 الاقتصاد الكلي",              _build_spot_s8(data),  None))
-            bot2_reports.append(("[فوري] 9/12 شهية المخاطرة",               _build_spot_s9(data),  None))
-            bot2_reports.append(("[فوري] 10/12 عوائد السندات",              _build_spot_s10(data), None))
-            bot2_reports.append(("[فوري] 11/12 قوة العملات DXY",             _build_spot_s11(data), None))
-            bot2_reports.append(("[فوري] 12/12 الخلاصة المحورية",            _build_spot_s12(data), None))
+            bot3_reports.append(("[فوري] 1/12 الاسعار والفيبوناتشي",       _build_spot_s1(data),  None))
+            bot3_reports.append(("[فوري] 2/12 الاطارات الزمنية",            _build_spot_s2(data),  None))
+            bot3_reports.append(("[فوري] 3/12 زيرو انعكاس",                 _build_spot_s3(data),  None))
+            bot3_reports.append(("[فوري] 4/12 السكالبينج",                   _build_spot_s4(data),  None))
+            bot3_reports.append(("[فوري] 5/12 السوينج",                      _build_spot_s5(data),  None))
+            bot3_reports.append(("[فوري] 6/12 اللوت العالي",                 _build_spot_s6(data),  None))
+            bot3_reports.append(("[فوري] 7/12 التحليل الفني والزخم",         _build_spot_s7(data),  None))
+            bot3_reports.append(("[فوري] 8/12 الاقتصاد الكلي",              _build_spot_s8(data),  None))
+            bot3_reports.append(("[فوري] 9/12 شهية المخاطرة",               _build_spot_s9(data),  None))
+            bot3_reports.append(("[فوري] 10/12 عوائد السندات",              _build_spot_s10(data), None))
+            bot3_reports.append(("[فوري] 11/12 قوة العملات DXY",             _build_spot_s11(data), None))
+            bot3_reports.append(("[فوري] 12/12 الخلاصة المحورية",            _build_spot_s12(data), None))
+            log.info(f"[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي")
         except Exception as _se:
             log.warning(f"[S1-S12] خطا في توليد القوالب الفورية: {_se}")
 
@@ -4749,7 +4794,26 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                         
                     log.info(f"✅ رسالة البوت الثاني {i2}/{total_2} وصلت." if ok2 else f"❌ فشل رسالة البوت الثاني {i2}/{total_2}.")
                     time.sleep(2)
-            log.info("🔓 [Spot] تم الإرسال، تحرير القفل لانتظار الخلاصة...")
+
+            # ── البوت الثالث: القوالب الفورية S1-S12 (@Dsssoppp78_bot) ──
+            if 'bot3_reports' in locals() and bot3_reports:
+                flat_chunks_3 = []
+                for title3, txt3, cid3 in bot3_reports:
+                    if txt3:
+                        for chunk3 in _split_message(txt3):
+                            flat_chunks_3.append((title3, chunk3, cid3))
+                total_3 = len(flat_chunks_3)
+                log.info(f"📤 [Bot3] ارسال {total_3} قالب فوري عبر @Dsssoppp78_bot...")
+                for i3, (title3, chunk3, cid3) in enumerate(flat_chunks_3, 1):
+                    final_text3 = (
+                        f"📊 [{i3}/{total_3}] تقارير سوق الفوري (XAU/USD Spot)\n"
+                        f"{title3}\n\n{chunk3}"
+                    )
+                    ok3 = _send_single_bot3(final_text3, cid3)
+                    log.info(f"{'✅' if ok3 else '❌'} [Bot3] {i3}/{total_3}")
+                    time.sleep(2)
+
+            log.info("🔓 [Spot] تم الارسال، تحرير القفل لانتظار الخلاصة...")
 
         # ══════════════════════════════════════════════════════
         #  الخلاصة النهائية المشتركة — تأتي هنا بعد كل الرسائل

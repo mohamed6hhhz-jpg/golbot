@@ -3852,6 +3852,510 @@ Breakeven Call: {breakeven_c}$ | Breakeven Put: {breakeven_p}$
             log.error(f"❌ [T13] {model_name}: {e}")
     return ""
 
+
+# ══════════════════════════════════════════════════
+#  قوالب الفوري الخاصة S1-S12 — رياضية 100% — صفر AI
+# ══════════════════════════════════════════════════
+
+def _build_spot_s1(d: dict) -> str:
+    gold   = d.get('gold', 0)
+    rsi    = d.get('rsi', 50)
+    macd   = d.get('macd', 0)
+    atr    = d.get('atr', 0)
+    fib    = d.get('fib', {})
+    pivot  = d.get('pivot', 0)
+    ctx    = d.get('hist_ctx', {})
+    vwap   = d.get('vwap', None)
+    high52 = ctx.get('high_52w', '---')
+    low52  = ctx.get('low_52w', '---')
+    chg1d  = ctx.get('chg_1d', 0) or 0
+    pct1d  = ctx.get('pct_1d', 0) or 0
+    chg7d  = ctx.get('chg_7d', 0) or 0
+    pct7d  = ctx.get('pct_7d', 0) or 0
+    fib50  = fib.get('50.0%', 0) or 0
+    fib618 = fib.get('61.8%', 0) or 0
+    fib382 = fib.get('38.2%', 0) or 0
+    if fib618 and gold < fib618:
+        fib_zone = "تحت 61.8% - منطقة دعم قوية، احتمال ارتداد صعودي"
+    elif fib50 and gold < fib50:
+        fib_zone = "بين 61.8% و50% - تصحيح صحي، السوق يجمع قوى"
+    elif fib382 and gold < fib382:
+        fib_zone = "بين 50% و38.2% - منطقة محايدة"
+    else:
+        fib_zone = "فوق 38.2% - زخم صعودي"
+    rsi_label  = "تشبع بيع" if rsi < 30 else ("تشبع شراء" if rsi > 70 else "محايد")
+    macd_label = "زخم صاعد" if macd > 0 else "زخم هابط"
+    vwap_line  = f"VWAP: {vwap}$\n" if vwap else ""
+    fib_lines  = "\n".join([f"   {k}: {v}$" for k, v in fib.items()])
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 1/12 الاسعار وملخص السوق والفيبوناتشي\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر الفوري: {gold:.2f}$ | Pivot: {pivot:.2f}$\n"
+        f"{vwap_line}"
+        f"24h: {chg1d:+.2f}$ ({pct1d:+.2f}%) | 7d: {chg7d:+.2f}$ ({pct7d:+.2f}%)\n"
+        f"52w: High={high52}$ | Low={low52}$\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "مستويات فيبوناتشي:\n"
+        f"{fib_lines}\n"
+        f"الموقع: {fib_zone}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"RSI: {rsi:.2f} ({rsi_label}) | MACD: {macd:.4f} ({macd_label})\n"
+        f"ATR: {atr:.2f}$ (المدى اليومي المتوقع)\n"
+        "⚠️ تقرير خاص بسوق الفوري XAU/USD Spot"
+    )
+
+
+def _build_spot_s2(d: dict) -> str:
+    gold  = d.get('gold', 0)
+    pivot = d.get('pivot', 0)
+    r1, r2, r3 = d.get('r1', 0), d.get('r2', 0), d.get('r3', 0)
+    s1, s2, s3 = d.get('s1', 0), d.get('s2', 0), d.get('s3', 0)
+    atr   = d.get('atr', 0)
+    tfs_map = {
+        '5 دقائق' : d.get('tf_5m', {}),
+        '15 دقيقة': d.get('tf_15m', {}),
+        'ساعة'    : d.get('tf_hourly', {}),
+        '4 ساعات' : d.get('tf_4h', {}),
+        'يومي'    : d.get('tf_daily', {}),
+        'اسبوعي'  : d.get('tf_weekly', {}),
+        'شهري'    : d.get('tf_monthly', {}),
+    }
+    tf_lines = ""
+    for label, tf in tfs_map.items():
+        if not tf:
+            continue
+        bias  = tf.get('bias', '---')
+        rsi_v = tf.get('rsi', '---')
+        score = tf.get('score', 0) or 0
+        arrow = "UP" if score > 0 else ("DOWN" if score < 0 else "FLAT")
+        tf_lines += f"   {label}: {bias} [{arrow}] | RSI: {rsi_v}\n"
+    pos = "فوق المحور (صعودي)" if gold > pivot else "تحت المحور (هبوطي)"
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 2/12 تحليل الاطارات الزمنية\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر: {gold:.2f}$ | المحور: {pivot:.2f}$ | {pos}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "توجه الاطارات:\n"
+        f"{tf_lines}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "الدعم والمقاومة:\n"
+        f"R3={r3:.2f}$ | R2={r2:.2f}$ | R1={r1:.2f}$\n"
+        f"Pivot={pivot:.2f}$\n"
+        f"S1={s1:.2f}$ | S2={s2:.2f}$ | S3={s3:.2f}$\n"
+        f"ATR: {atr:.2f}$"
+    )
+
+
+def _build_spot_s3(d: dict) -> str:
+    gold = d.get('gold', 0)
+    atr  = d.get('atr', 0)
+    rsi  = d.get('rsi', 50)
+    adv  = d.get('adv_trades', {})
+    div  = d.get('divergence', 'لا يوجد')
+    def fmt_t(t, label):
+        if not t:
+            return f"   {label}: غير متاح (شروط غير مكتملة)\n"
+        rr = round(abs((t.get('t1', 0) or 0) - (t.get('entry', 0) or 0)) / max(t.get('risk', 1) or 1, 0.01), 1)
+        return (f"   {label}:\n"
+                f"   دخول={t.get('entry',0):.2f}$ | وقف={t.get('sl',0):.2f}$ | خطر={t.get('risk',0):.2f}$\n"
+                f"   T1={t.get('t1',0):.2f}$ | T2={t.get('t2',0):.2f}$ | T3={t.get('t3',0):.2f}$\n"
+                f"   R:R={rr}x | اطار={t.get('tf','---')}\n")
+    rsi_note = "RSI<30 مرشح انعكاس صعودي" if rsi < 30 else ("RSI>70 مرشح انعكاس هبوطي" if rsi > 70 else f"RSI={rsi:.1f} لا تشبع")
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 3/12 صفقات زيرو انعكاس\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر={gold:.2f}$ | ATR={atr:.2f}$ | {rsi_note}\n"
+        f"التباين: {div}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "شراء انعكاسي:\n"
+        f"{fmt_t(adv.get('rev_buy'), 'شراء')}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "بيع انعكاسي:\n"
+        f"{fmt_t(adv.get('rev_sell'), 'بيع')}"
+        "شرط: شمعة تاكيد انعكاسية قبل الدخول"
+    )
+
+
+def _build_spot_s4(d: dict) -> str:
+    gold = d.get('gold', 0)
+    atr  = d.get('atr', 0)
+    adv  = d.get('adv_trades', {})
+    def fmt_t(t, label):
+        if not t:
+            return f"   {label}: غير متاح\n"
+        rr = round(abs((t.get('t1', 0) or 0) - (t.get('entry', 0) or 0)) / max(t.get('risk', 1) or 1, 0.01), 1)
+        return (f"   {label} [{t.get('tf','---')}]:\n"
+                f"   دخول={t.get('entry',0):.2f}$ | وقف={t.get('sl',0):.2f}$\n"
+                f"   T1={t.get('t1',0):.2f}$ | T2={t.get('t2',0):.2f}$ | T3={t.get('t3',0):.2f}$ | R:R={rr}x\n")
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 4/12 صفقات السكالبينج\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر={gold:.2f}$ | ATR={atr:.2f}$\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "سكالبينج 15 دقيقة:\n"
+        f"{fmt_t(adv.get('scalp_buy'),'شراء')}"
+        f"{fmt_t(adv.get('scalp_sell'),'بيع')}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "سكالبينج 5 دقائق:\n"
+        f"{fmt_t(adv.get('scalp_5m_buy'),'شراء سريع')}"
+        f"{fmt_t(adv.get('scalp_5m_sell'),'بيع سريع')}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "سكالب ضيق (لوت عالي):\n"
+        f"{fmt_t(adv.get('tight_scalp_buy'),'شراء ضيق')}"
+        f"{fmt_t(adv.get('tight_scalp_sell'),'بيع ضيق')}"
+        "شرط: كسر المستوى بشمعة مغلقة"
+    )
+
+
+def _build_spot_s5(d: dict) -> str:
+    gold = d.get('gold', 0)
+    atr  = d.get('atr', 0)
+    adv  = d.get('adv_trades', {})
+    sw_h = d.get('swing_high', 0) or 0
+    sw_l = d.get('swing_low', 0) or 0
+    pw_h = d.get('prev_wk_high', 0) or 0
+    pw_l = d.get('prev_wk_low', 0) or 0
+    def fmt_t(t, label):
+        if not t:
+            return f"   {label}: غير متاح\n"
+        rr = round(abs((t.get('t1', 0) or 0) - (t.get('entry', 0) or 0)) / max(t.get('risk', 1) or 1, 0.01), 1)
+        return (f"   {label} [{t.get('tf','---')}] نوع={t.get('typ','---')}\n"
+                f"   دخول={t.get('entry',0):.2f}$ | وقف={t.get('sl',0):.2f}$ | خطر={t.get('risk',0):.2f}$\n"
+                f"   T1={t.get('t1',0):.2f}$ (R:{rr}x) | T2={t.get('t2',0):.2f}$ | T3={t.get('t3',0):.2f}$\n")
+    rng = round(sw_h - sw_l, 2) if sw_h and sw_l else 0
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 5/12 صفقات السوينج\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر={gold:.2f}$ | ATR={atr:.2f}$\n"
+        f"نطاق السوينج: {sw_l} -> {sw_h} (مدى={rng}$)\n"
+        f"الاسبوع السابق: قمة={pw_h}$ | قاع={pw_l}$\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "سوينج قصير:\n"
+        f"{fmt_t(adv.get('swing_buy'),'شراء')}"
+        f"{fmt_t(adv.get('swing_sell'),'بيع')}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "سوينج اسبوعي:\n"
+        f"{fmt_t(adv.get('weekly_buy'),'شراء اسبوعي')}"
+        f"{fmt_t(adv.get('weekly_sell'),'بيع اسبوعي')}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "سوينج طويل الامد:\n"
+        f"{fmt_t(adv.get('long_swing_buy'),'شراء طويل')}"
+        f"{fmt_t(adv.get('long_swing_sell'),'بيع طويل')}"
+    )
+
+
+def _build_spot_s6(d: dict) -> str:
+    gold = d.get('gold', 0)
+    atr  = d.get('atr', 0)
+    adv  = d.get('adv_trades', {})
+    fib  = d.get('fib', {})
+    def fmt_t(t, label):
+        if not t:
+            return f"   {label}: لا توجد نقطة فيبوناتشي قريبة\n"
+        return (f"   {label}:\n"
+                f"   دخول={t.get('entry',0):.2f}$ | وقف={t.get('sl',0):.2f}$ | خطر={t.get('risk',0):.1f}$\n"
+                f"   T1={t.get('t1',0):.2f}$ | T2={t.get('t2',0):.2f}$ | T3={t.get('t3',0):.2f}$\n")
+    fib_str = " | ".join([f"{k}={v}$" for k, v in list(fib.items())[:4]])
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 6/12 صفقات اللوت العالي\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر={gold:.2f}$ | ATR={atr:.2f}$\n"
+        f"فيبوناتشي: {fib_str}\n"
+        "المبدا: دخول دقيق من فيب + وقف ضيق = لوت اعلى\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "شراء لوت عالي:\n"
+        f"{fmt_t(adv.get('high_lot_buy'),'شراء دقيق')}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "بيع لوت عالي:\n"
+        f"{fmt_t(adv.get('high_lot_sell'),'بيع دقيق')}"
+        "لا تتجاوز 1-2% من راس المال لكل صفقة"
+    )
+
+
+def _build_spot_s7(d: dict) -> str:
+    gold     = d.get('gold', 0)
+    rsi      = d.get('rsi', 50)
+    stoch_k  = d.get('stoch_k', 50)
+    stoch_d  = d.get('stoch_d', 50)
+    macd     = d.get('macd', 0)
+    macd_sig = d.get('macd_sig', 0)
+    macd_h   = d.get('macd_hist', 0)
+    ema20    = d.get('ema20', 0) or 0
+    ema50    = d.get('ema50', 0) or 0
+    ema200   = d.get('ema200', 0) or 0
+    bb_u     = d.get('bb_upper', 0) or 0
+    bb_m     = d.get('bb_mid', 0) or 0
+    bb_l     = d.get('bb_lower', 0) or 0
+    adx      = d.get('adx', 0) or 0
+    di_p     = d.get('di_plus', 0) or 0
+    di_m_v   = d.get('di_minus', 0) or 0
+    cci      = d.get('cci', 0) or 0
+    wr       = d.get('williams_r', -50) or -50
+    atr      = d.get('atr', 0)
+    obv_t    = d.get('obv_trend', '---')
+    div      = d.get('divergence', '---')
+    rel_vol  = d.get('rel_vol_label', '---')
+    if ema20 > ema50 > ema200:   ema_label = "توافق صعودي (20>50>200)"
+    elif ema20 < ema50 < ema200: ema_label = "توافق هبوطي (20<50<200)"
+    else:                         ema_label = "تقاطع جزئي"
+    if bb_u and bb_l:
+        if gold > bb_u:   bb_label = "فوق الشريط العلوي - تشبع شراء"
+        elif gold < bb_l: bb_label = "تحت الشريط السفلي - تشبع بيع"
+        else:              bb_label = "داخل النطاق - حركة طبيعية"
+    else: bb_label = "---"
+    adx_label = ("ترند صعودي قوي" if di_p > di_m_v else "ترند هبوطي قوي") if adx > 25 else "لا ترند - تذبذب"
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 7/12 التحليل الفني والزخم\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر: {gold:.2f}$\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "مؤشرات الزخم:\n"
+        f"RSI(14)={rsi:.2f} ({'تشبع شراء' if rsi>70 else ('تشبع بيع' if rsi<30 else 'محايد')})\n"
+        f"Stoch K={stoch_k:.2f} D={stoch_d:.2f}\n"
+        f"MACD={macd:.4f} Signal={macd_sig:.4f} Hist={macd_h:.4f}\n"
+        f"CCI={cci:.2f} | Williams%R={wr:.2f}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "المتوسطات:\n"
+        f"EMA20={ema20:.2f}$ EMA50={ema50:.2f}$ EMA200={ema200:.2f}$\n"
+        f"{ema_label}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "Bollinger Bands:\n"
+        f"Upper={bb_u:.2f}$ Mid={bb_m:.2f}$ Lower={bb_l:.2f}$\n"
+        f"{bb_label}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"ADX={adx:.2f} DI+={di_p:.2f} DI-={di_m_v:.2f} -> {adx_label}\n"
+        f"ATR={atr:.2f}$ | OBV={obv_t} | حجم={rel_vol}\n"
+        f"تباين={div}"
+    )
+
+
+def _build_spot_s8(d: dict) -> str:
+    gold      = d.get('gold', 0)
+    inflation = d.get('inflation_est', 0) or 0
+    interest  = d.get('interest_rate', 0) or 0
+    ry        = d.get('real_yield', 0) or 0
+    tnx       = d.get('tnx_val', 0) or 0
+    dxy_p     = d.get('dxy_p', 0) or 0
+    dxy_pct   = d.get('dxy_pct', 0) or 0
+    sp500_pct = d.get('sp500_pct', 0) or 0
+    nas_pct   = d.get('nasdaq_pct', 0) or 0
+    vix_p     = d.get('vix_p', 0) or 0
+    vix_pct   = d.get('vix_pct', 0) or 0
+    gs_ratio  = d.get('gs_ratio', 0) or 0
+    fx        = d.get('fx_sorted', [])
+    dxy_eff   = "يضغط الذهب (دولار قوي)" if dxy_pct > 0.3 else ("يدعم الذهب" if dxy_pct < -0.3 else "تاثير محدود")
+    ry_eff    = "يضغط الذهب" if ry > 2 else ("يدعم الذهب" if ry < 0.5 else "متوازن")
+    fx_line   = "".join([f"   {s}: {p:+.4f}%\n" for s, p in (fx[:5] if fx else [])])
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 8/12 الاقتصاد الكلي\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر الفوري: {gold:.2f}$\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "السياسة النقدية:\n"
+        f"   فائدة الفيدرالي: {interest:.2f}%\n"
+        f"   تضخم CPI: {inflation:.2f}%\n"
+        f"   عائد حقيقي: {ry:+.2f}% -> {ry_eff}\n"
+        f"   TNX (10Y): {tnx:.2f}%\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "مؤشر الدولار DXY:\n"
+        f"   DXY={dxy_p:.2f} ({dxy_pct:+.2f}% اليوم) -> {dxy_eff}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "اسواق المخاطرة:\n"
+        f"   S&P500={sp500_pct:+.2f}% | Nasdaq={nas_pct:+.2f}%\n"
+        f"   VIX={vix_p:.2f} ({vix_pct:+.2f}%)\n"
+        f"   Gold/Silver Ratio={gs_ratio:.2f}x\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "اهم العملات:\n"
+        f"{fx_line}"
+    )
+
+
+def _build_spot_s9(d: dict) -> str:
+    gold      = d.get('gold', 0)
+    vix_p     = d.get('vix_p', 0) or 0
+    vix_label = d.get('vix_label', '---')
+    g_press   = d.get('gold_pressure', '---')
+    dxy_bias  = d.get('dxy_bias', '---')
+    sp500_pct = d.get('sp500_pct', 0) or 0
+    nas_pct   = d.get('nasdaq_pct', 0) or 0
+    rel_vol   = d.get('rel_vol', 1.0) or 1.0
+    bond_bias = d.get('bond_bias', '---')
+    conf      = d.get('confluence', {})
+    verdict   = conf.get('verdict', '---')
+    obv_t     = d.get('obv_trend', '---')
+    score = 0
+    if vix_p > 25:       score -= 2
+    elif vix_p < 18:     score += 2
+    if sp500_pct > 0.5:  score += 1
+    elif sp500_pct < -0.5: score -= 1
+    if 'قوي' in str(dxy_bias): score += 1
+    elif 'ضعيف' in str(dxy_bias): score -= 1
+    if score <= -2:   risk_lbl = "خوف عالٍ - ملاذ آمن - صعودي للذهب"
+    elif score <= 0:  risk_lbl = "شهية متحفظة - دعم جزئي للذهب"
+    elif score <= 2:  risk_lbl = "شهية متوسطة - محايد"
+    else:             risk_lbl = "شهية مرتفعة - ضغط على الذهب"
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 9/12 شهية المخاطرة\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر: {gold:.2f}$\n"
+        f"الحكم: {risk_lbl}\n"
+        f"نقاط الشهية: {score:+d}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "مؤشرات الخوف والجشع:\n"
+        f"   VIX={vix_p:.2f} - {vix_label}\n"
+        f"   S&P500={sp500_pct:+.2f}% | Nasdaq={nas_pct:+.2f}%\n"
+        f"   حجم نسبي={rel_vol:.2f}x\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "تحليل الضغط:\n"
+        f"   ضغط الذهب: {g_press}\n"
+        f"   الدولار: {dxy_bias}\n"
+        f"   السندات: {bond_bias}\n"
+        f"   OBV: {obv_t}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"توافق المؤشرات: {verdict}\n"
+        "VIX>25 = ذهب ملاذ آمن يصعد"
+    )
+
+
+def _build_spot_s10(d: dict) -> str:
+    gold      = d.get('gold', 0)
+    tnx       = d.get('tnx_val', 0) or 0
+    twy       = d.get('twy_val', 0) or 0
+    interest  = d.get('interest_rate', 0) or 0
+    inflation = d.get('inflation_est', 0) or 0
+    ry        = d.get('real_yield', 0) or 0
+    ry_brief  = d.get('real_yield_brief', '')
+    spread    = round(tnx - twy, 2) if tnx and twy else 0
+    if spread > 0.5:   curve = "طبيعي - اقتصاد نامٍ"
+    elif spread < 0:   curve = "مقلوب - خطر ركود"
+    else:              curve = "مسطح - مرحلة تحول"
+    if ry < 0:     ry_gold = "سالب - داعم قوي جداً للذهب"
+    elif ry < 1:   ry_gold = "منخفض - بيئة داعمة"
+    elif ry < 2:   ry_gold = "معتدل - تاثير محايد"
+    else:          ry_gold = "مرتفع - ضاغط على الذهب"
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 10/12 عوائد السندات والفائدة والتضخم\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر: {gold:.2f}$\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "منحنى العوائد:\n"
+        f"   سندات 2Y: {twy:.2f}%\n"
+        f"   سندات 10Y: {tnx:.2f}%\n"
+        f"   الفارق: {spread:+.2f}% -> {curve}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "السياسة النقدية:\n"
+        f"   فائدة الفيدرالي: {interest:.2f}%\n"
+        f"   تضخم CPI: {inflation:.2f}%\n"
+        f"   العائد الحقيقي: {ry:+.2f}% -> {ry_gold}\n"
+        f"   ({tnx:.2f}% - {inflation:.2f}% = {ry:+.2f}%)\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{ry_brief}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "التاريخ: عائد سالب=ذهب يصعد | عائد>2%=ضغط"
+    )
+
+
+def _build_spot_s11(d: dict) -> str:
+    gold     = d.get('gold', 0)
+    dxy_p    = d.get('dxy_p', 0) or 0
+    dxy_pct  = d.get('dxy_pct', 0) or 0
+    dxy_bias = d.get('dxy_bias', '---')
+    fx       = d.get('fx_sorted', [])
+    if dxy_pct > 0.5:    dxy_eff = "دولار قوي - يضغط على الذهب"
+    elif dxy_pct < -0.5: dxy_eff = "دولار ضعيف - يدعم الذهب"
+    else:                 dxy_eff = "دولار مستقر - تاثير محدود"
+    fx_lines = "".join([f"   {s}: {p:+.4f}% ({'UP' if p>0 else 'DOWN'})\n" for s, p in (fx if fx else [])])
+    if not fx_lines:
+        fx_lines = "   بيانات العملات غير متاحة\n"
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 11/12 قوة العملات وتاثير DXY\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر: {gold:.2f}$\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "مؤشر الدولار DXY:\n"
+        f"   DXY={dxy_p:.4f} ({dxy_pct:+.4f}% اليوم)\n"
+        f"   التوجه: {dxy_bias}\n"
+        f"   التاثير: {dxy_eff}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "ترتيب العملات اليوم:\n"
+        f"{fx_lines}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "DXY يرتفع -> ذهب ينخفض (ارتباط عكسي ~0.85)\n"
+        "اليورو/دولار اكبر مكون في DXY (57.6%)"
+    )
+
+
+def _build_spot_s12(d: dict) -> str:
+    gold    = d.get('gold', 0)
+    pivot   = d.get('pivot', 0)
+    r1, r2  = d.get('r1', 0), d.get('r2', 0)
+    s1, s2  = d.get('s1', 0), d.get('s2', 0)
+    rsi     = d.get('rsi', 50)
+    macd_h  = d.get('macd_hist', 0) or 0
+    atr     = d.get('atr', 0)
+    ry      = d.get('real_yield', 0) or 0
+    conf    = d.get('confluence', {})
+    verdict = conf.get('verdict', '---')
+    bias    = conf.get('bias', 'neutral')
+    bullish = conf.get('bullish', 0)
+    bearish = conf.get('bearish', 0)
+    neutral_v = conf.get('neutral', 0)
+    n       = conf.get('n', 10) or 10
+    tf_lbl  = d.get('tf_label', '---')
+    dxy_pct = d.get('dxy_pct', 0) or 0
+    div     = d.get('divergence', '---')
+    adv     = d.get('adv_trades', {})
+    vwap    = d.get('vwap', None)
+    best_b  = adv.get('monthly_buy') or adv.get('swing_buy') or adv.get('daily_buy')
+    best_s  = adv.get('monthly_sell') or adv.get('swing_sell') or adv.get('daily_sell')
+    def fmt_b(t, lbl):
+        if not t: return f"   {lbl}: غير متاح\n"
+        return f"   {lbl}: دخول={t.get('entry',0):.2f}$ وقف={t.get('sl',0):.2f}$ T1={t.get('t1',0):.2f}$\n"
+    bull_pct = round(bullish / n * 100) if n else 50
+    bear_pct = round(bearish / n * 100) if n else 50
+    pos = "فوق المحور" if gold > pivot else "تحت المحور"
+    vwap_str = f" | VWAP={vwap}$" if vwap else ""
+    if bias == 'bull':   conc = "يميل للصعود - ابحث عن شراء عند الدعم"
+    elif bias == 'bear': conc = "يميل للهبوط - ابحث عن بيع عند المقاومة"
+    else:                conc = "متذبذب - انتظر تاكيداً واضحاً"
+    return (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "[فوري] 12/12 الخلاصة المحورية الشاملة\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"السعر={gold:.2f}$ | {pos}{vwap_str}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "توافق المؤشرات (10 مؤشرات):\n"
+        f"   صعودي={bullish}/{n} ({bull_pct}%) | هبوطي={bearish}/{n} ({bear_pct}%) | محايد={neutral_v}/{n}\n"
+        f"   الحكم: {verdict}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"الاطارات: {tf_lbl}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "المستويات:\n"
+        f"   R2={r2:.2f}$ R1={r1:.2f}$ Pivot={pivot:.2f}$ S1={s1:.2f}$ S2={s2:.2f}$\n"
+        f"   ATR={atr:.2f}$\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "افضل صفقة:\n"
+        f"{fmt_b(best_b,'شراء')}"
+        f"{fmt_b(best_s,'بيع')}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"RSI={rsi:.2f} | MACD Hist={macd_h:.4f} | عائد حقيقي={ry:+.2f}%\n"
+        f"DXY={dxy_pct:+.2f}% | تباين={div}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"الخلاصة: {conc}"
+    )
+
+
 def _build_summary_template(d: dict, report_text: str, mode_label: str) -> str:
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client: return ""
@@ -4153,11 +4657,27 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         if 't12' in locals() and t12: bot2_reports.append(("🏦 تقرير المشتقات وصناديق الاستثمار", t12, None))
         if 't13' in locals() and t13: bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13, None))
 
+        # القوالب الفورية الخاصة S1-S12 (رياضية 100% - صفر AI)
+        try:
+            bot2_reports.append(("[فوري] 1/12 الاسعار والفيبوناتشي",       _build_spot_s1(data),  None))
+            bot2_reports.append(("[فوري] 2/12 الاطارات الزمنية",            _build_spot_s2(data),  None))
+            bot2_reports.append(("[فوري] 3/12 زيرو انعكاس",                 _build_spot_s3(data),  None))
+            bot2_reports.append(("[فوري] 4/12 السكالبينج",                   _build_spot_s4(data),  None))
+            bot2_reports.append(("[فوري] 5/12 السوينج",                      _build_spot_s5(data),  None))
+            bot2_reports.append(("[فوري] 6/12 اللوت العالي",                 _build_spot_s6(data),  None))
+            bot2_reports.append(("[فوري] 7/12 التحليل الفني والزخم",         _build_spot_s7(data),  None))
+            bot2_reports.append(("[فوري] 8/12 الاقتصاد الكلي",              _build_spot_s8(data),  None))
+            bot2_reports.append(("[فوري] 9/12 شهية المخاطرة",               _build_spot_s9(data),  None))
+            bot2_reports.append(("[فوري] 10/12 عوائد السندات",              _build_spot_s10(data), None))
+            bot2_reports.append(("[فوري] 11/12 قوة العملات DXY",             _build_spot_s11(data), None))
+            bot2_reports.append(("[فوري] 12/12 الخلاصة المحورية",            _build_spot_s12(data), None))
+        except Exception as _se:
+            log.warning(f"[S1-S12] خطا في توليد القوالب الفورية: {_se}")
 
         if t7: bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7, None))
-        if t8: bot2_reports.append(("🐋 تأثير الأسواق والمؤسسات (الفوري)", t8, None))
+        if t8: bot2_reports.append(("🐋 تاثير الاسواق والمؤسسات (الفوري)", t8, None))
         if t9: bot2_reports.append(("📊 تقرير اتجاه الذهب اليومي (الفوري)", t9, None))
-        if t10: bot2_reports.append(("📆 التقرير الأسبوعي الشامل (الفوري)", t10, None))
+        if t10: bot2_reports.append(("📆 التقرير الاسبوعي الشامل (الفوري)", t10, None))
         if t6: bot2_reports.append(("الخلاصة المحورية", t6, None))
 
         # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──

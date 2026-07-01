@@ -2351,86 +2351,59 @@ def _build_today_ohlc_section(d: dict) -> str:
 
 def _build_template_1(d: dict) -> str:
     """بناء القالب الأول (الموجز الكلاسيكي المنفصل)"""
-    w_bias = d['tf_weekly'].get('bias', 'متذبذب')
-    w_icon = '📈' if 'صاعد' in w_bias else ('📉' if 'هابط' in w_bias else '↔️')
+    w_rsi = d.get('tf_weekly', {}).get('rsi', 50)
+    w_bias = 'صاعد 📈' if w_rsi >= 50 else 'هابط 📉'
     
-    d_bias = d['tf_daily'].get('bias', 'متذبذب')
-    d_icon = '📈' if 'صاعد' in d_bias else ('📉' if 'هابط' in d_bias else '↔️')
+    d_rsi = d.get('tf_daily', {}).get('rsi', 50)
+    d_bias = 'صاعد 📈' if d_rsi >= 50 else 'هابط 📉'
     
     gold = d['gold']
-    vwap = d.get('vwap') or gold
-    rsi_1h = d['tf_hourly'].get('rsi', 50) if d.get('tf_hourly') else 50
-    score_4h = d['tf_4h'].get('score', 0) if d.get('tf_4h') else 0
-    
-    context_lines = []
-    if gold < vwap:
-        context_lines.append("الإغلاق تم أسفل مناطق دعم مكسورة تحولت إلى مقاومات.")
-    else:
-        context_lines.append("الإغلاق تم أعلى مقاومات مخترقة تحولت إلى دعوم.")
-        
-    if score_4h < -2 and rsi_1h < 40:
-        context_lines.append("يوجد زخم بيعي مسيطر وقناة سعرية هابطة على فريم الساعة.")
-    elif score_4h > 2 and rsi_1h > 60:
-        context_lines.append("توجد قناة سعرية صاعدة متكونة على فريم الساعة بزخم شرائي قوي.")
-    else:
-        context_lines.append("السعر يتداول في نطاق عرضي تجميعي على المدى القصير.")
-        
-    context_text = "\n".join(context_lines)
-    
-    main_bias = d['confluence']['bias']
+    pivot = d.get('pivot', gold)
     atr = d.get('atr', 20)
+    r1 = d.get('r1', pivot + atr)
+    s1 = d.get('s1', pivot - atr)
     
-    if main_bias == 'bear' or main_bias == 'neutral':
-        # نفضل البيع
-        zone_color = "🔴"
-        zone_name = "مستوى البيع"
-        # المقاومات
-        r1, r2 = d.get('r1', gold+10), d.get('r2', gold+20)
-        exact_zone = round(r1, 2)
-        t1 = round(d.get('s1', gold-10), 2)
-        t2 = round(d.get('s2', gold-20), 2)
-        cont_action = "الهبوط لمستويات أقل"
-        rev_color = "🟢"
-        rev_zone = round(d.get('swing_high') or (r2 + atr), 2)
-        rev_dir = "الصعود"
-        break_dir = "أعلاه"
+    if gold >= pivot:
+        zone_color = '🟢'
+        zone_name = 'مستوى الدعم الحيوي'
+        exact_zone = round(pivot, 2)
+        t1 = round(r1, 2)
+        t2 = round(d.get('r2', r1 + atr), 2)
+        cont_action = 'الصعود لاستهداف قمم أعلى'
+        rev_color = '🔴'
+        rev_zone = round(s1, 2)
+        rev_dir = 'الهبوط السلبي'
+        break_dir = 'أسفله'
     else:
-        # الشراء
-        zone_color = "🟢"
-        zone_name = "مستوى الشراء"
-        s1, s2 = d.get('s1', gold-10), d.get('s2', gold-20)
-        exact_zone = round(s1, 2)
-        t1 = round(d.get('r1', gold+10), 2)
-        t2 = round(d.get('r2', gold+20), 2)
-        cont_action = "الصعود لمستويات أعلى"
-        rev_color = "🔴"
-        rev_zone = round(d.get('swing_low') or (s2 - atr), 2)
-        rev_dir = "الهبوط"
-        break_dir = "أسفله"
-    
-    # القالب كما طلبه العميل بالحرف
-    template = f"""تحليل الذهب 🟡
+        zone_color = '🔴'
+        zone_name = 'مستوى المقاومة المحوري'
+        exact_zone = round(pivot, 2)
+        t1 = round(s1, 2)
+        t2 = round(d.get('s2', s1 - atr), 2)
+        cont_action = 'الهبوط لاستهداف قيعان أدنى'
+        rev_color = '🟢'
+        rev_zone = round(r1, 2)
+        rev_dir = 'الصعود الإيجابي'
+        break_dir = 'أعلاه'
+        
+    template = f'''تحليل الذهب 🟡
 
 1W (الأسبوعي)
-التحيز الأسبوعي: {w_bias} {w_icon}
+التحيز الأسبوعي: {w_bias}
 
 1D (اليومي)
-التحيز اليومي: {d_bias} {d_icon}
+التحيز اليومي: {d_bias}
 
-4H - 1H
-{context_text}
-
-{zone_color} {zone_name}: {exact_zone}
+{zone_color} {zone_name}: {exact_zone}$
 
 في حال احترام المستوى، نتوقع استهداف:
-{t1}
-{t2}
+🎯 {t1}$
+🎯 {t2}$
 
-وفي حالة كسر {t2}، سيستمر {cont_action}.
+وفي حالة كسر {t2}$، سيستمر {cont_action}.
 
-{rev_color} أما إذا لم يحترم السعر مستوى {exact_zone} وتمكن من اختراقه، فسيستهدف {rev_zone}.
-وتعتبر نقطة {rev_zone} هي النقطة الذهبية الفاصلة بين الصعود والهبوط، وباختراقها والثبات {break_dir} يمكننا القول إن السعر بدأ يغير اتجاهه ويميل إلى {rev_dir}."""
-    
+{rev_color} أما إذا لم يحترم السعر مستوى {exact_zone}$ وتمكن من كسره، فسيستهدف {rev_zone}$.
+وتعتبر النقطة {rev_zone}$ هي النقطة الذهبية الفاصلة، وباختراقها والثبات {break_dir} يتغير الاتجاه نحو {rev_dir}.'''
     return template
 
 def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is_morning: bool = False) -> str | None:

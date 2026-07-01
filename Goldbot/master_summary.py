@@ -80,11 +80,17 @@ def main():
     token = '8315216245:AAFoXDISnKYc051VNaOQqE4HjfbpKt2FvyM'
     
     try:
-        url = f"https://api.telegram.org/bot{token}/getUpdates"
-        resp = requests.get(url, timeout=10).json()
-        chat_id = "5198906322" # fallback
-        if resp.get('ok') and resp.get('result'):
-            chat_id = resp['result'][-1]['message']['chat']['id']
+        chat_id = "@spotGol" # Send master summary to main group by default
+        try:
+            url = f"https://api.telegram.org/bot{token}/getUpdates"
+            resp = requests.get(url, timeout=5).json()
+            if resp.get('ok') and resp.get('result'):
+                for res in reversed(resp['result']):
+                    if 'message' in res and res['message']['chat']['type'] == 'private':
+                        chat_id = res['message']['chat']['id']
+                        break
+        except:
+            pass
             
         send_url = f"https://api.telegram.org/bot{token}/sendMessage"
         requests.post(send_url, json={'chat_id': chat_id, 'text': master_msg}, timeout=10)

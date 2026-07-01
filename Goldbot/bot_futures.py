@@ -3715,13 +3715,21 @@ if __name__ == "__main__":
 
 import requests
 
-def send_summary_to_bot(token, message):
+def send_summary_to_bot(token, message, chat_id):
+    import requests
     try:
-        url = f"https://api.telegram.org/bot{token}/getUpdates"
-        resp = requests.get(url, timeout=10).json()
-        chat_id = "5198906322"
-        if resp.get('ok') and resp.get('result'):
-            chat_id = resp['result'][-1]['message']['chat']['id']
+        # Fallback dynamic retrieval (if user messaged bot directly)
+        try:
+            url = f"https://api.telegram.org/bot{token}/getUpdates"
+            resp = requests.get(url, timeout=5).json()
+            if resp.get('ok') and resp.get('result'):
+                # Prioritize a private chat if available, else keep the group chat_id
+                for res in reversed(resp['result']):
+                    if 'message' in res and res['message']['chat']['type'] == 'private':
+                        chat_id = res['message']['chat']['id']
+                        break
+        except:
+            pass
             
         send_url = f"https://api.telegram.org/bot{token}/sendMessage"
         requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=10)

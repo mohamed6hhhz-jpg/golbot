@@ -3901,49 +3901,63 @@ Breakeven Call: {breakeven_c}$ | Breakeven Put: {breakeven_p}$
 # ══════════════════════════════════════════════════
 
 def _build_spot_s1(d: dict) -> str:
-    gold  = d.get('gold', 0)
-    rsi   = d.get('rsi', 50)
-    macd  = d.get('macd', 0)
-    atr   = d.get('atr', 0)
-    fib   = d.get('fib', {})
+    """1/12 - ملخص السوق والفيبوناتشي"""
+    gold   = d.get('gold', 0) or 0
+    rsi    = d.get('rsi', 50) or 50
+    macd   = d.get('macd', 0) or 0
+    atr    = d.get('atr', 0) or 0
+    fib    = d.get('fib', {}) or {}
+    ctx    = d.get('hist_ctx', {}) or {}
+
     fib50  = fib.get('50.0%', 0) or 0
     fib618 = fib.get('61.8%', 0) or 0
     fib382 = fib.get('38.2%', 0) or 0
 
-    if gold < fib618 and fib618:
-        analysis = (f"الاسعار الحالية تقع تحت مستوى 61.8% من فيبوناتشي ({fib618}$)، مما يشير الى ان السوق في طور تصحيح عميق.")
-    elif gold < fib50 and fib50:
-        analysis = (f"الاسعار الحالية تقع تحت مستوى 50.0% من فيبوناتشي ({fib50}$)، مما يشير الى ان السوق قد يكون في طور تصحيح.")
-    elif gold < fib382 and fib382:
-        analysis = (f"الاسعار الحالية تقع قريبة من مستوى 38.2% ({fib382}$)، مما يشير الى استمرار الزخم الصعودي.")
+    # تحليل الموقع من فيبوناتشي
+    if fib618 and gold < fib618:
+        analysis = f"الاسعار الحالية تقع تحت مستوى 61.8% من فيبوناتشي ({fib618}$)، مما يشير الى ان السوق في طور تصحيح عميق."
+    elif fib50 and gold < fib50:
+        analysis = f"الاسعار الحالية تقع تحت مستوى 50.0% من فيبوناتشي ({fib50}$)، مما يشير الى ان السوق قد يكون في طور تصحيح."
+    elif fib382 and gold < fib382:
+        analysis = f"الاسعار الحالية تقع قريبة من مستوى 38.2% ({fib382}$)، مما يشير الى استمرار الزخم الصعودي."
     else:
-        analysis = (f"الاسعار الحالية فوق مستوى 38.2% من فيبوناتشي، مما يشير الى زخم صعودي قوي.")
+        analysis = f"الاسعار الحالية فوق مستوى 38.2% من فيبوناتشي، مما يشير الى زخم صعودي قوي."
 
+    # تحليل RSI
     if rsi < 30:
         analysis += f" ومع ذلك، مؤشر RSI يبلغ {rsi:.2f} مما يشير الى تشبع بيعي، مما يرجح فرصة ارتداد صعودي. 💡"
     elif rsi > 70:
         analysis += f" ومع ذلك، مؤشر RSI يبلغ {rsi:.2f} مما يشير الى تشبع شرائي، مما يرجح احتمالية انعكاس هبوطي. 💡"
     else:
-        analysis += f" ومع ذلك، يجب ان نلاحظ ان مؤشر RSI عند {rsi:.2f} يظهر ان السوق ليس في منطقة تشبع واضحة، مما قد يشير الى ان هناك فرصة للاستمرار في الاتجاه الهبوطي. 💡"
+        analysis += f" ومع ذلك، يجب ان نلاحظ ان مؤشر RSI عند {rsi:.2f} يظهر ان السوق ليس في منطقة تشبع واضحة، مما قد يشير الى ان هناك فرصة للاستمرار في الاتجاه الحالي. 💡"
 
+    # التوصية
     if rsi < 30:
-        recom = f"يمكن النظر في فرصة شراء عند المستويات الحالية مع تاكيد اضافي بكسر مستوى المقاومة. ⏰"
+        recom = "يمكن النظر في فرصة شراء عند المستويات الحالية مع تاكيد اضافي بكسر مستوى المقاومة. ⏰"
     elif rsi > 70:
-        recom = f"يمكن النظر في فرصة بيع عند المستويات الحالية مع تاكيد اضافي بكسر مستوى الدعم. ⏰"
+        recom = "يمكن النظر في فرصة بيع عند المستويات الحالية مع تاكيد اضافي بكسر مستوى الدعم. ⏰"
     else:
-        recom = f"لا توجد توصيات شراء او بيع في الوقت الحالي، حيث ان السوق في وضع غير واضح. يجب ان ننتظر حتى يتضح الاتجاه قبل اتخاذ اي اجراء. ⏰"
+        recom = "لا توجد توصيات شراء او بيع في الوقت الحالي، حيث ان السوق في وضع غير واضح. يجب ان ننتظر حتى يتضح الاتجاه قبل اتخاذ اي اجراء. ⏰"
 
+    # بناء سطور فيبوناتشي
     fib_lines = []
     for k, v in fib.items():
         emoji = "🔝" if k in ("0.0%", "100%") else "🔜"
         fib_lines.append(f"* {k}: **{v}** {emoji}")
+
+    # سطر التغيرات التاريخية
+    chg1d = ctx.get('chg_1d', 0) or 0
+    pct1d = ctx.get('pct_1d', 0) or 0
+    chg7d = ctx.get('chg_7d', 0) or 0
+    pct7d = ctx.get('pct_7d', 0) or 0
 
     return (
         "### ملخص السوق 📊\n"
         f"السعر الحالي: **{gold:.2f}** 💰\n"
         f"مؤشر RSI: **{rsi:.2f}** 📈\n"
         f"مؤشر MACD: **{macd:.4f}** 📉\n"
-        f"مؤشر ATR: **{atr:.2f}** 📊\n\n"
+        f"مؤشر ATR: **{atr:.2f}** 📊\n"
+        f"التغير اليومي: {chg1d:+.2f}$ ({pct1d:+.2f}%) | اسبوعي: {chg7d:+.2f}$ ({pct7d:+.2f}%)\n\n"
         "### مستويات فيبوناتشي 📐\n"
         + "\n".join(fib_lines) + "\n\n"
         + "### تحليل السوق 📊\n"
@@ -3957,79 +3971,88 @@ def _build_spot_s1(d: dict) -> str:
 
 
 def _build_spot_s2(d: dict) -> str:
-    gold   = d.get('gold', 0)
-    rsi    = d.get('rsi', 50)
-    macd   = d.get('macd', 0)
-    pivot  = d.get('pivot', 0)
-    r1     = d.get('r1', 0)
-    s1     = d.get('s1', 0)
+    """2/12 - تحليل الاطارات الزمنية"""
+    gold  = d.get('gold', 0) or 0
+    rsi   = d.get('rsi', 50) or 50
+    macd  = d.get('macd', 0) or 0
+    pivot = d.get('pivot', 0) or 0
+    r1    = d.get('r1', 0) or 0
+    s1    = d.get('s1', 0) or 0
 
-    tf15   = d.get('tf_15m', {})
-    tf_d   = d.get('tf_daily', {})
-    tf_w   = d.get('tf_weekly', {})
-    tf_m   = d.get('tf_monthly', {})
+    tf15 = d.get('tf_15m', {}) or {}
+    tf_d = d.get('tf_daily', {}) or {}
+    tf_w = d.get('tf_weekly', {}) or {}
+    tf_m = d.get('tf_monthly', {}) or {}
 
     def tf_bias_ar(tf):
-        b = tf.get('bias', '') if tf else ''
-        if 'bull' in str(b).lower() or 'صاعد' in str(b): return "صاعد ⬆️"
-        if 'bear' in str(b).lower() or 'هابط' in str(b): return "هابط ⬇️"
+        if not tf: return "محايد 🤔"
+        b = str(tf.get('bias', ''))
+        if 'صعودي' in b or 'bull' in b.lower(): return "صعودي ⬆️"
+        if 'هبوطي' in b or 'bear' in b.lower(): return "هبوطي ⬇️"
         return "محايد 🤔"
 
-    low15  = tf15.get('range_low', s1) if tf15 else s1
-    high15 = tf15.get('range_high', r1) if tf15 else r1
-    piv_d  = tf_d.get('pivot', pivot) if tf_d else pivot
-    piv_w  = tf_w.get('pivot', 0) if tf_w else 0
-    piv_mo = tf_m.get('pivot', 0) if tf_m else 0
+    def tf_rsi(tf): return tf.get('rsi', 50) if tf else 50
+
+    piv_d  = tf_d.get('pivot', pivot) or pivot
+    piv_w  = tf_w.get('pivot', 0) or 0
+    piv_mo = tf_m.get('pivot', 0) or 0
+    rng_low  = round(pivot - (d.get('atr', 0) or 0) * 0.5, 2)
+    rng_high = round(pivot + (d.get('atr', 0) or 0) * 0.5, 2)
+
     bias15 = tf_bias_ar(tf15)
     bias_d = tf_bias_ar(tf_d)
     bias_w = tf_bias_ar(tf_w)
+    bias_m = tf_bias_ar(tf_m)
 
     pos_d  = "تحت مستوى البيفوت" if gold < piv_d else "فوق مستوى البيفوت"
     pos_w  = "تحت مستوى البيفوت" if piv_w and gold < piv_w else "فوق مستوى البيفوت"
     pos_mo = "تحت مستوى البيفوت" if piv_mo and gold < piv_mo else "فوق مستوى البيفوت"
 
     if gold < pivot:
-        sell_lvl = r1
-        recom_sell = f"يمكن النظر في بيع الذهب عند مستوى {sell_lvl:.2f}$ 📊."
-        recom_buy = "لا يوجد توصية شراء في الوقت الحالي 🙅."
+        recom_sell = f"يمكن النظر في بيع الذهب عند مستوى {r1:.2f}$ 📊."
+        recom_buy  = "لا يوجد توصية شراء في الوقت الحالي 🙅."
     else:
-        sell_lvl = r1
-        recom_buy = f"يمكن النظر في شراء الذهب عند مستوى {s1:.2f}$ 📊."
+        recom_buy  = f"يمكن النظر في شراء الذهب عند مستوى {s1:.2f}$ 📊."
         recom_sell = "لا يوجد توصية بيع في الوقت الحالي 🙅."
 
-    rsi_risk = "مرتفعة" if rsi < 35 or rsi > 65 else "متوسطة"
+    mkt_state = "حالة بيع" if rsi < 45 else "حالة شراء"
+    mkt_dir   = "هبوطي" if macd < 0 else "صعودي"
 
     return (
         "### تحليل الاطارات الزمنية 🕒\n"
         "#### نظرة عامة على السوق 📊\n"
-        f"السعر الحالي للذهب هو {gold:.2f} 💰. مؤشر RSI يبلغ {rsi:.2f} 📈، مما يشير الى ان السوق في {'حالة بيع' if rsi < 45 else 'حالة شراء' if rsi > 55 else 'حالة محايدة'}. مؤشر MACD يبلغ {macd:.4f} 📉، مما يشير الى ان السوق في اتجاه {'هبوطي' if macd < 0 else 'صعودي'}.\n\n"
+        f"السعر الحالي للذهب هو {gold:.2f} 💰. مؤشر RSI يبلغ {rsi:.2f} 📈، مما يشير الى ان السوق في {mkt_state}. "
+        f"مؤشر MACD يبلغ {macd:.4f} 📉، مما يشير الى ان السوق في اتجاه {mkt_dir}.\n\n"
         "#### الاطارات الزمنية 🕒\n"
-        f"* **15 دقيقة** ⏰: السعر الحالي يقع في نطاق {low15:.2f} و {high15:.2f} 📊. الاتجاه الحالي هو {bias15}.\n"
+        f"* **15 دقيقة** ⏰: السعر الحالي يقع في نطاق {rng_low:.2f} و {rng_high:.2f} 📊. الاتجاه الحالي هو {bias15}.\n"
         f"* **يومية** 📅: السعر الحالي يقع {pos_d} {piv_d:.2f} 📊. الاتجاه الحالي هو {bias_d}.\n"
         f"* **اسبوعية** 📆: السعر الحالي يقع {pos_w} {piv_w:.2f} 📊. الاتجاه الحالي هو {bias_w}.\n"
-        f"* **شهرية** 📆: السعر الحالي يقع {pos_mo} {piv_mo:.2f} 📊. الاتجاه الحالي هو {'هبوطي ⬇️' if gold < piv_mo else 'صاعد ⬆️'}.\n\n"
+        f"* **شهرية** 📆: السعر الحالي يقع {pos_mo} {piv_mo:.2f} 📊. الاتجاه الحالي هو {bias_m}.\n\n"
         "#### التوصيات 📝\n"
         f"* **شراء** 🛍️: {recom_buy}\n"
         f"* **بيع** 🚫: {recom_sell}\n\n"
         "#### المخاطر 🚨\n"
-        f"* **مخاطر السوق** 📊: السوق في حالة {'بيع 📉' if rsi < 45 else 'شراء 📈'}، مما {'يزيد' if rsi_risk == 'مرتفعة' else 'لا يزيد كثيرا'} من المخاطر 🚨.\n"
+        f"* **مخاطر السوق** 📊: السوق في {mkt_state} 📉، مما {'يزيد' if rsi < 35 or rsi > 65 else 'لا يزيد كثيرا'} من المخاطر 🚨.\n"
         "* **مخاطر السيولة** 💧: يجب مراقبة حجم التداول لتقييم مستوى السيولة 📉.\n\n"
         "#### الخلاصة 📝\n"
-        f"السوق في حالة {'بيع 📉' if rsi < 45 else 'شراء 📈'}، والسعر الحالي يقع {pos_d} {piv_d:.2f} 📊. {recom_buy} {recom_sell} يجب ان يكون المستثمر على علم بالمخاطر 🚨 ويدير المخاطر بشكل فعال 📊. 💡"
+        f"السوق في {mkt_state} 📉، والسعر الحالي يقع {pos_d} {piv_d:.2f} 📊. "
+        f"{recom_buy} {recom_sell} يجب ان يكون المستثمر على علم بالمخاطر 🚨 ويدير المخاطر بشكل فعال 📊. 💡"
     )
 
 
 def _build_spot_s3(d: dict) -> str:
-    gold  = d.get('gold', 0)
-    rsi   = d.get('rsi', 50)
-    macd  = d.get('macd', 0)
-    atr   = d.get('atr', 0)
-    fib   = d.get('fib', {})
-    pivot = d.get('pivot', 0)
-    adv   = d.get('adv_trades', {})
-    ctx   = d.get('hist_ctx', {})
-    day_high = ctx.get('day_high', d.get('r1', 0)) or d.get('r1', 0)
-    day_low  = ctx.get('day_low', d.get('s1', 0)) or d.get('s1', 0)
+    """3/12 - صفقات زيرو انعكاس"""
+    gold  = d.get('gold', 0) or 0
+    rsi   = d.get('rsi', 50) or 50
+    macd  = d.get('macd', 0) or 0
+    atr   = d.get('atr', 0) or 0
+    fib   = d.get('fib', {}) or {}
+    pivot = d.get('pivot', 0) or 0
+    adv   = d.get('adv_trades', {}) or {}
+    r1    = d.get('r1', 0) or 0
+    s1    = d.get('s1', 0) or 0
+    swing_h = d.get('swing_high', r1) or r1
+    swing_l = d.get('swing_low', s1) or s1
 
     rev_b = adv.get('rev_buy')
     rev_s = adv.get('rev_sell')
@@ -4038,12 +4061,16 @@ def _build_spot_s3(d: dict) -> str:
 
     if rev_b:
         strat = (
-            f"### استراتيجية زيرو انعكاس 🔄\n"
-            f"بناء على البيانات، يمكننا النظر في:\n"
-            f"* **شراء** عند {rev_b.get('entry',0):.2f}$ مع وقف الخسارة عند {rev_b.get('sl',0):.2f}$، وهدف عند {rev_b.get('t1',0):.2f}$ 📈.\n"
+            "### استراتيجية زيرو انعكاس 🔄\n"
+            f"بناء على البيانات، يمكننا النظر في استراتيجية تداول:\n"
+            f"* **شراء** عند {rev_b.get('entry',0):.2f}$ مع وقف الخسارة عند {rev_b.get('sl',0):.2f}$، "
+            f"وهدف عند {rev_b.get('t1',0):.2f}$ 📈\n"
         )
         if rev_s:
-            strat += f"* **بيع** عند {rev_s.get('entry',0):.2f}$ مع وقف الخسارة عند {rev_s.get('sl',0):.2f}$، وهدف عند {rev_s.get('t1',0):.2f}$ 📉.\n"
+            strat += (
+                f"* **بيع** عند {rev_s.get('entry',0):.2f}$ مع وقف الخسارة عند {rev_s.get('sl',0):.2f}$، "
+                f"وهدف عند {rev_s.get('t1',0):.2f}$ 📉\n"
+            )
         strat += "ومع ذلك، يجب ان يتم تقييم هذه الاستراتيجية بناء على البيانات الحالية والتحليل الفني 📊.\n"
     else:
         strat = (
@@ -4052,41 +4079,46 @@ def _build_spot_s3(d: dict) -> str:
             f"يجب انتظار تشكل نمط انعكاسي واضح مع تاكيد RSI وMACD. 📊\n"
         )
 
+    rsi_note = ('RSI في منطقة تشبع بيع — مرشح للارتداد الصعودي' if rsi < 30
+                else 'RSI في منطقة تشبع شراء — مرشح للانعكاس الهبوطي' if rsi > 70
+                else f'RSI={rsi:.2f} في المنطقة المحايدة')
+    macd_dir = 'سلبي — ضغط بيعي' if macd < 0 else 'ايجابي — زخم صعودي'
+
     return (
         "### تحليل البيانات 📊\n"
         "نحن نتعامل مع بيانات السوق الفوري (Spot - XAU/USD) 📈.\n\n"
         "### بيانات السوق الحالية 📊\n"
         f"- السعر الحالي: {gold:.2f} 💰\n"
-        f"- RSI: {rsi:.2f} 📊\n"
-        f"- MACD: {macd:.4f} 📉\n"
+        f"- RSI: {rsi:.2f} 📊 ({rsi_note})\n"
+        f"- MACD: {macd:.4f} 📉 ({macd_dir})\n"
         f"- ATR: {atr:.2f} 📊\n"
         "- فيبوناتشي:\n"
         f"{fib_lines}\n"
-        f"- اعلى سعر يومي: {day_high:.2f} 📈\n"
-        f"- اقل سعر يومي: {day_low:.2f} 📉\n"
+        f"- اعلى سعر يومي (Swing H): {swing_h:.2f} 📈\n"
+        f"- اقل سعر يومي (Swing L): {swing_l:.2f} 📉\n"
         f"- محور الدوران: {pivot:.2f} 🔄\n\n"
         "### استراتيجيات التداول 📈\n"
-        "البيانات تشمل استراتيجيات تداول مختلفة. سنركز على استراتيجيات السوق الفوري.\n\n"
+        "البيانات تشمل استراتيجيات تداول مختلفة خاصة بالسوق الفوري.\n\n"
         "### تحليل الاستراتيجيات 📊\n"
-        f"نظرا للبيانات الحالية، RSI عند {rsi:.2f} {'يشير الى تشبع بيعي' if rsi < 30 else 'يشير الى تشبع شرائي' if rsi > 70 else 'في منطقة محايدة'}، وMACD {'سالب مشيرا الى اتجاه هبوطي' if macd < 0 else 'موجب مشيرا الى اتجاه صعودي'}.\n\n"
+        f"نظرا للبيانات الحالية، RSI عند {rsi:.2f} {rsi_note}، وMACD {macd_dir}.\n\n"
         + strat + "\n"
         "### خلاصة 📝\n"
-        "يجب ان نكون حذرين عند تطبيق استراتيجيات التداول عند التعامل مع السوق الفوري 📊. "
+        "يجب ان نكون حذرين عند تطبيق استراتيجيات التداول في السوق الفوري 📊. "
         "يجب ان يتم تقييم جميع الاستراتيجيات بناء على البيانات الحالية والتحليل الفني 📈."
     )
 
 
 def _build_spot_s4(d: dict) -> str:
-    gold  = d.get('gold', 0)
-    rsi   = d.get('rsi', 50)
-    macd  = d.get('macd', 0)
-    atr   = d.get('atr', 0)
-    fib   = d.get('fib', {})
-    pivot = d.get('pivot', 0)
-    adv   = d.get('adv_trades', {})
-    ctx   = d.get('hist_ctx', {})
-    day_high = ctx.get('day_high', d.get('r1', 0)) or d.get('r1', 0)
-    day_low  = ctx.get('day_low', d.get('s1', 0)) or d.get('s1', 0)
+    """4/12 - صفقات السكالبينج"""
+    gold  = d.get('gold', 0) or 0
+    rsi   = d.get('rsi', 50) or 50
+    macd  = d.get('macd', 0) or 0
+    atr   = d.get('atr', 0) or 0
+    fib   = d.get('fib', {}) or {}
+    pivot = d.get('pivot', 0) or 0
+    adv   = d.get('adv_trades', {}) or {}
+    swing_h = d.get('swing_high', d.get('r1', 0)) or d.get('r1', 0)
+    swing_l = d.get('swing_low', d.get('s1', 0)) or d.get('s1', 0)
 
     sb = adv.get('scalp_buy')
     ss = adv.get('scalp_sell')
@@ -4098,9 +4130,9 @@ def _build_spot_s4(d: dict) -> str:
             f" + وقف الخسارة: {sb.get('sl',0):.2f}\n"
             f" + مخاطر: {sb.get('risk',0):.1f}\n"
             f" + اهداف:\n"
-            f" - الاول: {sb.get('t1',0):.2f}\n"
-            f" - الثاني: {sb.get('t2',0):.2f}\n"
-            f" - الثالث: {sb.get('t3',0):.2f}\n"
+            f"    - الاول: {sb.get('t1',0):.2f}\n"
+            f"    - الثاني: {sb.get('t2',0):.2f}\n"
+            f"    - الثالث: {sb.get('t3',0):.2f}\n"
         )
     else:
         buy_block = "* **شراء** 🛍️: لا تتوفر صفقة سكالبينج شراء حاليا\n"
@@ -4112,15 +4144,16 @@ def _build_spot_s4(d: dict) -> str:
             f" + وقف الخسارة: {ss.get('sl',0):.2f}\n"
             f" + مخاطر: {ss.get('risk',0):.1f}\n"
             f" + اهداف:\n"
-            f" - الاول: {ss.get('t1',0):.2f}\n"
-            f" - الثاني: {ss.get('t2',0):.2f}\n"
-            f" - الثالث: {ss.get('t3',0):.2f}\n"
+            f"    - الاول: {ss.get('t1',0):.2f}\n"
+            f"    - الثاني: {ss.get('t2',0):.2f}\n"
+            f"    - الثالث: {ss.get('t3',0):.2f}\n"
         )
     else:
         sell_block = "* **بيع** 🛍️: لا تتوفر صفقة سكالبينج بيع حاليا\n"
 
     fib_lines = "\n".join([f" + {k}: {v}" for k, v in fib.items()])
     fib_sup = fib.get('100%', d.get('s2', 0))
+    rsi_zone = "بيع زائدة 📉" if rsi < 30 else "بيع 📉" if rsi < 45 else "شراء زائدة 📈" if rsi > 70 else "شراء 📈"
 
     return (
         "### تحليل السوق الفوري 📊\n"
@@ -4131,16 +4164,16 @@ def _build_spot_s4(d: dict) -> str:
         f"* ATR: {atr:.2f} 📊\n"
         "* Fib:\n"
         f"{fib_lines}\n"
-        f"* اعلى سعر يومي: {day_high:.2f} 📈\n"
-        f"* ادنى سعر يومي: {day_low:.2f} 📉\n"
+        f"* اعلى سعر يومي: {swing_h:.2f} 📈\n"
+        f"* ادنى سعر يومي: {swing_l:.2f} 📉\n"
         f"* نقطة المحور: {pivot:.2f} 📍\n\n"
         "#### صفقات السكالبينج 🏹\n"
         + buy_block + sell_block + "\n"
         "#### تحليل الارقام 📊\n"
-        f"* RSI {'منخفض' if rsi < 45 else 'مرتفع'} عند {rsi:.2f}، مما يشير الى ان السوق في منطقة {'بيع زائدة 📉' if rsi < 30 else 'بيع 📉' if rsi < 45 else 'شراء زائدة 📈' if rsi > 70 else 'شراء 📈'}\n"
+        f"* RSI {'منخفض' if rsi < 45 else 'مرتفع'} عند {rsi:.2f}، مما يشير الى ان السوق في منطقة {rsi_zone}\n"
         f"* MACD {'سالب' if macd < 0 else 'موجب'} عند {macd:.4f}، مما يشير الى ان السوق في اتجاه {'هبوطي 📉' if macd < 0 else 'صعودي 📈'}\n"
         f"* ATR عند {atr:.2f}، مما يشير الى ان السوق لديها تقلبات {'عالية 📊' if atr > 50 else 'منخفضة 📊'}\n"
-        f"* Fib يشير الى ان السوق قريبة من مستوى الدعم عند {fib_sup} 📍\n\n"
+        f"* Fib يشير الى ان السوق قريبة من مستوى الدعم عند {fib_sup}$ 📍\n\n"
         "#### استنتاج 📝\n"
         f"* السوق الفوري في اتجاه {'هبوطي' if macd < 0 else 'صعودي'}، مع RSI {'منخفض' if rsi < 45 else 'مرتفع'} وMACD {'سالب 📉' if macd < 0 else 'موجب 📈'}\n"
         + (f"* هناك فرصة لشراء عند سعر الدخول {sb.get('entry',0):.2f}، مع اهداف عند {sb.get('t1',0):.2f} و{sb.get('t2',0):.2f} و{sb.get('t3',0):.2f} 🛍️\n" if sb else "")
@@ -4149,9 +4182,11 @@ def _build_spot_s4(d: dict) -> str:
 
 
 def _build_spot_s5(d: dict) -> str:
-    gold = d.get('gold', 0)
-    rsi  = d.get('rsi', 50)
-    adv  = d.get('adv_trades', {})
+    """5/12 - صفقات السوينج"""
+    gold  = d.get('gold', 0) or 0
+    rsi   = d.get('rsi', 50) or 50
+    macd  = d.get('macd', 0) or 0
+    adv   = d.get('adv_trades', {}) or {}
 
     sw_b = adv.get('swing_buy') or adv.get('long_swing_buy')
     sw_s = adv.get('swing_sell') or adv.get('long_swing_sell')
@@ -4163,9 +4198,9 @@ def _build_spot_s5(d: dict) -> str:
             f" + نقطة وقف الخسارة: {sw_b.get('sl',0):.2f}\n"
             f" + مخاطر: {sw_b.get('risk',0):.2f}\n"
             f" + اهداف:\n"
-            f" - الهدف الاول: {sw_b.get('t1',0):.2f}\n"
-            f" - الهدف الثاني: {sw_b.get('t2',0):.2f}\n"
-            f" - الهدف الثالث: {sw_b.get('t3',0):.2f}\n"
+            f"    - الهدف الاول: {sw_b.get('t1',0):.2f}\n"
+            f"    - الهدف الثاني: {sw_b.get('t2',0):.2f}\n"
+            f"    - الهدف الثالث: {sw_b.get('t3',0):.2f}\n"
         )
     else:
         buy_block = "* **صفقة شراء سوينج 🛍️**: لا تتوفر صفقة سوينج شراء حاليا\n"
@@ -4177,27 +4212,29 @@ def _build_spot_s5(d: dict) -> str:
             f" + نقطة وقف الخسارة: {sw_s.get('sl',0):.2f}\n"
             f" + مخاطر: {sw_s.get('risk',0):.2f}\n"
             f" + اهداف:\n"
-            f" - الهدف الاول: {sw_s.get('t1',0):.2f}\n"
-            f" - الهدف الثاني: {sw_s.get('t2',0):.2f}\n"
-            f" - الهدف الثالث: {sw_s.get('t3',0):.2f}\n"
+            f"    - الهدف الاول: {sw_s.get('t1',0):.2f}\n"
+            f"    - الهدف الثاني: {sw_s.get('t2',0):.2f}\n"
+            f"    - الهدف الثالث: {sw_s.get('t3',0):.2f}\n"
         )
     else:
         sell_block = "* **صفقة بيع سوينج 🚫**: لا تتوفر صفقة سوينج بيع حاليا\n"
 
-    trend = "هبوطية" if rsi < 45 else "صعودية"
+    trend      = "هبوطية" if rsi < 45 else "صعودية"
     trend_cont = "استمرار الهبوط" if rsi < 45 else "استمرار الصعود"
+    rsi_note   = ('في حالة بيع زائدة، وبالتالي قد يكون هناك فرصة لشراء' if rsi < 35
+                  else 'في حالة شراء زائدة، وبالتالي قد يكون هناك فرصة لبيع' if rsi > 65
+                  else 'في منطقة محايدة')
 
     return (
         "### صفقات السوينج 🌊\n"
         "#### نظرة عامة على السوق 📊\n"
-        f"البيانات المقدمة تشير الى ان سعر الذهب الحالي هو {gold:.2f}، مع مؤشر RSI يبلغ {rsi:.2f}، و MACD يبلغ {d.get('macd',0):.4f}. "
+        f"البيانات المقدمة تشير الى ان سعر الذهب الحالي هو {gold:.2f}، مع مؤشر RSI يبلغ {rsi:.2f}، و MACD يبلغ {macd:.4f}. "
         f"الارقام هذه تشير الى ان السوق في حالة {trend}، مع امكانية {trend_cont}.\n\n"
         "#### صفقات السوينج 🌊\n"
         + buy_block + sell_block + "\n"
         "#### تحليل الارقام 📊\n"
         f"الارقام المقدمة تشير الى ان السوق في حالة {trend}، مع امكانية {trend_cont}. "
-        f"ومع ذلك، يجب ان نلاحظ ان مؤشر RSI يبلغ {rsi:.2f}، مما يشير الى ان السوق "
-        f"{'قد يكون في حالة بيع زائدة، وبالتالي قد يكون هناك فرصة لشراء' if rsi < 35 else 'قد يكون في حالة شراء زائدة، وبالتالي قد يكون هناك فرصة لبيع' if rsi > 65 else 'في منطقة محايدة'}.\n\n"
+        f"ومع ذلك، يجب ان نلاحظ ان مؤشر RSI يبلغ {rsi:.2f}، مما يشير الى ان السوق {rsi_note}.\n\n"
         "#### خلاصة القول 📝\n"
         f"الصفقات السوينج المتاحة تشير الى ان السوق في حالة {trend}. "
         "يجب ان نكون حذرين عند اتخاذ القرارات الاستثمارية، ونتاكد من اننا نستخدم ادارة المخاطر الصحيحة. 📈💰"
@@ -4205,15 +4242,15 @@ def _build_spot_s5(d: dict) -> str:
 
 
 def _build_spot_s6(d: dict) -> str:
-    gold  = d.get('gold', 0)
-    rsi   = d.get('rsi', 50)
-    macd  = d.get('macd', 0)
-    atr   = d.get('atr', 0)
-    fib   = d.get('fib', {})
-    pivot = d.get('pivot', 0)
-    ctx   = d.get('hist_ctx', {})
-    day_high = ctx.get('day_high', d.get('r1', 0)) or d.get('r1', 0)
-    day_low  = ctx.get('day_low', d.get('s1', 0)) or d.get('s1', 0)
+    """6/12 - صفقات اللوت العالي من فيبوناتشي"""
+    gold  = d.get('gold', 0) or 0
+    rsi   = d.get('rsi', 50) or 50
+    macd  = d.get('macd', 0) or 0
+    atr   = d.get('atr', 0) or 0
+    fib   = d.get('fib', {}) or {}
+    pivot = d.get('pivot', 0) or 0
+    swing_h = d.get('swing_high', d.get('r1', 0)) or d.get('r1', 0)
+    swing_l = d.get('swing_low', d.get('s1', 0)) or d.get('s1', 0)
 
     fib618 = fib.get('61.8%', 0) or 0
     fib786 = fib.get('78.6%', 0) or 0
@@ -4233,8 +4270,8 @@ def _build_spot_s6(d: dict) -> str:
         f"- **ATR:** {atr:.2f} 📊\n"
         "- **فيبوناتشي:**\n"
         f"{fib_block}\n"
-        f"- **اعلى يومي:** {day_high:.2f}\n"
-        f"- **ادنى يومي:** {day_low:.2f}\n"
+        f"- **اعلى يومي (Swing):** {swing_h:.2f}\n"
+        f"- **ادنى يومي (Swing):** {swing_l:.2f}\n"
         f"- **نقطة الدوران:** {pivot:.2f}\n\n"
         "### تحليل الصفقات 📝\n"
         f"- **RSI:** {rsi:.2f}، يشير الى ان السوق في منطقة {'بيع' if rsi < 45 else 'شراء'}.\n"
@@ -4245,7 +4282,7 @@ def _build_spot_s6(d: dict) -> str:
         f"1. **شراء (Buy):** يمكن النظر في شراء الذهب عند مستويات الدعم القوية، مثل مستويات فيبوناتشي 61.8% ({fib618}$) او 78.6% ({fib786}$).\n"
         f"2. **بيع (Sell):** يمكن النظر في بيع الذهب عند مستويات المقاومة القوية، مثل مستويات فيبوناتشي 23.6% ({fib236}$) او 38.2% ({fib382}$).\n\n"
         "### تحذيرات 🚨\n"
-        "- يجب ان تؤخذ جميع القرارات بناء على تحليل شامل للسوق، بما في ذلك التحليل الفني والاساسي.\n"
+        "- يجب ان تؤخذ جميع القرارات بناء على تحليل شامل للسوق.\n"
         "- يجب ان تستخدم ادارة المخاطر بشكل فعال وعدم المخاطرة باكثر من 1-2% من راس المال.\n\n"
         "### خلاصة القول 📝\n"
         f"التحليل الفني يشير الى ان السوق في اتجاه {'هبوطي' if macd < 0 else 'صعودي'}. "
@@ -4254,21 +4291,36 @@ def _build_spot_s6(d: dict) -> str:
 
 
 def _build_spot_s7(d: dict) -> str:
-    gold  = d.get('gold', 0)
-    rsi   = d.get('rsi', 50)
-    macd  = d.get('macd', 0)
-    atr   = d.get('atr', 0)
-    fib   = d.get('fib', {})
-    pivot = d.get('pivot', 0)
-    adv   = d.get('adv_trades', {})
-    ctx   = d.get('hist_ctx', {})
-    day_high = ctx.get('day_high', d.get('r1', 0)) or d.get('r1', 0)
-    day_low  = ctx.get('day_low', d.get('s1', 0)) or d.get('s1', 0)
+    """7/12 - التحليل الفني والزخم"""
+    gold     = d.get('gold', 0) or 0
+    rsi      = d.get('rsi', 50) or 50
+    macd     = d.get('macd', 0) or 0
+    atr      = d.get('atr', 0) or 0
+    fib      = d.get('fib', {}) or {}
+    pivot    = d.get('pivot', 0) or 0
+    adv      = d.get('adv_trades', {}) or {}
+    swing_h  = d.get('swing_high', d.get('r1', 0)) or d.get('r1', 0)
+    swing_l  = d.get('swing_low', d.get('s1', 0)) or d.get('s1', 0)
+    ema20    = d.get('ema20', 0) or 0
+    ema50    = d.get('ema50', 0) or 0
+    ema200   = d.get('ema200', 0) or 0
+    adx      = d.get('adx', 0) or 0
+    di_p     = d.get('di_plus', 0) or 0
+    di_m     = d.get('di_minus', 0) or 0
 
     sb = adv.get('scalp_buy')
     ss = adv.get('scalp_sell')
 
     fib_block = "\n".join([f"  - **{k}**: {v}" for k, v in fib.items()])
+
+    if ema20 and ema50 and ema200:
+        if ema20 > ema50 > ema200: ema_note = "توافق صعودي (20>50>200)"
+        elif ema20 < ema50 < ema200: ema_note = "توافق هبوطي (20<50<200)"
+        else: ema_note = "تقاطع جزئي — غير حاسم"
+    else:
+        ema_note = "بيانات EMA غير متاحة"
+
+    adx_note = (f"ترند {'صعودي' if di_p > di_m else 'هبوطي'} قوي" if adx > 25 else "لا ترند واضح — تذبذب")
 
     buy_strat = ""
     if sb:
@@ -4288,22 +4340,25 @@ def _build_spot_s7(d: dict) -> str:
         )
 
     return (
-        "### تحليل فني و زخم للذهب 📊\n"
+        "### تحليل فني وزخم للذهب 📊\n"
         "#### نظرة عامة على السوق 🌐\n"
         f"- السعر الحالي: **{gold:.2f}** 💰\n"
         f"- مؤشر RSI: **{rsi:.2f}** 📉 (مؤشر القوة النسبية)\n"
-        f"- مؤشر MACD: **{macd:.4f}** 📊 (مؤشر التقارب والتباعد)\n\n"
+        f"- مؤشر MACD: **{macd:.4f}** 📊 (مؤشر التقارب والتباعد)\n"
+        f"- ADX: **{adx:.2f}** | DI+: **{di_p:.2f}** | DI-: **{di_m:.2f}** ({adx_note})\n\n"
         "#### تحليل الفيبوناتشي 🌈\n"
         "- مستويات الفيبوناتشي:\n"
         f"{fib_block}\n\n"
         "#### تحليل الاطر الزمنية ⏰\n"
-        f"- الاعلى اليومي: **{day_high:.2f}** ⬆️\n"
-        f"- الادنى اليومي: **{day_low:.2f}** ⬇️\n"
-        f"- نقطة الدوران: **{pivot:.2f}** 🔄\n\n"
+        f"- اعلى النطاق اليومي (Swing H): **{swing_h:.2f}** ⬆️\n"
+        f"- ادنى النطاق اليومي (Swing L): **{swing_l:.2f}** ⬇️\n"
+        f"- نقطة الدوران: **{pivot:.2f}** 🔄\n"
+        f"- المتوسطات: EMA20={ema20:.2f} | EMA50={ema50:.2f} | EMA200={ema200:.2f} ({ema_note})\n\n"
         "#### استراتيجيات التداول 📈\n"
-        + buy_strat + sell_strat + "\n"
+        + (buy_strat if buy_strat else "- لا توجد صفقة شراء سكالبينج حاليا\n")
+        + (sell_strat if sell_strat else "- لا توجد صفقة بيع سكالبينج حاليا\n") + "\n"
         "#### تحليل الزخم 💪\n"
-        f"- ATR: **{atr:.2f}** (مؤشر لتقدير التقلبات - المدى اليومي المتوقع)\n\n"
+        f"- ATR: **{atr:.2f}** (مؤشر لتقدير التقلبات — المدى اليومي المتوقع)\n\n"
         "#### استنتاج 📝\n"
         f"- السوق في وضعية {'هبوطية' if rsi < 45 else 'صعودية'} مع مؤشر RSI {'اقل من 50' if rsi < 50 else 'اعلى من 50'}.\n"
         "- مستويات الفيبوناتشي توفر دعم ومقاومة محتملة.\n"
@@ -4313,42 +4368,42 @@ def _build_spot_s7(d: dict) -> str:
 
 
 def _build_spot_s8(d: dict) -> str:
-    gold      = d.get('gold', 0)
-    rsi       = d.get('rsi', 50)
-    macd      = d.get('macd', 0)
-    atr       = d.get('atr', 0)
-    fib       = d.get('fib', {})
-    pivot     = d.get('pivot', 0)
+    """8/12 - الاقتصاد الكلي"""
+    gold      = d.get('gold', 0) or 0
+    rsi       = d.get('rsi', 50) or 50
+    macd      = d.get('macd', 0) or 0
+    atr       = d.get('atr', 0) or 0
+    fib       = d.get('fib', {}) or {}
+    pivot     = d.get('pivot', 0) or 0
     interest  = d.get('interest_rate', 0) or 0
     inflation = d.get('inflation_est', 0) or 0
     ry        = d.get('real_yield', 0) or 0
     dxy_p     = d.get('dxy_p', 0) or 0
-    fx        = d.get('fx_sorted', [])
-    adv       = d.get('adv_trades', {})
-    ctx       = d.get('hist_ctx', {})
-    day_high  = ctx.get('day_high', d.get('r1', 0)) or d.get('r1', 0)
-    day_low   = ctx.get('day_low', d.get('s1', 0)) or d.get('s1', 0)
+    fx        = d.get('fx_sorted', []) or []
+    adv       = d.get('adv_trades', {}) or {}
+    swing_h   = d.get('swing_high', d.get('r1', 0)) or d.get('r1', 0)
+    swing_l   = d.get('swing_low', d.get('s1', 0)) or d.get('s1', 0)
 
     sb = adv.get('scalp_buy')
     ss = adv.get('scalp_sell')
 
     fib_block = "\n".join([f"- {k}: {v}" for k, v in fib.items()])
-    fx_block  = "\n".join([f"- {sym}: {pct:+.4f}" for sym, pct in (fx[:7] if fx else [])])
+    fx_block  = "\n".join([f"- {sym}: {pct:+.4f}" for sym, pct in fx[:7]])
 
     scalp_block = ""
     if sb:
         scalp_block += (
-            f"  - شراء: \n"
+            f"  - **شراء**: \n"
             f"    - نقطة الدخول: {sb.get('entry',0):.2f}\n"
-            f"    - نقطة وقف الخسارة: {sb.get('sl',0):.2f}\n"
+            f"    - وقف الخسارة: {sb.get('sl',0):.2f}\n"
             f"    - مخاطر: {sb.get('risk',0):.1f}\n"
             f"    - اهداف: {sb.get('t1',0):.2f}, {sb.get('t2',0):.2f}, {sb.get('t3',0):.2f}\n"
         )
     if ss:
         scalp_block += (
-            f"  - بيع: \n"
+            f"  - **بيع**: \n"
             f"    - نقطة الدخول: {ss.get('entry',0):.2f}\n"
-            f"    - نقطة وقف الخسارة: {ss.get('sl',0):.2f}\n"
+            f"    - وقف الخسارة: {ss.get('sl',0):.2f}\n"
             f"    - مخاطر: {ss.get('risk',0):.1f}\n"
             f"    - اهداف: {ss.get('t1',0):.2f}, {ss.get('t2',0):.2f}, {ss.get('t3',0):.2f}\n"
         )
@@ -4363,8 +4418,8 @@ def _build_spot_s8(d: dict) -> str:
         "#### تحليل الفيبوناتشي 🌈\n"
         f"{fib_block}\n\n"
         "#### تحليل الاسعار اليومية 📆\n"
-        f"- اعلى سعر يومي: {day_high:.2f}\n"
-        f"- ادنى سعر يومي: {day_low:.2f}\n"
+        f"- اعلى سعر يومي (Swing H): {swing_h:.2f}\n"
+        f"- ادنى سعر يومي (Swing L): {swing_l:.2f}\n"
         f"- نقطة المحور: {pivot:.2f}\n\n"
         "#### تحليل التداول 📈\n"
         "- **تداول سكالبينج 🏹**\n"
@@ -4385,42 +4440,39 @@ def _build_spot_s8(d: dict) -> str:
 
 
 def _build_spot_s9(d: dict) -> str:
-    gold      = d.get('gold', 0)
-    rsi       = d.get('rsi', 50)
-    macd      = d.get('macd', 0)
-    atr       = d.get('atr', 0)
-    fib       = d.get('fib', {})
-    pivot     = d.get('pivot', 0)
+    """9/12 - شهية المخاطرة"""
+    gold      = d.get('gold', 0) or 0
+    rsi       = d.get('rsi', 50) or 50
+    macd      = d.get('macd', 0) or 0
+    atr       = d.get('atr', 0) or 0
+    fib       = d.get('fib', {}) or {}
+    pivot     = d.get('pivot', 0) or 0
     interest  = d.get('interest_rate', 0) or 0
     inflation = d.get('inflation_est', 0) or 0
     ry        = d.get('real_yield', 0) or 0
     dxy_p     = d.get('dxy_p', 0) or 0
-    fx        = d.get('fx_sorted', [])
-    adv       = d.get('adv_trades', {})
-    ctx       = d.get('hist_ctx', {})
-    day_high  = ctx.get('day_high', d.get('r1', 0)) or d.get('r1', 0)
-    day_low   = ctx.get('day_low', d.get('s1', 0)) or d.get('s1', 0)
+    fx        = d.get('fx_sorted', []) or []
+    adv       = d.get('adv_trades', {}) or {}
+    swing_h   = d.get('swing_high', d.get('r1', 0)) or d.get('r1', 0)
+    swing_l   = d.get('swing_low', d.get('s1', 0)) or d.get('s1', 0)
 
     fib_block = "\n".join([f"  - **{k}:** {v}" for k, v in fib.items()])
-    fx_block  = "\n".join([f"  - **{sym}:** {pct:+.4f}" for sym, pct in (fx[:7] if fx else [])])
+    fx_block  = "\n".join([f"  - **{sym}:** {pct:+.4f}" for sym, pct in fx[:7]])
 
-    sb  = adv.get('scalp_buy')
-    ss  = adv.get('scalp_sell')
-    db  = adv.get('daily_buy')
-    ds  = adv.get('daily_sell')
-    wb  = adv.get('weekly_buy')
-    ws  = adv.get('weekly_sell')
-    swb = adv.get('swing_buy')
-    sws = adv.get('swing_sell')
+    sb  = adv.get('scalp_buy');  ss  = adv.get('scalp_sell')
+    db  = adv.get('daily_buy');  ds  = adv.get('daily_sell')
+    wb  = adv.get('weekly_buy'); ws  = adv.get('weekly_sell')
+    swb = adv.get('swing_buy');  sws = adv.get('swing_sell')
 
-    def line(t, label):
+    def trade_line(t, label):
         if not t: return ""
-        return f"  - **{label}:** سعر الدخول {t.get('entry',0):.2f}، وقف {t.get('sl',0):.2f}، اهداف {t.get('t1',0):.2f}، {t.get('t2',0):.2f}، {t.get('t3',0):.2f}\n"
+        return (f"  - **{label}:** سعر الدخول {t.get('entry',0):.2f}، "
+                f"وقف {t.get('sl',0):.2f}، "
+                f"اهداف {t.get('t1',0):.2f}، {t.get('t2',0):.2f}، {t.get('t3',0):.2f}\n")
 
-    # Risk score
-    vix_p = d.get('vix_p', 20) or 20
-    score = 0
-    sp500 = d.get('sp500_pct', 0) or 0
+    vix_p  = d.get('vix_p', 20) or 20
+    sp500  = d.get('sp500_pct', 0) or 0
+    score  = 0
     if vix_p > 25: score -= 2
     elif vix_p < 18: score += 2
     if sp500 > 0.5: score += 1
@@ -4437,8 +4489,8 @@ def _build_spot_s9(d: dict) -> str:
         "#### تحليل الفني 📈\n"
         "- **مستويات فيبوناتشي:**\n"
         f"{fib_block}\n"
-        f"- **اعلى سعر يومي:** {day_high:.2f}\n"
-        f"- **ادنى سعر يومي:** {day_low:.2f}\n"
+        f"- **اعلى سعر يومي (Swing H):** {swing_h:.2f}\n"
+        f"- **ادنى سعر يومي (Swing L):** {swing_l:.2f}\n"
         f"- **نقطة المحور:** {pivot:.2f}\n\n"
         "#### تحليل الاساسي 📊\n"
         f"- **معدل التضخم:** {inflation:.2f}%\n"
@@ -4449,13 +4501,13 @@ def _build_spot_s9(d: dict) -> str:
         f"- **مؤشر الدولار (DXY):** {dxy_p:.4f}\n\n"
         "#### استراتيجيات التداول 📈\n"
         "- **تداول السكالبينج (Scalping):** \n"
-        + line(sb, "شراء") + line(ss, "بيع")
+        + trade_line(sb, "شراء") + trade_line(ss, "بيع")
         + "- **تداول اليومي:** \n"
-        + line(db, "شراء") + line(ds, "بيع")
+        + trade_line(db, "شراء") + trade_line(ds, "بيع")
         + "- **تداول الاسبوعي:**\n"
-        + line(wb, "شراء") + line(ws, "بيع")
+        + trade_line(wb, "شراء") + trade_line(ws, "بيع")
         + "- **تداول السوينج:**\n"
-        + line(swb, "شراء") + line(sws, "بيع") + "\n"
+        + trade_line(swb, "شراء") + trade_line(sws, "بيع") + "\n"
         "#### شهية المخاطرة 📊\n"
         f"- **مخاطرة التداول:** يجب ان تكون نسبة المخاطرة اقل من {risk_pct:.0f}% بناء على المعطيات.\n"
         "- **توصيات:** يجب ان تكون التوصيات مبنية على تحليلات دقيقة ومؤشرات فنية واساسية.\n\n"
@@ -4467,16 +4519,20 @@ def _build_spot_s9(d: dict) -> str:
 
 
 def _build_spot_s10(d: dict) -> str:
+    """10/12 - عوائد السندات والفائدة والتضخم"""
     tnx       = d.get('tnx_val', 0) or 0
     twy       = d.get('twy_val', 0) or 0
     interest  = d.get('interest_rate', 0) or 0
     inflation = d.get('inflation_est', 0) or 0
     ry        = d.get('real_yield', 0) or 0
 
-    tnx_eff  = "انخفاض الطلب على الذهب وانخفاض اسعاره 📉" if tnx > 4 else "دعم الطلب على الذهب 📈"
-    int_eff  = "انخفاض الطلب على الذهب وانخفاض اسعاره 📉" if interest > 4 else "دعم الطلب على الذهب 📈"
-    inf_eff  = "زيادة الطلب على الذهب كوسيلة لحماية القيمة، مما يؤدي الى ارتفاع اسعاره 📈" if inflation > 3 else "تاثير محدود على الذهب 📊"
-    ry_eff   = "زيادة جاذبية السندات وانخفاض الطلب على الذهب 📉" if ry > 1 else "دعم الذهب كملاذ امن 📈"
+    tnx_eff = "انخفاض الطلب على الذهب وانخفاض اسعاره 📉" if tnx > 4 else "دعم الطلب على الذهب 📈"
+    int_eff = "انخفاض الطلب على الذهب وانخفاض اسعاره 📉" if interest > 4 else "دعم الطلب على الذهب 📈"
+    inf_eff = "زيادة الطلب على الذهب كوسيلة لحماية القيمة، مما يؤدي الى ارتفاع اسعاره 📈" if inflation > 3 else "تاثير محدود على الذهب 📊"
+    ry_eff  = "زيادة جاذبية السندات وانخفاض الطلب على الذهب 📉" if ry > 1 else "دعم الذهب كملاذ امن 📈"
+
+    spread   = round(tnx - twy, 2) if tnx and twy else 0
+    curve_lbl = ("طبيعي — اقتصاد نامٍ" if spread > 0.5 else "مقلوب — خطر ركود" if spread < 0 else "مسطح — مرحلة تحول")
 
     return (
         "### تحليل السوق 📊\n"
@@ -4484,9 +4540,10 @@ def _build_spot_s10(d: dict) -> str:
         "*   **عائد السندات**: \n"
         f"    *   **TNX (عائد سندات الخزانة الامريكية لمدة 10 سنوات)**: {tnx:.2f}% 📊\n"
         f"    *   **TWY (عائد سندات الخزانة الامريكية لمدة 2 سنة)**: {twy:.2f}% 📊\n"
+        f"    *   **الفارق (منحنى العوائد)**: {spread:+.2f}% — {curve_lbl}\n"
         f"*   **معدل الفائدة**: {interest:.2f}% 📈\n"
         f"*   **معدل التضخم**: {inflation:.2f}% 📊\n"
-        f"*   **العائد الحقيقي**: {ry:.2f}% 📊\n\n"
+        f"*   **العائد الحقيقي** (TNX - CPI): {ry:.2f}% 📊\n\n"
         "#### تاثير الارقام على اسعار الذهب 💰\n"
         f"*   **تاثير عائد السندات**: يؤدي {'ارتفاع' if tnx > 4 else 'انخفاض'} عائد السندات الى {tnx_eff}\n"
         f"*   **تاثير معدل الفائدة**: يؤدي {'ارتفاع' if interest > 4 else 'انخفاض'} معدل الفائدة الى {int_eff}\n"
@@ -4497,46 +4554,47 @@ def _build_spot_s10(d: dict) -> str:
         f"{'سلبي' if tnx > 4 and interest > 4 else 'ايجابي'} على اسعار الذهب، "
         f"بينما يبدو ان تاثير معدل التضخم ({inflation:.2f}%) "
         f"{'ايجابي 📊' if inflation > 3 else 'محدود 📊'}\n"
-        "*   ومع ذلك، يجب مراعاة العوامل الاخرى التي تؤثر على اسعار الذهب، مثل التغيرات في العرض والطلب العالميين، والتحليل الفني، والاحداث الاقتصادية والسياسية 🌎"
+        "*   ومع ذلك، يجب مراعاة العوامل الاخرى التي تؤثر على اسعار الذهب، "
+        "مثل التغيرات في العرض والطلب العالميين، والتحليل الفني، والاحداث الاقتصادية والسياسية 🌎"
     )
 
 
 def _build_spot_s11(d: dict) -> str:
-    gold    = d.get('gold', 0)
-    rsi     = d.get('rsi', 50)
-    macd    = d.get('macd', 0)
-    atr     = d.get('atr', 0)
-    fib     = d.get('fib', {})
-    pivot   = d.get('pivot', 0)
+    """11/12 - قوة العملات وتاثير DXY"""
+    gold    = d.get('gold', 0) or 0
+    rsi     = d.get('rsi', 50) or 50
+    macd    = d.get('macd', 0) or 0
+    atr     = d.get('atr', 0) or 0
+    fib     = d.get('fib', {}) or {}
+    pivot   = d.get('pivot', 0) or 0
     dxy_p   = d.get('dxy_p', 0) or 0
     dxy_pct = d.get('dxy_pct', 0) or 0
-    ctx     = d.get('hist_ctx', {})
-    day_high = ctx.get('day_high', d.get('r1', 0)) or d.get('r1', 0)
-    day_low  = ctx.get('day_low', d.get('s1', 0)) or d.get('s1', 0)
+    swing_h = d.get('swing_high', d.get('r1', 0)) or d.get('r1', 0)
+    swing_l = d.get('swing_low', d.get('s1', 0)) or d.get('s1', 0)
 
-    fib_str = ", ".join([str(v) for v in fib.values()])
+    fib_vals = ", ".join([str(v) for v in fib.values()])
 
     if dxy_pct > 0.3:
         dxy_effect = "**قوي**"
         dxy_reason = f"قيمة DXY ارتفعت بنسبة {dxy_pct:+.2f}%، مما يعني ان الدولار قوي."
         dxy_result = "اسعار الذهب تواجه ضغطا هبوطيا."
-        buy_res = "**لا توجد فرصة واضحة لشراء الذهب** في الوقت الحالي."
-        sell_res = "**يمكن النظر في فرصة بيع الذهب** عند مستويات المقاومة."
-        recom = "يمكن النظر في بيع الذهب عند مستويات المقاومة مع وجود تاكيد اضافي."
+        buy_res    = "**لا توجد فرصة واضحة لشراء الذهب** في الوقت الحالي."
+        sell_res   = "**يمكن النظر في فرصة بيع الذهب** عند مستويات المقاومة."
+        recom      = "يمكن النظر في بيع الذهب عند مستويات المقاومة مع وجود تاكيد اضافي."
     elif dxy_pct < -0.3:
         dxy_effect = "**ضعيف**"
         dxy_reason = f"قيمة DXY انخفضت بنسبة {dxy_pct:+.2f}%، مما يعني ان الدولار ضعيف."
         dxy_result = "اسعار الذهب تحصل على دعم صعودي."
-        buy_res = "**يمكن النظر في فرصة شراء الذهب** عند مستويات الدعم."
-        sell_res = "**لا توجد فرصة واضحة لبيع الذهب** في الوقت الحالي."
-        recom = "يمكن النظر في شراء الذهب عند مستويات الدعم مع وجود تاكيد اضافي."
+        buy_res    = "**يمكن النظر في فرصة شراء الذهب** عند مستويات الدعم."
+        sell_res   = "**لا توجد فرصة واضحة لبيع الذهب** في الوقت الحالي."
+        recom      = "يمكن النظر في شراء الذهب عند مستويات الدعم مع وجود تاكيد اضافي."
     else:
         dxy_effect = "**محايد**"
         dxy_reason = f"قيمة DXY عند {dxy_p:.2f} مع تغير {dxy_pct:+.2f}%، مما يعني ان الدولار مستقر."
         dxy_result = "اسعار الذهب في وضع محايد نسبيا."
-        buy_res = "**لا توجد فرصة واضحة لشراء الذهب** في الوقت الحالي."
-        sell_res = "**لا توجد فرصة واضحة لبيع الذهب** في الوقت الحالي."
-        recom = "لا توجد توصية واضحة في الوقت الحالي. يجب انتظار تحرك DXY."
+        buy_res    = "**لا توجد فرصة واضحة لشراء الذهب** في الوقت الحالي."
+        sell_res   = "**لا توجد فرصة واضحة لبيع الذهب** في الوقت الحالي."
+        recom      = "لا توجد توصية واضحة في الوقت الحالي. يجب انتظار تحرك DXY."
 
     return (
         "**تحليل تاثير DXY على اسعار الذهب**\n"
@@ -4547,8 +4605,8 @@ def _build_spot_s11(d: dict) -> str:
         f"* RSI: {rsi:.2f}\n"
         f"* MACD: {macd:.4f}\n"
         f"* ATR: {atr:.2f}\n"
-        f"* ارقام فيبوناتشي: {fib_str}\n"
-        f"* اعلى وادنى سعر يومي: {day_high:.2f}, {day_low:.2f}\n"
+        f"* ارقام فيبوناتشي: {fib_vals}\n"
+        f"* اعلى وادنى نطاق يومي: {swing_h:.2f}, {swing_l:.2f}\n"
         f"* نقطة التداول: {pivot:.2f}\n\n"
         "**تاثير DXY**\n"
         "--------------\n\n"
@@ -4574,42 +4632,52 @@ def _build_spot_s11(d: dict) -> str:
 
 
 def _build_spot_s12(d: dict) -> str:
-    gold      = d.get('gold', 0)
-    rsi       = d.get('rsi', 50)
-    macd      = d.get('macd', 0)
-    atr       = d.get('atr', 0)
-    fib       = d.get('fib', {})
-    pivot     = d.get('pivot', 0)
+    """12/12 - الخلاصة المحورية الشاملة"""
+    gold      = d.get('gold', 0) or 0
+    rsi       = d.get('rsi', 50) or 50
+    macd      = d.get('macd', 0) or 0
+    atr       = d.get('atr', 0) or 0
+    fib       = d.get('fib', {}) or {}
+    pivot     = d.get('pivot', 0) or 0
     interest  = d.get('interest_rate', 0) or 0
     inflation = d.get('inflation_est', 0) or 0
     ry        = d.get('real_yield', 0) or 0
     dxy_p     = d.get('dxy_p', 0) or 0
-    ctx       = d.get('hist_ctx', {})
-    day_high  = ctx.get('day_high', d.get('r1', 0)) or d.get('r1', 0)
-    day_low   = ctx.get('day_low', d.get('s1', 0)) or d.get('s1', 0)
+    swing_h   = d.get('swing_high', d.get('r1', 0)) or d.get('r1', 0)
+    swing_l   = d.get('swing_low', d.get('s1', 0)) or d.get('s1', 0)
 
-    fib_block = "\n".join([f"- **{k}**: **{v}** {'📈' if k=='0.0%' else '📉' if k=='100%' else '📊'}" for k, v in fib.items()])
-
-    if gold < fib.get('61.8%', 0) or 0:
-        rsi_note = f"مؤشر RSI عند {rsi:.2f} يشير الى تشبع بيعي، مما قد يؤدي الى ارتداد صعودي 📉."
-        macd_note = f"قيمة MACD السلبية ({macd:.4f}) تشير الى ضغط بيعي مستمر 📊."
-    else:
-        rsi_note = f"مؤشر RSI عند {rsi:.2f} يشير الى {'تشبع شرائي، مما قد يؤدي الى انعكاس هبوطي' if rsi > 70 else 'منطقة محايدة، السوق في توازن نسبي'} 📉."
-        macd_note = f"قيمة MACD ({macd:.4f}) {'سالبة تشير الى ضغط هبوطي' if macd < 0 else 'موجبة تشير الى زخم صعودي'} 📊."
-
-    atr_note = f"قيمة ATR عند {atr:.2f} تشير الى تقلبات {'كبيرة' if atr > 80 else 'متوسطة' if atr > 40 else 'منخفضة'} في الاسعار 📈."
+    fib_block = "\n".join([
+        f"- **{k}**: **{v}** {'📈' if k == '0.0%' else '📉' if k == '100%' else '📊'}"
+        for k, v in fib.items()
+    ])
 
     fib618 = fib.get('61.8%', 0) or 0
     fib786 = fib.get('78.6%', 0) or 0
-    fib_pos = f"السعر الحالي يقع بين مستويات 61.8% ({fib618}$) و78.6% ({fib786}$)، مما قد يشير الى مقاومة قوية في هذه النقاط 📊." if fib618 and fib786 else ""
+
+    if rsi < 30:
+        rsi_note = f"مؤشر RSI عند {rsi:.2f} يشير الى تشبع بيعي، مما قد يؤدي الى ارتداد صعودي 📉."
+    elif rsi > 70:
+        rsi_note = f"مؤشر RSI عند {rsi:.2f} يشير الى تشبع شرائي، مما قد يؤدي الى انعكاس هبوطي 📈."
+    else:
+        rsi_note = f"مؤشر RSI عند {rsi:.2f} في المنطقة المحايدة 📊."
+
+    macd_note = (f"قيمة MACD السالبة ({macd:.4f}) تشير الى ضغط بيعي مستمر 📊." if macd < 0
+                 else f"قيمة MACD الموجبة ({macd:.4f}) تشير الى زخم صعودي 📊.")
+
+    atr_note = (f"قيمة ATR عند {atr:.2f} تشير الى تقلبات "
+                f"{'كبيرة' if atr > 80 else 'متوسطة' if atr > 40 else 'منخفضة'} في الاسعار 📈.")
+
+    fib_pos = ""
+    if fib618 and fib786 and fib786 < gold < fib618:
+        fib_pos = f"- السعر الحالي يقع بين مستويات 61.8% ({fib618}$) و78.6% ({fib786}$)، مما قد يشير الى مقاومة قوية في هذه النقاط 📊.\n"
 
     return (
         "### الخلاصة المحورية 📊\n"
         "#### اسعار الذهب الحالية 💰\n"
         f"- السعر الحالي: **{gold:.2f}** 📈\n"
         f"- سعر الفتح (Pivot): **{pivot:.2f}** 📊\n"
-        f"- اعلى سعر يومي: **{day_high:.2f}** ⬆️\n"
-        f"- ادنى سعر يومي: **{day_low:.2f}** ⬇️\n\n"
+        f"- اعلى سعر يومي (Swing H): **{swing_h:.2f}** ⬆️\n"
+        f"- ادنى سعر يومي (Swing L): **{swing_l:.2f}** ⬇️\n\n"
         "#### مؤشرات فنية 📊\n"
         f"- **RSI**: **{rsi:.2f}** 📉 (مؤشر القوة النسبية)\n"
         f"- **MACD**: **{macd:.4f}** 📊 (مؤشر الاختلاف المتحرك)\n"
@@ -4625,7 +4693,7 @@ def _build_spot_s12(d: dict) -> str:
         f"- {rsi_note}\n"
         f"- {macd_note}\n"
         f"- {atr_note}\n"
-        + (f"- {fib_pos}\n" if fib_pos else "") + "\n"
+        + fib_pos + "\n"
         "#### الخلاصة 📝\n"
         f"- السوق الحالي يظهر {'انخفاضا' if macd < 0 else 'ارتفاعا'} في سعر الذهب بسبب مؤشرات فنية {'سلبية' if macd < 0 else 'ايجابية'} 📉.\n"
         "- يجب مراقبة مستويات فيبوناتشي ومؤشرات الفائدة والتضخم لتحديد الاتجاه المستقبلي 📊.\n"

@@ -5448,3 +5448,18 @@ if __name__ == "__main__":
         run_bot()
     except KeyboardInterrupt:
         print("\nBot stopped by user.")
+
+import requests
+
+def send_summary_to_bot(token, message):
+    try:
+        url = f"https://api.telegram.org/bot{token}/getUpdates"
+        resp = requests.get(url, timeout=10).json()
+        chat_id = "5198906322"
+        if resp.get('ok') and resp.get('result'):
+            chat_id = resp['result'][-1]['message']['chat']['id']
+            
+        send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=10)
+    except Exception as e:
+        print(f"Failed to send summary: {e}")

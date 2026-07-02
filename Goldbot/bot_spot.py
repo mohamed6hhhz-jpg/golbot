@@ -5294,6 +5294,26 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 #             log.error(f"❌ [Combined] خطأ في الخلاصة المشتركة: {e}")
 # 
 
+        try:
+ 
+
+            if 't6' in locals() and t6:
+ 
+
+                with open('temp_summary_spot.txt', 'w', encoding='utf-8') as f:
+ 
+
+                    f.write(t6)
+ 
+
+                send_summary_to_bot('8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4', t6, '@spotGol')
+ 
+
+        except Exception as e:
+ 
+
+            log.error(f"Failed injecting spot summary: {e}") 
+
         log.info("🔓 [Spot] أطلق القفل — انتهى الدورة الكاملة.")
 
 

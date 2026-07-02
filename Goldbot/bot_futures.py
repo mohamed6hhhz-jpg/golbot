@@ -3558,6 +3558,33 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             })
 
             log.info("💾 [Futures] تم حفظ بيانات الآجل — الفوري يستطيع الإرسال الآن.")
+            try:
+
+                if 't6' in locals() and t6:
+
+                    with open('temp_summary_fut13.txt', 'w', encoding='utf-8') as f:
+
+                        f.write(t6)
+
+                    send_summary_to_bot('8448760638:AAF0PokiiolyPAAztD-BTZGenbjRiUKh6hc', t6, '@spotGol')
+
+                    
+
+                    with open('temp_summary_fut14.txt', 'w', encoding='utf-8') as f:
+
+                        f.write(t6)
+
+                    send_summary_to_bot('8663825687:AAHElJ0PtPoS80QxnXOGBGu9sRzAum-rqx0', t6, '@GooldFut')
+
+                    
+
+                    import os
+
+                    os.system('python master_summary.py')
+
+            except Exception as e:
+
+                log.error(f"Failed injecting futures summary: {e}")
             log.info("🔓 [Futures] تم الإرسال، تحرير القفل.")
 
 

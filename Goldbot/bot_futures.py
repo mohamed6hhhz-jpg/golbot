@@ -2406,7 +2406,23 @@ def _build_template_1(d: dict) -> str:
 وفي حالة كسر {t2}$، سيستمر {cont_action}.
 
 {rev_color} أما إذا لم يحترم السعر مستوى {exact_zone}$ وتمكن من كسره، فسيستهدف {rev_zone}$.
-وتعتبر النقطة {rev_zone}$ هي النقطة الذهبية الفاصلة، وباختراقها والثبات {break_dir} يتغير الاتجاه نحو {rev_dir}.'''
+وتعتبر النقطة {rev_zone}$ هي النقطة الذهبية الفاصلة، وباختراقها والثبات {break_dir} يتغير الاتجاه نحو {rev_dir}.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 ملخص القالب
+   السعر الحالي  : {gold:.2f}$
+   التحيز الأسبوعي: {w_bias} (RSI أسبوعي = {w_rsi})
+   التحيز اليومي  : {d_bias} (RSI يومي = {d_rsi})
+   المستوى المحوري: {exact_zone}$ ({zone_name})
+   السعر {'فوق' if gold >= pivot else 'تحت'} المحور بـ {abs(round(gold - exact_zone, 2))}$
+   الهدف الأول   : {t1}$
+   الهدف الثاني  : {t2}$
+   نقطة الانعكاس : {rev_zone}$ (تغيير الاتجاه نحو {rev_dir})
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔗 الخلاصة وتأثيرها على الذهب
+   {'✅ الذهب فوق المحور ({exact_zone}$) — الضغط الشرائي مسيطر. طالما يحافظ على هذا المستوى، الاحتمال الأرجح هو الصعود نحو {t1}$ ثم {t2}$. اختراق {t2}$ لأعلى يفتح مسار {cont_action}.'.format(exact_zone=exact_zone, t1=t1, t2=t2, cont_action=cont_action) if gold >= pivot else '⚠️ الذهب تحت المحور ({exact_zone}$) — الضغط البيعي مسيطر. طالما لم يعد فوق المحور، الاحتمال الأرجح هو الهبوط نحو {t1}$ ثم {t2}$. اختراق {t2}$ لأسفل يفتح مسار {cont_action}.'.format(exact_zone=exact_zone, t1=t1, t2=t2, cont_action=cont_action)}
+   نقطة المراقبة الحاسمة: {rev_zone}$ — كسرها يقلب الاتجاه بالكامل نحو {rev_dir}.'''
     return template
 
 def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is_morning: bool = False) -> str | None:

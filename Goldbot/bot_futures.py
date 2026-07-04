@@ -1737,7 +1737,9 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     if d['gold_spot']:
         spot_label = f"{d['gold_spot']:.2f}$  ⏱ {d['spot_date']}"
     else:
-        spot_label = f"غير متاح (آخر معلوم: راجع الآجل)"
+        # fallback: derive approximate spot from futures (futures ~ spot + contango)
+        _approx_spot = round(d['gold_futures'] - (d['contango'] or 0), 2)
+        spot_label = f"{_approx_spot:.2f}$ (مشتق من الآجل)  ⏱ {d['futures_date']}"
     contango_str = (f"  (+{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
                     else f"  ({d['contango']:.2f}$)" if d['contango'] else "")
 
@@ -1823,7 +1825,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 ملخص السوق
    الزخم        : {ent['momentum']} {'→ تسارع بيع، الذهب عرضة للهبوط' if 'هابط' in ent['momentum'] else '→ تسارع شراء، الذهب في دعم' if 'صاعد' in ent['momentum'] else '→ حركة غير محددة'}
-   الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ الاتجاه غير محدد'}
+   الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ السوق في نطاق عرضي — تداول بين الدعم والمقاومة'}
    السيولة       : {ent['liquidity']} {'→ الحركات موثوقة ✅' if 'مرتفعة' in ent['liquidity'] else '→ انتبه: حركات وهمية محتملة ⚠️'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1849,7 +1851,8 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 📡 الأسواق
    DXY:{d['dxy']:.1f}({d['dxy_bias']}) {'→🟢دعم ذهب' if d['dxy']<101 else '→🔴ضغط' if d['dxy']>104 else '→⚪محايد'} | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | 10Y:{d['tnx']:.2f}% | 30Y:{f"{d['tty']:.2f}%" if d['tty'] else '—'} | Spread(10Y-2Y):{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
    VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'}) {'→🟢خوف=طلب ملاذء' if d['vix'] and d['vix']>25 else '→🔴هدوء=تراجع ملاذء' if d['vix'] else ''} | 🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
-   🎯 نسبة P/C:{f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
+   🎯 نسبة Put/Call (P/C):{f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—'} {'→ تشاؤم: المتداولون يشترون تأميناً ضد الهبوط (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→ تفاؤل: المتداولون يراهنون على الصعود (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→ توازن: لا انحياز واضح للمتداولين' if d['gld_pcr'] else ''}
+   💡 ما هو P/C؟ هو مؤشر خيارات الذهب (GLD ETF): يقيس نسبة عقود الـPut (الرهان على هبوط الذهب) إلى عقود الـCall (الرهان على صعوده). نسبة >1.2 = أغلب المتداولين خايفين ويشترون تأميناً ضد الهبوط. نسبة <0.8 = أغلبهم متفائلون ويراهنون على الصعود. قريب من 1 = السوق محايد.
    {d['real_yield_brief']}
 {d['real_yield_signal']}
 

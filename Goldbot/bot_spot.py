@@ -1000,7 +1000,30 @@ def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
         'stoch_tashabuo_shira': 'Stoch تشبع شراء'
     }
 
-    rs_text = " | ".join([ar_map.get(r, r) for r in reasons[:3]]) if reasons else "بدون إشارات قوية"
+    
+    def translate_dynamic(r):
+        if r in ar_map: return ar_map[r]
+        if r.startswith('tawaqu_inikas'): return 'توقع انعكاس قوي'
+        if r.startswith('dukhul_qannas'): return 'دخول قناص عالي الدقة'
+        if r.startswith('tawafuq_inikas'): return 'تأكيد انعكاس محتمل'
+        if r.startswith('tawafuq_'): return 'توافق إطارات متعددة'
+        if r.startswith('adx_trend_qawi'): return 'ترند قوي جداً'
+        if r.startswith('adx_trend_sareea'): return 'اندفاع سريع'
+        if r.startswith('adx_tadhabdhub'): return 'تذبذب (ADX ضعيف)'
+        if r.startswith('hajm_ali'): return 'حجم سيولة عالي'
+        if r.startswith('hajm_motawaset'): return 'سيولة متوسطة'
+        if r.startswith('hajm_daeef'): return 'سيولة ضعيفة'
+        if r.startswith('rr_mumtaz'): return 'مخاطرة/عائد استثنائية'
+        if r.startswith('rr_qawi'): return 'مخاطرة/عائد قوية'
+        if r.startswith('rr_maqbool'): return 'مخاطرة/عائد مقبولة'
+        if r.startswith('rr_daeef'): return 'مخاطرة/عائد ضعيفة'
+        if r.startswith('qarib_min_daom'): return 'ارتكاز على دعم'
+        if r.startswith('qarib_min_muqawama'): return 'ارتكاز على مقاومة'
+        if r.startswith('obv_muayad'): return 'سيولة OBV مؤيدة'
+        return r
+
+    rs_text = " | ".join([translate_dynamic(r) for r in reasons[:3]]) if reasons else "بدون إشارات قوية"
+
     
     return pct, emoji + " " + lbl, rs_text
 def calc_all_entries(d: dict, bias: str) -> dict:
@@ -5372,6 +5395,21 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 results[i] = ""
                 
         t0, t1, t2, t3, t4, t5, t7, t8, t9, t10, t11, t13, t6 = results
+        
+        # Inject the Master Summary & High Lot Sniper into Bot2 (the 13-chunk report)
+        s12_report = _build_spot_s12(data)
+        if s12_report:
+            raw_reports.append(("👑 الخلاصة المحورية لليوم (الفوري - Spot)", s12_report, None))
+            
+        s9_report = _build_spot_s9(data)
+        if s9_report:
+            raw_reports.append(("👑 مصفوفة التداول السريعة (الفوري - Spot)", s9_report, None))
+            
+        s6_report = _build_spot_s6(data)
+        if s6_report:
+            raw_reports.append(("👑 قناص اللوت العالي والسكالبينج الشامل (الفوري - Spot)", s6_report, None))
+
+
 
         if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الفوري)", t0, None))
         if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الفوري)", t1, None))

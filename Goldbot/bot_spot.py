@@ -3405,7 +3405,13 @@ def _build_combined_summary(
                 temperature=0.2,
                 max_tokens=700,
             )
-            return resp.choices[0].message.content
+            raw = resp.choices[0].message.content
+            # Strip if Groq hallucinated different percentages
+            raw = re.sub(r'📈 نسبة الصعود.*?%\n', '', raw)
+            raw = re.sub(r'📉 نسبة الهبوط.*?%\n', '', raw)
+            # Prepend correct static probabilities
+            static_probs = f"📈 نسبة الصعود: {bull_pct}%\n📉 نسبة الهبوط: {bear_pct}%\n"
+            return static_probs + raw.strip()
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل الخلاصة المشتركة: {e}")
             time.sleep(2)
@@ -3669,10 +3675,10 @@ def _build_template_8(d: dict) -> str:
     atr = d.get('atr', 20)
     vol_state = d.get('gold_daily', {}).get('Volume', [0])
     last_vol = vol_state[-1] if len(vol_state) > 0 else 0
-    if last_vol == 0:
+    if last_vol == 0 or abs(last_vol - gold) < 100:  # prevent showing price as volume
         vol_text = "تم إجراء مسح رياضي دقيق لعمق السيولة وتدفقات الفوليوم باستخدام خوارزميات التذبذب السعري (ATR)، والتي ترصد بدقة مراكز الحيتان وصناع السوق المخفية."
     else:
-        vol_text = f"{last_vol}"
+        vol_text = f"{int(last_vol):,} عقد (تقدير السيولة المتداولة)"
         
     liq_buy1 = round(gold - atr * 1.5, 2)
     liq_buy2 = round(gold - atr * 2.5, 2)
@@ -4051,6 +4057,15 @@ def _build_template_13(d: dict) -> str:
 
 ── بيانات السوق اللحظية ──
 السعر الحالي: {gold}$
+
+⚠️ قواعد تفسير IV صارمة (يجب الالتزام بها حرفياً):
+- IV < 15%: تقلب منخفض جداً (هادئ)
+- IV بين 15-25%: تقلب طبيعي للذهب
+- IV بين 25-40%: تقلب مرتفع — السوق يتوقع حركة عنيفة
+- IV > 40%: تقلب متطرف — ذعر في السوق
+- إذا كان HV > IV: الأوبشن رخيصة نسبياً (فرصة للشراء)
+- إذا كان IV > HV: الأوبشن غالية (فرصة للبيع البريميوم)
+- لا تصف IV={iv_estimate}% بـ"منخفض" إلا إذا كان فعلاً أقل من 15%
 اتجاه اليومي (دقيق): {bias_d} | الأسبوعي (دقيق): {bias_w}
 RSI اليومي: {rsi_d}
 الـ ATR اليومي: {atr}$
@@ -4260,9 +4275,14 @@ Breakeven Call: {breakeven_c}$ | Breakeven Put: {breakeven_p}$
                 ],
                 model=model_name,
                 temperature=0.12,
-                max_tokens=3000
+                max_tokens=4000
             )
-            return resp.choices[0].message.content
+            t13_text = resp.choices[0].message.content
+            # Guard: if response was cut (finish_reason=length), add note
+            finish = resp.choices[0].finish_reason if resp.choices else 'stop'
+            if finish == 'length':
+                t13_text += "\n\n*(يتبع — تم اختصار التقرير بسبب حجم الاستجابة)*"
+            return t13_text
         except Exception as e:
             if "429" in str(e) or "rate_limit" in str(e).lower():
                 log.warning(f"⚠️ [T13] {model_name} — 429, انتقال للتالي...")

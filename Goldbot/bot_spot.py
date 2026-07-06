@@ -5538,7 +5538,11 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
         # القالب الذكي الجديد CFTC (t11)
         if 't11' in locals() and t11: bot2_reports.append(("📰 تقرير CFTC", t11, None))
-        if 't13' in locals() and t13: bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13, None))
+                if 't13' in locals() and t13: 
+            import re
+            t13_clean = re.sub(r'\[.*?\]', '', t13, flags=re.DOTALL)
+            t13_clean = re.sub(r'\n\s*\n', '\n\n', t13_clean).strip()
+            bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13_clean, None))
 
         # القوالب الفورية S1-S12 — البوت الثالث @Dsssoppp78_bot
         bot3_reports = []

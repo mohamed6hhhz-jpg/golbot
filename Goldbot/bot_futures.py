@@ -4012,8 +4012,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
 
 
-        # if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الآجل)", t0, None))
-        # if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الآجل)", t1, None))
+        if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الآجل)", t0, None))
+        if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الآجل)", t1, None))
         if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الآجل)", t2, None))
         if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الآجل)", t3, None))
         if t4: raw_reports.append(("📈 تقرير عوائد السندات (الآجل)", t4, None))

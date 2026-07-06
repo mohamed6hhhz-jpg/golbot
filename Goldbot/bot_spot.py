@@ -5434,8 +5434,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
 
 
-        # if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الفوري)", t0, None))
-        # if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الفوري)", t1, None))
+        if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الفوري)", t0, None))
+        if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الفوري)", t1, None))
         if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الفوري)", t2, None))
         if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الفوري)", t3, None))
         if t4: raw_reports.append(("📈 تقرير عوائد السندات (الفوري)", t4, None))

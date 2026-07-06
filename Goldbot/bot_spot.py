@@ -3675,6 +3675,18 @@ def _build_template_8(d: dict) -> str:
                 continue
     return "⚠️ تعذر توليد قالب الحيتان."
 
+def _cci_gold_impact(cci: float) -> str:
+    if cci > 100:
+        base = f"🟢 CCI مرتفع ({cci:.1f}) — تشبع شرائي"
+        note = "📌 الذهب يتداول بقوة أعلى متوسطاته التاريخية. هناك خطر لجني أرباح سريع إذا ظهرت شمعة انعكاسية، لكن الاتجاه قوي."
+    elif cci < -100:
+        base = f"🔴 CCI منخفض ({cci:.1f}) — تشبع بيعي"
+        note = "📌 الذهب يتداول بقوة أسفل متوسطاته التاريخية. هناك فرصة لارتداد صعودي سريع إذا تم بناء قاع مدعوم بالسيولة."
+    else:
+        base = f"⚪ CCI محايد ({cci:.1f})"
+        note = "📌 الذهب يتحرك بشكل طبيعي ضمن متوسطاته ولا توجد إشارات شاذة أو تشبعات."
+    return f"{base}\n        {note}"
+
 def _build_template_9(d: dict) -> str:
     """تقرير اتجاه الذهب اليومي"""
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None

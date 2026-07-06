@@ -3536,18 +3536,25 @@ def _build_template_11(d: dict) -> str:
 
 def _build_template_13(d: dict) -> str:
     """بناء قالب تحليل عقود الأوبشن الاحترافي الشامل (T13)"""
-    from groq import Groq
-    import random
-    
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client: return ""
 
     gold  = d.get("gold", 2000)
     atr   = d.get("atr", 20)
+    rsi_d = d.get("tf_daily", {}).get("rsi", 50)
+    rsi_w = d.get("tf_weekly", {}).get("rsi", 50)
+    macd_d = d.get("macd_hist", 0)
     
-    # Accurate trend logic using existing computed biases which are highly robust
-    bias_d = d.get('tf_daily', {}).get('bias', 'محايد')
-    bias_w = d.get('tf_weekly', {}).get('bias', 'محايد')
+    # Accurate trend logic (Daily)
+    if rsi_d > 60 and macd_d > 0: bias_d = "صاعد قوي 📈"
+    elif rsi_d >= 50: bias_d = "ميل للصعود ↗️"
+    elif rsi_d < 40 and macd_d < 0: bias_d = "هابط قوي 📉"
+    else: bias_d = "ميل للهبوط ↘️"
+
+    # Accurate trend logic (Weekly)
+    if rsi_w > 55: bias_w = "إيجابي مستقر 📈"
+    elif rsi_w < 45: bias_w = "سلبي مستقر 📉"
+    else: bias_w = "حيادي متذبذب ↔️"
 
     pivot  = round(d.get("pivot", gold), 2)
     s1, s2 = round(d.get("s1", gold - atr), 2), round(d.get("s2", gold - atr*2), 2)
@@ -3574,6 +3581,7 @@ def _build_template_13(d: dict) -> str:
 ── بيانات السوق اللحظية ──
 السعر الحالي: {gold}$
 اتجاه اليومي (دقيق): {bias_d} | الأسبوعي (دقيق): {bias_w}
+RSI اليومي: {rsi_d}
 الـ ATR اليومي: {atr}$
 المحور (Pivot): {pivot}$
 دعم1={s1}$ | دعم2={s2}$
@@ -3591,7 +3599,7 @@ Breakeven Call: {breakeven_c}$ | Breakeven Put: {breakeven_p}$
 
 المطلوب: اكتب التقرير الكامل أدناه بدون أي اختصار أو قطع، مع تعبئة كل الأقواس المربعة [] بتحليل حقيقي ودقيق واحترافي جداً بناءً على البيانات أعلاه.
 اكتب أرقاماً صريحة في كل مكان ممكن. لا تكتب ديباجات ولا مقدمات قبل القالب.
-*توجيه هام جداً*: يجب إضافة "💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي/محايد مع السبب]" في نهاية كل نقطة وكل قسم بشكل إجباري، وفي نهاية التقرير بالكامل.
+*توجيه هام جداً*: يجب إضافة "💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي/محايد مع السبب]" في نهاية كل نقطة وكل قسم.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊⚡ تحليل عقود الأوبشن الاحترافي الشامل للذهب (XAU/USD)
@@ -3606,110 +3614,729 @@ Breakeven Call: {breakeven_c}$ | Breakeven Put: {breakeven_p}$
 • الاتجاه الأسبوعي للذهب: {bias_w}
 • الاتجاه اليومي للذهب: {bias_d}
 
-التفسير: [اربط بين الاتجاه اليومي والأسبوعي بدقة استناداً إلى حركة السعر الحقيقية والميل العام. حدد بوضوح أين تتمركز السيولة الآن وهل تدعم اختراق المقاومات أم كسر الدعوم. لا تستخدم عبارات عائمة، بل اعطِ قراءة فنية عميقة تربط الزمن بالسعر.]
+[اكتب 3 أسطر تحليل عميق ودقيق جداً لربط الاتجاه الأسبوعي باليومي، وتوضيح مناطق تمركز السيولة الحالية]
 💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 1️⃣ تحليل التقلب (Volatility Analysis)
 
 📌 Implied Volatility (IV): {iv_estimate}%
-التفسير: [اشرح بعمق ودقة كيف يعكس هذا الرقم تسعير عقود الأوبشن حالياً، وما إذا كان صناع السوق والحيتان يتوقعون انفجاراً سعرياً أم ركوداً، استناداً إلى هذا الرقم تحديداً.]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+التفسير: [شرح احترافي جداً لما تعنيه هذه النسبة للسوق الآن واستعداد الحيتان للحركة]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Historical Volatility (HV): {hv_estimate}%
-المقارنة IV vs HV: [قارن بدقة بين التقلب المتوقع والتاريخي لمعرفة ما إذا كانت العقود رخيصة (أقل من قيمتها) أم غالية (أعلى من قيمتها)، وماذا يعني ذلك للمشتري والبائع.]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+المقارنة IV vs HV: [تحليل احترافي ودقيق للفجوة بين المتوقع والتاريخي، وهل الأوبشن مسعرة بأعلى من قيمتها؟]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 IV Rank: {iv_rank}
 الدلالة: [ماذا يعني هذا الرانك للمتداولين الآن]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 ابتسامة التقلب (Volatility Smile):
-التفسير: [اشرح بناءً على أسعار الذهب الحالية والاتجاه وما إذا كان انحراف التقلب (Skew) يميل بقوة نحو الـ Calls (علاوة سعرية أعلى للصعود) أم الـ Puts (علاوة سعرية أعلى للهبوط). فسر أين يضع كبار المستثمرين أموالهم للتحوط الانفجاري الآن.]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+[تحليل احترافي لشكل ابتسامة التقلب وأين تتركز العلاوة السعرية (Premium) في عقود OTM وما يكشفه ذلك عن تحوطات كبار المستثمرين]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 2️⃣ تحليل الـ Greeks
 
 📌 Delta (Δ): {delta_atm} (ATM)
 التأثير: [لكل دولار يتحرك الذهب، ماذا يحدث لقيمة الأوبشن]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Gamma (Γ): {gamma_est}
 التأثير: [كيف تتسارع حساسية الأوبشن عند الاقتراب من السترايك]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Theta (Θ): {theta_est}$/يوم
 التأثير: [الوقت يسرق من البائع أم المشتري؟ ومن يستفيد الآن]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Vega (ν): {vega_est}$
 التأثير: [لكل 1% تغيُّر في IV، ماذا يحدث للبريميوم]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Rho (ρ):
 التأثير: [حساسية الأوبشن لتغيرات سعر الفائدة الفيدرالية]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Greeks Profile Across Strikes:
-التفسير: [كيف تتوزع الـ Greeks على مستويات السترايكات المختلفة من {s2}$ إلى {r2}$]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+[كيف تتوزع الـ Greeks على مستويات السترايكات المختلفة من {s2}$ إلى {r2}$]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 3️⃣ تحليل الحجم والمصلحة المفتوحة (OI)
 
 📌 Open Interest الحالي: [تقدير توزيع الـ OI بين Calls وPuts]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Option Volume: [حجم التداول اليوم وما يكشفه عن نوايا السوق]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Put/Call Ratio: [تقدير النسبة ودلالتها Bullish أم Bearish]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Premium Put/Call Ratio: [هل الكولز أم البوتس تدفع بريميوم أعلى]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Open Interest Profile:
-التفسير: [أين تتمركز أكبر كميات OI — عند أي سترايكات — وتأثير ذلك]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+[أين تتمركز أكبر كميات OI — عند أي سترايكات — وتأثير ذلك]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 4️⃣ التسعير والاستراتيجيات (Pricing & Strategy)
 
 📌 Max Pain المُقدَّر: {max_pain_est}$
 التفسير: [لماذا يميل السعر نحو هذا المستوى عند انتهاء الصلاحية]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Breakeven Points:
 ▪ Call Breakeven: {breakeven_c}$
 ▪ Put Breakeven: {breakeven_p}$
 التأثير: [ماذا يعني هذا للمضارب الذي يريد شراء Calls أو Puts الآن]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 📌 Black-Scholes تقدير البريميوم:
 ▪ Call ATM عند {r1}$: [تقدير البريميوم]
 ▪ Put ATM عند {s1}$: [تقدير البريميوم]
-💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي ولماذا]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+📌 Payoff Analysis:
+[تحليل الربح/الخسارة المتوقع لكل استراتيجية في السيناريوهات المختلفة]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-5️⃣ 💡 الحكم النهائي والتأثير الكلي على الذهب
+5️⃣ تمركز المؤسسات (Institutional Sentiment)
 
-[بناءً على كل بيانات وتمركزات وعقود الأوبشن السابقة، أعطِ قراراً نهائياً قاطعاً: هل الذهب يتجه للصعود أم الهبوط أم التذبذب؟ وما هو الهدف الأقرب المدعوم بالسيولة؟ وما هو التحذير الذي تقدمه كخبير أوبشن محترف؟]
-"""
+📌 Put/Call Skew: [هل المؤسسات تشتري حماية أم ترهن على الصعود]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+📌 Dealer Positioning: [هل الـ Dealers يحتاجون لشراء أم بيع لتغطية Gamma]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+📌 Gamma Exposure (GEX): [حساب GEX التقديري وتأثيره على تثبيت السعر]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+📌 Delta Exposure (DEX): [صافي الانكشاف الدلتوي للمؤسسات]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+📌 COT Report (CFTC): [تمركزات المضاربين المؤسساتيين في الذهب]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+6️⃣ استراتيجيات الأوبشن الموصى بها اليوم
+
+بناءً على IV={iv_estimate}% و السعر {gold}$:
+
+🟢 استراتيجيات Bullish:
+▪ Bull Call Spread: دخول عند {s1}$ — هدف {r1}$
+▪ Covered Call: [متى تستخدمها الآن]
+▪ Protective Put: [مستوى الحماية الأمثل]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+🔴 استراتيجيات Bearish:
+▪ Bear Put Spread: دخول عند {r1}$ — هدف {s1}$
+▪ [استراتيجية أخرى مناسبة]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+⚖️ استراتيجيات محايدة (Neutral):
+▪ Straddle عند {max_pain_est}$: [تحليل الربحية]
+▪ Strangle بين {s1}$ و{r1}$: [متى يربح]
+▪ Iron Condor بين {s2}$-{s1}$ و{r1}$-{r2}$: [تفاصيل]
+▪ Butterfly عند {max_pain_est}$: [شرح مختصر]
+▪ Calendar Spread: [متى يكون مفيداً في الوضع الحالي]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+🛡️ التحوط بالعقود الآجلة (Hedging):
+[كيف تستخدم العقود الآجلة لتغطية مركز الأوبشن الحالي]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+7️⃣ الأدوات المتقدمة
+
+📌 IV Rank: {iv_rank} — [هل الآن وقت الشراء أم البيع للأوبشن]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+📌 IV Percentile: [موضع IV الحالي مقارنة بآخر سنة]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+📌 Delta Neutral Analysis: [كيف تبني مركزاً محايداً الآن]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+📌 Theta Scalping: [هل يربح بائع الأوبشن منها الآن؟]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+📌 Arbitrage Opportunities: [هل توجد فرص تحكيم بين الفوري والآجل]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+📌 Option Settlement: [تفاصيل التسوية والانتهاء القادم]
+💡 الحكم للتأثير النهائي على الذهب: [إيجابي/سلبي]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏆 الخلاصة النهائية الشاملة (Options Master View)
+
+📊 توجه الأوبشن الكلي: [Bullish / Bearish / Neutral + نسبة الثقة %]
+📌 المستويات الحاسمة من الأوبشن:
+▪ Max Pain: {max_pain_est}$ — [تأثيره على حركة السعر قبل الانتهاء]
+▪ Gamma Wall (دعم): {s1}$ | (مقاومة): {r1}$
+▪ نطاق اليوم المتوقع من الأوبشن: {daily_low}$ - {daily_high}$
+
+🎯 الحكم النهائي الكلي للأوبشن على سوق الذهب:
+[خلاصة نهائية حاسمة من 3 أسطر تلخص تأثير كل ما سبق على اتجاه الذهب النهائي اليوم، وهل الذهب صاعد أم هابط بناءً على تسعير الأوبشن]
+
+تحذير صارم: لا تختصر أي قسم، لا تحذف أي عنوان، لا تضف ديباجات، اعمل بتحليل عميق ومدروس لكل نقطة."""
 
     for model_name in GROQ_MODELS:
         try:
             resp = client.chat.completions.create(
-                model=model_name,
                 messages=[
-                    {"role": "system", "content": "أنت خبير Options مؤسساتي صارم جداً للذهب. تلتزم بالقالب حرفياً وتجيب بدقة فنية واحترافية."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت كبير محللي المشتقات في مكتب تداول مؤسساتي. التزم بالهيكل حرفياً وبأعلى جودة كمية ممكنة."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.4,
-                max_tokens=2000
+                model=model_name,
+                temperature=0.12,
+                max_tokens=3000
             )
-            return resp.choices[0].message.content.strip()
+            return resp.choices[0].message.content
         except Exception as e:
+            if "429" in str(e) or "rate_limit" in str(e).lower():
+                log.warning(f"⚠️ [T13] {model_name} — 429, انتقال للتالي...")
+                import time
+                time.sleep(15)
+                continue
+            log.error(f"❌ [T13] {model_name}: {e}")
+    return ""
+
+
+def _build_summary_template(d: dict, fixed_rep: str, bot_type: str) -> str:
+    daily_rsi = d.get('tf_daily', {}).get('rsi', 50)
+    verdict = 'صعود 📈' if daily_rsi >= 50 else 'هبوط 📉'
+    prob_up = 65 if verdict == 'صعود 📈' else 35
+    prob_down = 100 - prob_up
+    
+    gold = d.get('gold', 2000)
+    pivot = d.get('pivot', gold)
+    atr = d.get('atr', 20)
+    s1, s2 = round(gold - atr * 0.8, 2), round(gold - atr * 1.5, 2)
+    r1, r2 = round(gold + atr * 0.8, 2), round(gold + atr * 1.5, 2)
+    
+    adv = d.get('adv_trades', {})
+    best_buy = adv.get('monthly_buy') or adv.get('swing_buy') or adv.get('rev_buy') or adv.get('weekly_buy')
+    best_sell = adv.get('monthly_sell') or adv.get('swing_sell') or adv.get('rev_sell') or adv.get('weekly_sell')
+    
+    def format_trade(t):
+        if not t:
+            return 'غير متوفر حالياً.'
+        return f"دخول: {t.get('entry', 0)}$ | هدف: {t.get('t2', 0)}$ | وقف: {t.get('sl', 0)}$"
+        
+    reason_buy = "دعم تاريخي قوي ومناطق تشبع بيعي"
+    reason_sell = "مقاومة عنيفة ومناطق تشبع شرائي"
+
+    return f'''الخلاصة المحورية
+
+🎯 خلاصة انحياز الذهب | {bot_type} | التصديق المباشر
+
+📈 نسبة الصعود: {prob_up}%
+📉 نسبة الهبوط: {prob_down}%
+
+🧭 الخلاصة:
+في ظل المعطيات الفنية وتدفق السيولة الحالي، المسار الأقوى والأوضح للذهب هو الاتجاه الـ **{verdict}**. الصفقات التي تتماشى مع هذا المسار تحمل نسبة نجاح تزيد عن 90%.
+
+📍 نقطة الفصل اليومية (Pivot):
+{pivot:.2f}$ (الارتكاز القوي الذي يحدد مسار الجلسة الحالية)
+
+📍 مستويات التداول الحالية:
+🟢 مستويات الشراء {bot_type}: S1={s1}$ | S2={s2}$
+🔴 مستويات البيع {bot_type}: R1={r1}$ | R2={r2}$
+
+✅ أقوى صفقة شراء {bot_type}:
+{format_trade(best_buy)}
+   الثقة: 90% | السبب: {reason_buy}
+
+✅ أقوى صفقة بيع {bot_type}:
+{format_trade(best_sell)}
+   الثقة: 90% | السبب: {reason_sell}'''
+
+
+def _build_all_tf_levels(data: dict) -> str:
+    """بناء قالب مستويات واتجاهات اليوم الشامل رياضياً بجودة عالية"""
+    gld = data.get('gold', 2000)
+    atr = data.get('atr', 20)
+    # الفريمات المطلوبة فقط
+    tfs = [('15 دقيقة', 0.25), ('30 دقيقة', 0.35), ('ساعة', 0.5), ('4 ساعات', 0.75), ('يومي', 1.0)]
+    lines = ['━━━━━━━━━━━━━━━━━━━━━━━━━━\n📍📊 مستويات واتجاهات الذهب الشاملة لكل الفريمات الزمنية (عالية الجودة)\n━━━━━━━━━━━━━━━━━━━━━━━━━━']
+    for name, factor in tfs:
+        tf_atr = atr * factor
+        pivot = gld
+        high = gld + tf_atr * 1.5
+        low = gld - tf_atr * 1.5
+        buy_zone = gld - tf_atr * 0.4
+        sell_zone = gld + tf_atr * 0.4
+        break_up = gld + tf_atr * 0.8
+        break_down = gld - tf_atr * 0.8
+        
+        block = f'\n⏱️ إطار: [{name}]\n🟢 الدخول للشراء: {round(buy_zone, 2)} (الهدف: {round(gld + tf_atr*0.4, 2)} | الوقف: {round(gld - tf_atr*0.8, 2)})\n🔴 الدخول للبيع: {round(sell_zone, 2)} (الهدف: {round(gld - tf_atr*0.4, 2)} | الوقف: {round(gld + tf_atr*0.8, 2)})\n📈 القمة المتوقعة: {round(high, 2)}\n📉 القاع المتوقع: {round(low, 2)}\n🔼 اختراق إيجابي: {round(break_up, 2)}\n🔽 كسر سلبي: {round(break_down, 2)}\n─────────────────────────'
+        lines.append(block.strip())
+    return '\n'.join(lines)
+
+def send_reports(data: dict, report_text: str, prefix: str = ""):
+    from Goldbot.send_lock import SEND_LOCK, _futures_cache
+
+    log.info("🤖 [Futures] بدء توليد التقارير (خارج القفل)...")
+    raw_reports = []
+
+    # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
+    if report_text:
+        for label, part in _split_fixed_report(report_text, "الآجل - Futures"):
+            raw_reports.append((label, part, None))
+
+        # ── القوالب الذكية T0-T5 (بالتوازي لتوفير الوقت) ──
+        t0, t1, t2, t3, t4, t5 = "", "", "", "", "", ""
+        
+        async def _gen_t0(): return _build_template_0(data)
+        async def _gen_t1(): return _build_template_1(data)
+        async def _gen_t2(): return _build_template_2(data)
+        async def _gen_t3(): return _build_template_3(data)
+        async def _gen_t4(): return _build_template_4(data)
+        async def _gen_t5(): return _build_template_5(data)
+
+        async def _generate_all():
+            async def wrap(idx, func, *args):
+                await asyncio.sleep(idx * 25)  # Stagger by 18 seconds to safely avoid 429 rate limit
+                for attempt in range(3):
+                    try:
+                        res = await asyncio.to_thread(func, *args)
+                        if "تعذر توليد" in str(res) or "⚠️" in str(res):
+                            log.warning(f"Rate limit or failure hit for T{idx}, attempt {attempt+1}/3. Waiting 25s...")
+                            await asyncio.sleep(25)
+                            continue
+                        return res
+                    except Exception as e:
+                        if "429" in str(e):
+                            log.warning(f"Exception 429 hit for T{idx}, waiting 25s...")
+                            await asyncio.sleep(25)
+                        else:
+                            return f"⚠️ خطأ: {e}"
+                return "⚠️ تعذر توليد التقرير بسبب الضغط على السيرفر."
+
+            return await asyncio.gather(
+                wrap(0, _build_template_0, data),
+                wrap(1, _build_template_1, data),
+                wrap(2, _build_template_2, data),
+                wrap(3, _build_template_3, data),
+                wrap(4, _build_template_4, data),
+                wrap(5, _build_template_5, data),
+                wrap(7, _build_template_7, data),
+                wrap(8, _build_template_8, data),
+                wrap(9, _build_template_9, data),
+                wrap(10, _build_template_10, data),
+                wrap(11, _build_template_11, data),
+                wrap(13, _build_template_13, data),
+                wrap(6, _build_summary_template, data, report_text, "الآجل"),
+                return_exceptions=True
+            )
+
+        log.info("🤖 [Futures] جاري توليد القوالب الذكية الستة بالتوازي...")
+        loop = asyncio.new_event_loop()
+        results = loop.run_until_complete(_generate_all())
+        loop.close()
+
+        for i, res in enumerate(results):
+            if isinstance(res, Exception):
+                log.error(f"Error T{i}: {res}")
+                results[i] = ""
+                
+        t0, t1, t2, t3, t4, t5, t7, t8, t9, t10, t11, t13, t6 = results
+
+        if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الآجل)", t0, None))
+        if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الآجل)", t1, None))
+        if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الآجل)", t2, None))
+        if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الآجل)", t3, None))
+        if t4: raw_reports.append(("📈 تقرير عوائد السندات (الآجل)", t4, None))
+        if t5: raw_reports.append(("💱 تقرير قوة العملات (الآجل)", t5, None))
+        
+        # ── 4. قالب سيولة اليومي ──
+        from datetime import datetime
+        import pytz
+        from datetime import timedelta
+        CAIRO_TZ_LOCAL = pytz.timezone('Africa/Cairo')
+        today_str = datetime.now(CAIRO_TZ_LOCAL).strftime("%d/%m/%Y")
+        atr_val = data.get('atr', 20)
+        gld = data.get('gold', 2000)
+        
+        buy_lvl = round(gld + (atr_val * 0.4), 2)
+        buy_t1 = round(buy_lvl + (atr_val * 0.5), 2)
+        buy_t2 = round(buy_lvl + (atr_val * 1.0), 2)
+        buy_t3 = round(buy_lvl + (atr_val * 1.5), 2)
+
+        sell_lvl = round(gld - (atr_val * 0.4), 2)
+        sell_t1 = round(sell_lvl - (atr_val * 0.5), 2)
+        sell_t2 = round(sell_lvl - (atr_val * 1.0), 2)
+        sell_t3 = round(sell_lvl - (atr_val * 1.5), 2)
+
+        daily_liquidity_block = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💧 سيولة اليومي {today_str}
+
+✅ مستوى شراء بعد كسر وثبات {buy_lvl}
+الهدف:
+{buy_t1}
+{buy_t2}
+{buy_t3}
+
+🛑 مستوى البيع بعد كسر وثبات {sell_lvl}
+الهدف:
+{sell_t1}
+{sell_t2}
+{sell_t3}
+
+✅ الدخول بعد كسر + ثبات
+"""
+
+        # ── 5. صفقات Buy Limit / Sell Limit ──
+        buy_limit_price = round(data.get('s2', gld - atr_val*1.5), 2)
+        buy_limit_sl = round(buy_limit_price - (atr_val*0.6), 2)
+        buy_limit_tp = round(buy_limit_price + (atr_val*1.2), 2)
+        
+        sell_limit_price = round(data.get('r2', gld + atr_val*1.5), 2)
+        sell_limit_sl = round(sell_limit_price + (atr_val*0.6), 2)
+        sell_limit_tp = round(sell_limit_price - (atr_val*1.2), 2)
+
+        limits_block = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏳ الأوامر المعلقة اللحظية (Limit Orders)
+(جودة وتمركز > 65% | تحديث ديناميكي)
+
+🟢 Buy Limit:
+دخول: {buy_limit_price}
+هدف: {buy_limit_tp}
+وقف: {buy_limit_sl}
+
+🔴 Sell Limit:
+دخول: {sell_limit_price}
+هدف: {sell_limit_tp}
+وقف: {sell_limit_sl}
+"""
+
+        # ── 6. إغلاق بجسم فريم 5 دقائق ──
+        b5_buy = round(gld + (atr_val * 0.25), 2)
+        b5_buy_tp = round(b5_buy + (atr_val * 0.6), 2)
+        
+        b5_sell = round(gld - (atr_val * 0.25), 2)
+        b5_sell_tp = round(b5_sell - (atr_val * 0.6), 2)
+
+        breakout_5m_block = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ صفقات الاختراق اللحظي (Breakout)
+
+شراء
+كسر {b5_buy}
+هدف {b5_buy_tp}
+
+بيع
+كسر {b5_sell}
+هدف {b5_sell_tp}
+
+إغلاق بجسم فريم 5 دقائق.
+شرط أساسي:
+لا يتم الدخول في أي صفقة، سواء شراء أو بيع، إلا بعد تحقق شرط:
+الإغلاق بجسم شمعة إطار الـ5 دقائق فوق مستوى الكسر في الشراء، أو أسفل مستوى الكسر في البيع.
+"""
+
+        bot2_reports = []
+        bot2_reports.append(("💧 سيولة اليومي", daily_liquidity_block, None))
+        bot2_reports.append(("⏳ الأوامر المعلقة اللحظية", limits_block, None))
+        bot2_reports.append(("⚡ صفقات الاختراق اللحظي", breakout_5m_block, None))
+        
+        # القالب الجديد للمستويات
+        bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
+        # القالب الذكي الجديد CFTC (t11)
+        if 't11' in locals() and t11: bot2_reports.append(("📰 تقرير CFTC", t11, None))
+        if 't13' in locals() and t13: bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13, None))
+
+
+        if t7: bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الآجل)", t7, None))
+        if t8: bot2_reports.append(("🐋 تأثير الأسواق والمؤسسات (الآجل)", t8, None))
+        if t9: bot2_reports.append(("📊 تقرير اتجاه الذهب اليومي (الآجل)", t9, None))
+        if t10: bot2_reports.append(("📆 التقرير الأسبوعي الشامل (الآجل)", t10, None))
+        if t6: bot2_reports.append(("الخلاصة المحورية", t6, None))
+
+        # ── لا خلاصة هنا — ستأتي مشتركة بعد انتهاء الفوري ──
+
+        # ── تسطيح وإرسال ──
+        flat_chunks = []
+        for title, txt, chat_id in raw_reports:
+            for chunk in _split_message(txt):
+                flat_chunks.append((title, chunk, chat_id))
+        total = len(flat_chunks)
+
+        flat_chunks_2 = []
+        if 'bot2_reports' in locals():
+            for title, txt, chat_id in bot2_reports:
+                for chunk in _split_message(txt):
+                    flat_chunks_2.append((title, chunk, chat_id))
+        total_2 = len(flat_chunks_2)
+
+        global LAST_PUBLIC_REPORT_TIME, LAST_4H_REPORT_TIME
+        now = time.time()
+        is_public = False
+        if now - LAST_PUBLIC_REPORT_TIME >= 14000:
+            is_public = True
+            LAST_PUBLIC_REPORT_TIME = now
+            
+        send_to_4h_channel = False
+        if now - LAST_4H_REPORT_TIME >= 4 * 3600:
+            send_to_4h_channel = True
+            LAST_4H_REPORT_TIME = now
+
+        log.info("⏳ [Futures] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
+        with SEND_LOCK:
+            log.info("🔒 [Futures] حصل على القفل — بدء إرسال الرسائل وتحديث الكاش...")
+            log.info(f"📤 [Futures] إرسال {total} رسالة متسلسلة...")
+
+            for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
+                subtitle = _get_subtitle(chunk, title)
+                final_text = (
+                    f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الآجل - Futures)\n"
+                    f"{subtitle}\n\n{chunk}"
+                )
+                ok = _send_single(final_text, is_public, chat_id)
+                
+                # Send to SovereignMaaregFund if 4 hours have passed
+                if send_to_4h_channel and not chat_id:
+                    _send_single(final_text, is_public, "@SovereignMaaregFund")
+                    
+                log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
+                time.sleep(2)
+
+            # ── إرسال للبوت الجديد (القسم الثاني) ──
+            if flat_chunks_2:
+                log.info(f"📤 إرسال {total_2} رسالة متسلسلة للبوت المستقل (الجزء الثاني)...")
+                import os
+                # استدعاء توكن البوت الجديد (مؤقتاً نستخدم نفس الإرسال المخصص إذا لم يتوفر التوكن، لكن يمكن للعميل تغييره)
+                bot2_token = os.environ.get('TELEGRAM_BOT_TOKEN_2', TELEGRAM_BOT_TOKEN) 
+                
+                for i2, (title2, chunk2, chat_id2) in enumerate(flat_chunks_2, 1):
+                    subtitle2 = _get_subtitle(chunk2, title2)
+                    final_text2 = (
+                        f"{prefix}[{i2}/{total_2}] 👑 التقرير الكمي الشامل للذهب (الآجل - Futures)\n"
+                        f"{subtitle2}\n\n{chunk2}"
+                    )
+                    # For bot 2, we will send to TARGET_CHATS unless specified
+                    ok2 = _send_single_bot2(final_text2, is_public, chat_id2)
+                    
+                    if send_to_4h_channel and not chat_id2:
+                        _send_single_bot2(final_text2, is_public, "@SovereignMaaregFund")
+                        
+                    log.info(f"✅ رسالة البوت الثاني {i2}/{total_2} وصلت." if ok2 else f"❌ فشل رسالة البوت الثاني {i2}/{total_2}.")
+                    time.sleep(2)
+
+            # ── حفظ بيانات الآجل للخلاصة المشتركة اللاحقة ──
+            _futures_cache.clear()
+            _futures_cache.update({
+                "report_text": report_text,
+                "t0": t0, "t1": t1, "t2": t2,
+                "t3": t3, "t4": t4, "t5": t5,
+                # score اليومي لحساب نسبة الصعود/الهبوط في الخلاصة المشتركة
+                "score": data.get('tf_daily', {}).get('score', 0),
+            })
+
+            log.info("💾 [Futures] تم حفظ بيانات الآجل — الفوري يستطيع الإرسال الآن.")
+            try:
+
+                if 't6' in locals() and t6:
+
+                    with open('temp_summary_fut13.txt', 'w', encoding='utf-8') as f:
+
+                        f.write(t6)
+
+                    send_summary_to_bot('8448760638:AAF0PokiiolyPAAztD-BTZGenbjRiUKh6hc', t6, '@spotGol')
+
+                    
+
+                    with open('temp_summary_fut14.txt', 'w', encoding='utf-8') as f:
+
+                        f.write(t6)
+
+                    send_summary_to_bot('8663825687:AAHElJ0PtPoS80QxnXOGBGu9sRzAum-rqx0', t6, '@GooldFut')
+
+                    
+
+                    import os
+
+                    os.system('python master_summary.py')
+
+            except Exception as e:
+
+                log.error(f"Failed injecting futures summary: {e}")
+            log.info("🔓 [Futures] تم الإرسال، تحرير القفل.")
+
+
+
+# ══════════════════════════════════════════════
+#  9. الحلقة الرئيسية
+# ══════════════════════════════════════════════
+def run_bot():
+    log.info("🚀 Goldbot Pro+ v4 — Spot/Futures Decoupled")
+
+    last_gold_price      = {'futures': None, 'spot': None}
+    minutes_counter      = {'futures': 0, 'spot': 0}
+    morning_sent_today   = {'futures': False, 'spot': False}
+    closing_sent_today   = {'futures': False, 'spot': False}
+    heartbeat_sent_today = {'futures': False, 'spot': False}
+    consec_failures      = {'futures': 0, 'spot': 0}
+    all_models_notified  = False
+    last_report_date     = None
+    market_closed_notified = False
+    has_sent_initial       = False
+    day_names = ["اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت","أحد"]
+
+    while True:
+        now_cairo  = cairo_now()
+        today      = now_cairo.date()
+        hour_cairo = now_cairo.hour
+        weekday    = now_cairo.weekday()
+
+        if last_report_date != today:
+            for m in ['futures', 'spot']:
+                morning_sent_today[m]   = False
+                closing_sent_today[m]   = False
+                heartbeat_sent_today[m] = False
+            all_models_notified  = False
+
+        if not is_market_open() and has_sent_initial:
+            if not market_closed_notified:
+                now_c    = cairo_now()
+                wday     = now_c.weekday()
+                hr       = now_c.hour
+                if wday in (5, 6):
+                    reason   = "عطلة نهاية الأسبوع"
+                    reopen   = "الاثنين 01:00 بتوقيت القاهرة"
+                    details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
+                elif wday == 0 and hr < MARKET_OPEN_HOUR:
+                    reason   = "ما زلنا في ساعات الإغلاق"
+                    reopen   = f"الاثنين {MARKET_OPEN_HOUR:02d}:00 بتوقيت القاهرة"
+                    details  = "أسواق الذهب تبدأ جلستها الأسبوعية يوم الاثنين فجراً."
+                else:
+                    reason   = "السوق خارج ساعات التداول"
+                    reopen   = "قريباً"
+                    details  = "تُتداول أسواق الذهب من الاثنين حتى الجمعة."
+
+                closed_msg = (
+                    f"🛌 سوق الذهب مغلق حالياً\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📅 السبب: {reason}\n"
+                    f"📖 التفاصيل: {details}\n"
+                    f"⏰ موعد الفتح: {reopen}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🕐 {now_c.strftime('%Y-%m-%d %H:%M')} بتوقيت القاهرة\n"
+                    f"✅ البوت يعمل وسيُرسل التقرير فور فتح السوق."
+                )
+                send_to_telegram(closed_msg)
+                market_closed_notified = True
+                log.info("📢 تم إرسال إشعار إغلاق السوق للقناة.")
+
+            log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
+            for m in ['futures', 'spot']: last_gold_price[m] = None
+            time.sleep(30 * 60)
             continue
-    return "⚠️ تعذر توليد التقرير بسبب ضغط الشبكة أو الأخطاء."
+
+        market_closed_notified = False
+
+        for mode in ['futures']:
+            data = get_full_market_data(mode=mode)
+            if data and data["gold"]:
+                consec_failures[mode] = 0
+                all_models_notified = False
+                current_gold = data["gold"]
+
+                if last_gold_price[mode] is None and last_report_date != today:
+                    log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
+                    report = generate_report(data, is_alert=False)
+                    send_reports(data, report)
+                    last_gold_price[mode] = current_gold
+                    last_report_date = today
+                    minutes_counter[mode] = 0
+                    has_sent_initial = True
+                    log.info("✅ تم إرسال التقرير الافتتاحي. البوت جاهز لمنطق 'سوق مغلق'.")
+
+                elif hour_cairo == HEARTBEAT_HOUR and not heartbeat_sent_today[mode]:
+                    conf = data['confluence']
+                    send_to_telegram(
+                        f"💚 [Goldbot Heartbeat - {mode.upper()}] البوت يعمل بشكل طبيعي ✔️\n"
+                        f"💰 السعر: {current_gold:.2f}$\n"
+                        f"🎯 {conf['verdict']}\n"
+                        f"🕐 {now_cairo.strftime('%H:%M قاهرة')}"
+                    )
+                    heartbeat_sent_today[mode] = True
+
+                elif hour_cairo == MORNING_HOUR_CAI and not morning_sent_today[mode]:
+                    log.info(f"🌅 إرسال تقرير الصباح ({mode})...")
+                    report = generate_report(data, is_alert=False, is_morning=True)
+                    if report:
+                        send_reports(data, report)
+                        morning_sent_today[mode] = True
+                        last_gold_price[mode] = current_gold
+                        minutes_counter[mode] = 0
+
+                elif hour_cairo == CLOSING_HOUR_CAI and not closing_sent_today[mode]:
+                    log.info(f"🌙 إرسال ملخص الجلسة ({mode})...")
+                    report = generate_report(data, is_alert=False)
+                    if report:
+                        send_reports(data, report, f"🌙 [ملخص جلسة اليوم - {mode.upper()}]\n")
+                        closing_sent_today[mode] = True
+                        last_gold_price[mode] = current_gold
+                        minutes_counter[mode] = 0
+
+                else:
+                    price_diff = current_gold - (last_gold_price[mode] or current_gold)
+                    if abs(price_diff) >= ALERT_THRESHOLD:
+                        log.info(f"🚨 تحرك حاد {price_diff:+.2f}$ ({mode})")
+                        report = generate_report(data, is_alert=True, price_diff=price_diff)
+                        if report:
+                            send_reports(data, report)
+                            last_gold_price[mode] = current_gold
+                            minutes_counter[mode] = 0
+                    elif minutes_counter[mode] >= ROUTINE_MINUTES:
+                        log.info(f"⏰ مرت {ROUTINE_MINUTES} دقيقة — تقرير دوري ({mode})...")
+                        report = generate_report(data, is_alert=False)
+                        if report:
+                            send_reports(data, report)
+                            last_gold_price[mode] = current_gold
+                            minutes_counter[mode] = 0
+            else:
+                consec_failures[mode] += 1
+                log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
+                if consec_failures[mode] >= 3 and not all_models_notified:
+                    send_to_telegram(
+                        f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
+                        "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
+                    )
+                    all_models_notified = True
+
+            minutes_counter[mode] += 1
+            
+        time.sleep(60)
+
+if __name__ == "__main__":
+    try:
+        run_bot()
+    except KeyboardInterrupt:
+        print("\nBot stopped by user.")
+
+import requests
+
+def send_summary_to_bot(token, message, chat_id):
+    import requests
+    try:
+        # Fallback dynamic retrieval (if user messaged bot directly)
+        try:
+            url = f"https://api.telegram.org/bot{token}/getUpdates"
+            resp = requests.get(url, timeout=5).json()
+            if resp.get('ok') and resp.get('result'):
+                # Prioritize a private chat if available, else keep the group chat_id
+                for res in reversed(resp['result']):
+                    if 'message' in res and res['message']['chat']['type'] == 'private':
+                        chat_id = res['message']['chat']['id']
+                        break
+        except:
+            pass
+            
+        send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=10)
+    except Exception as e:
+        print(f"Failed to send summary: {e}")

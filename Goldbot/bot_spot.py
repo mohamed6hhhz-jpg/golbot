@@ -681,10 +681,45 @@ def _macd_gold_impact(macd_hist: float) -> str:
     return "⚪ زخم ضعيف → لا تأثير واضح على الذهب"
 
 
-def _obv_gold_impact(obv_trend: str) -> str:
-    if 'صعودي' in obv_trend: return "🟢 تراكم مؤسسي → المؤسسات تشتري الذهب"
-    elif 'هبوطي' in obv_trend: return "🔴 توزيع مؤسسي → المؤسسات تبيع الذهب"
-    return "⚪ OBV غير محدد"
+def _indicators_verdict(d: dict) -> str:
+    score = 0
+    if d.get('rsi', 50) > 50: score += 1
+    elif d.get('rsi', 50) < 50: score -= 1
+    if d.get('macd_hist', 0) > 0: score += 1
+    elif d.get('macd_hist', 0) < 0: score -= 1
+    if 'صعودي' in d.get('obv_trend', ''): score += 1
+    elif 'هبوطي' in d.get('obv_trend', ''): score -= 1
+    if score > 1:
+        return "📈 بناءً على التوافق بين تدفق السيولة المؤسسية (OBV) ومؤشرات الزخم، السيطرة الحالية تميل بالكامل لصالح المشترين. يُفضل التركيز على صفقات الشراء مع التراجعات وتجنب البيع المباشر."
+    elif score < -1:
+        return "📉 بناءً على التوافق بين تدفق السيولة المؤسسية (OBV) ومؤشرات الزخم، السيطرة الحالية تميل بالكامل لصالح البائعين. يُفضل التركيز على صفقات البيع مع الارتدادات وتجنب الشراء المباشر."
+    else:
+        return "⚖️ المؤشرات تشهد تعارضاً داخلياً (توازن). لا يوجد اتجاه زمني واضح، يُفضل التداول على الأطراف القصوى فقط (S2/R2) بحذر شديد."
+
+
+def _obv_gold_impact(obv_trend: str, d: dict = None) -> str:
+    is_price_bullish = None
+    if d and 'gold' in d and 'pivot' in d:
+        is_price_bullish = d['gold'] > d['pivot']
+    
+    if 'صعودي' in obv_trend:
+        if is_price_bullish is False:
+            base = "🟢 OBV صعودي (دايفرجنس إيجابي)"
+            note = "💡 تحذير: رغم هبوط السعر ظاهرياً، إلا أن السيولة المؤسسية تضخ بقوة (تجميع خفي)، مما يُنذر بارتداد صاعد مفاجئ."
+        else:
+            base = "🟢 OBV صعودي (تأكيد الاتجاه)"
+            note = "💡 المؤسسات تشتري وتدعم الاتجاه الصاعد بقوة، مما يعزز استمراره."
+    elif 'هبوطي' in obv_trend:
+        if is_price_bullish is True:
+            base = "🔴 OBV هبوطي (دايفرجنس سلبي)"
+            note = "💡 تحذير: رغم صعود السعر ظاهرياً، إلا أن السيولة المؤسسية تنسحب (توزيع خفي)، مما يُنذر بهبوط قادم."
+        else:
+            base = "🔴 OBV هبوطي (تأكيد الاتجاه)"
+            note = "💡 المؤسسات تبيع وتدعم الاتجاه الهابط بقوة، مما يعزز استمراره."
+    else:
+        base = "⚪ OBV محايد (توازن مؤسسي)"
+        note = "💡 السيولة المؤسسية متوقفة أو متوازنة، ننتظر ضخ سيولة جديدة لتحديد الاتجاه القادم."
+    return f"{base}\n        {note}" 
 
 
 def _adx_gold_impact(adx: float, di_p: float, di_m: float) -> str:
@@ -1864,12 +1899,25 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧮 المؤشرات وتأثيرها على الذهب
-   RSI:{d['rsi']}({d['rsi_label'].split()[0]}) | {_rsi_gold_impact(d['rsi'])}
-   MACD:{d['macd_hist']} | {_macd_gold_impact(d['macd_hist'])}
-   StochK:{d['stoch_k']} | BB:{d['bb_label'].split()[0]}{d['ind_bb_i']} | EMA:{d['ema_label']}{d['ind_ema_i']}
-   ADX:{d['adx']}(DI+{d['di_plus']}/DI-{d['di_minus']}) | {_adx_gold_impact(d['adx'],d['di_plus'],d['di_minus'])}
-   OBV:{d['obv_trend']} | {_obv_gold_impact(d['obv_trend'])}
-   CCI:{d['cci']}({d['cci_label'].split()[0]}) | W%R:{d['williams_r']} | ATR:{d['atr']}$
+   ─────────────────────────────
+   📊 RSI  : {_rsi_gold_impact(d['rsi'])} (القيمة: {d['rsi']} — {d['rsi_label'].split()[0]})
+   ─────────────────────────────
+   📊 MACD : {_macd_gold_impact(d['macd_hist'])} (Histogram: {d['macd_hist']})
+   ─────────────────────────────
+   📊 StochK={d['stoch_k']} | BB={d['bb_label'].split()[0]}{d['ind_bb_i']} | EMA={d['ema_label']}{d['ind_ema_i']}
+   ─────────────────────────────
+   📊 ADX  : {_adx_gold_impact(d['adx'],d['di_plus'],d['di_minus'])} (ADX={d['adx']} | DI+={d['di_plus']} / DI-={d['di_minus']})
+   ─────────────────────────────
+   📊 OBV  : {_obv_gold_impact(d['obv_trend'], d)}
+   ─────────────────────────────
+   📊 CCI  : {_cci_gold_impact(d['cci'])}
+   ─────────────────────────────
+   📊 W%R  : {_wr_gold_impact(d['williams_r'])}
+   ─────────────────────────────
+   📊 ATR  : {_atr_gold_impact(d['atr'], gold)}
+   ─────────────────────────────
+   📋 💡 الخلاصة النهائية للمؤشرات (حكم الماكينة):
+      {_indicators_verdict(d)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔢 المستويات (مبنية على الـ {market_suffix})

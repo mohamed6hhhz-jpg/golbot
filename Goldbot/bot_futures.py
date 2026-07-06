@@ -3412,26 +3412,25 @@ def _build_template_11(d: dict) -> str:
     # Gold
     g_chg, g_tot = gen_data(100000, is_bull)
     g_dir = "⬆️ ارتفعت" if is_bull else "⬇️ تراجعت"
-    g_type = "الشراء" if is_bull else "البيع"
     g_eff = "إيجابي" if is_bull else "سلبي"
     g_icon = "🟢" if is_bull else "🔴"
-    g_text = "استمرار ثقة المستثمرين في الذهب رغم الضغوط الناتجة عن قوة الدولار وتوقعات الفائدة المرتفعة." if is_bull else "تراجعاً نسبياً في ثقة المستثمرين في الذهب مع قوة الدولار وتوقعات الفائدة المرتفعة."
+    g_text = "استمرار ثقة المستثمرين في الذهب رغم الضغوط الناتجة عن قوة الدولار وتوقعات الفائدة المرتفعة." if is_bull else "تراجعاً نسبياً في ثقة المستثمرين في الذهب بسبب قوة الدولار وتوقعات الفائدة المرتفعة."
     
     # Silver
     s_chg, s_tot = gen_data(10000, is_bull)
     s_dir = "⬆️ ارتفعت" if is_bull else "⬇️ تراجعت"
-    s_type = "الشراء" if is_bull else "البيع"
     s_eff = "إيجابي" if is_bull else "سلبي"
     s_icon = "🟢" if is_bull else "🔴"
+    s_text_prefix = "استمرار زيادة المراكز يعكس" if is_bull else "انخفاض المراكز يعكس"
     s_text = "تحسناً في شهية المستثمرين تجاه الفضة." if is_bull else "تراجعاً في شهية المستثمرين تجاه الفضة."
     
     # Oil
     oil_bull = macd > 0
     o_chg, o_tot = gen_data(90000, oil_bull)
     o_dir = "⬆️ ارتفعت" if oil_bull else "⬇️ تراجعت"
-    o_type = "الشراء" if oil_bull else "البيع"
     o_eff = "إيجابي" if oil_bull else "سلبي"
     o_icon = "🟢" if oil_bull else "🔴"
+    o_text_prefix = "استمرار زيادة المراكز يعكس" if oil_bull else "انخفاض المراكز يعكس"
     o_text = "توجهاً لدعم استمرار صعود النفط." if oil_bull else "تراجعاً نسبياً في ثقة المضاربين تجاه استمرار صعود النفط."
     
     # Currencies
@@ -3475,7 +3474,7 @@ def _build_template_11(d: dict) -> str:
 
 🟡 الذهب (Gold)
 
-{g_dir} مراكز {g_type} بمقدار {g_chg:,} عقداً لتصل إلى {g_tot:,} عقداً.
+{g_dir} مراكز الشراء بمقدار {g_chg:,} عقداً لتصل إلى {g_tot:,} عقداً.
 
 📊 يعكس ذلك {g_text}
 
@@ -3485,9 +3484,9 @@ def _build_template_11(d: dict) -> str:
 
 ⚪ الفضة (Silver)
 
-{s_dir} مراكز {s_type} بمقدار {s_chg:,} عقداً لتصل إلى {s_tot:,} عقداً.
+{s_dir} مراكز الشراء بمقدار {s_chg:,} عقداً لتصل إلى {s_tot:,} عقداً.
 
-📌 استمرار زيادة المراكز يعكس {s_text}
+📌 {s_text_prefix} {s_text}
 
 {s_icon} التأثير: {s_eff} للفضة.
 
@@ -3495,9 +3494,9 @@ def _build_template_11(d: dict) -> str:
 
 🛢 النفط الخام WTI
 
-{o_dir} مراكز {o_type} بمقدار {o_chg:,} عقداً لتصل إلى {o_tot:,} عقداً.
+{o_dir} مراكز الشراء بمقدار {o_chg:,} عقداً لتصل إلى {o_tot:,} عقداً.
 
-📌 تغير المراكز يعكس {o_text}
+📌 {o_text_prefix} {o_text}
 
 {o_icon} التأثير: {o_eff} للنفط على المدى القصير.
 
@@ -3534,9 +3533,6 @@ def _build_template_11(d: dict) -> str:
 🔴 سلبي: {neg_str}
 
 ⚠️ تظل بيانات CFTC مؤشراً مهماً لقياس توجهات كبار المضاربين، لكنها لا تُستخدم منفردة لاتخاذ قرارات التداول، بل تُدمج مع التحليل الفني والأساسي.'''
-
-
-
 
 def _build_template_13(d: dict) -> str:
     """بناء قالب تحليل عقود الأوبشن الاحترافي الشامل (T13)"""

@@ -799,27 +799,25 @@ def calc_liquidity_signal(d: dict) -> str:
 
 
 def calc_divergence(df) -> str:
-    """كشف التباين بين RSI والسعر — صعودي / هبوطي"""
-    if df is None or len(df) < 35:
-        return "⚪ لا يوجد تباين واضح"
+    """حساب التباين السعري (Divergence) مع مؤشر RSI"""
+    import numpy as np
+    if df is None or len(df) < 20: return "—"
     closes = df['Close'].values
-    # نحسب RSI على آخر 30 شمعة
-    rsi_vals = [calc_rsi(closes[max(0,i-20):i+1]) for i in range(len(closes)-30, len(closes))]
-    prices   = closes[-30:]
-    if len(rsi_vals) < 20:
-        return "⚪ لا يوجد تباين واضح"
+    rsi_vals = [calc_rsi(closes[max(0,i-14):i+1]) for i in range(len(closes)-20, len(closes))]
+    prices = closes[-20:]
+    if len(rsi_vals) < 10: return "—"
     mid = len(prices) // 2
     p1_hi, p2_hi = np.max(prices[:mid]),  np.max(prices[mid:])
     p1_lo, p2_lo = np.min(prices[:mid]),  np.min(prices[mid:])
     r1_hi, r2_hi = np.max(rsi_vals[:mid]), np.max(rsi_vals[mid:])
     r1_lo, r2_lo = np.min(rsi_vals[:mid]), np.min(rsi_vals[mid:])
-    # تباين هبوطي: سعر قمة أعلى + RSI قمة أدنى
-    if p2_hi > p1_hi and r2_hi < r1_hi * 0.99:
-        return "⚠️ تباين هبوطي — السعر يصنع قمة أعلى وRSI أدنى ⚠️"
-    # تباين صعودي: سعر قاع أدنى + RSI قاع أعلى
-    if p2_lo < p1_lo and r2_lo > r1_lo * 1.01:
-        return "💡 تباين صعودي — السعر يصنع قاعاً أدنى وRSI أعلى 💡"
-    return "⚪ لا يوجد تباين في الوقت الحالي"
+    
+    if p2_hi > p1_hi and r2_hi < r1_hi * 0.95:
+        return "⚠️ تباين سلبي قوي (Divergence) — قمة أعلى مع تراجع الزخم"
+    if p2_lo < p1_lo and r2_lo > r1_lo * 1.05:
+        return "💡 تباين إيجابي قوي (Divergence) — قاع أدنى مع ارتفاع الزخم"
+    return "متوافق مع الزخم (لا يوجد تباين)"
+
 
 
 def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
@@ -1920,14 +1918,28 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
       {_indicators_verdict(d)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔢 المستويات (مبنية على الـ {market_suffix})
-   🟣 مقاومة نفسية:{rn['nearest_resistance']}$(+{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(-{rn['dist_to_support']}$)
-   📍 Swing H:{d['swing_high']}$ / L:{d['swing_low']}$ | VWAP:{f"{d['vwap']}$" if d['vwap'] else '—'}
-   📅 PrevWk H:{f"{d['prev_wk_high']}$" if d['prev_wk_high'] else '—'} / L:{f"{d['prev_wk_low']}$" if d['prev_wk_low'] else '—'} | PrevMo H:{f"{d['prev_mo_high']}$" if d['prev_mo_high'] else '—'} / L:{f"{d['prev_mo_low']}$" if d['prev_mo_low'] else '—'}
-   🔴 R1:{d['r1']}$ R2:{d['r2']}$ | Pivot:{d['pivot']}$ | 🟢 S1:{d['s1']}$ S2:{d['s2']}$
+🔢 خريطة المستويات والصفقات (مبنية على الـ {market_suffix})
+   🟣 مقاومة نفسية: {rn['nearest_resistance']}$ (+{rn['dist_to_resistance']}$) | دعم نفسي: {rn['nearest_support']}$ (-{rn['dist_to_support']}$)
+   ═════════════════════════════
+   📍 Swing High : {d['swing_high']}$
+   📍 Swing Low  : {d['swing_low']}$
+   ═════════════════════════════
+   📊 VWAP       : {f"{d['vwap']}$" if d['vwap'] else '— غير متاح'}
+   ═════════════════════════════
+   📅 الأسبوع السابق → قمة: {f"{d['prev_wk_high']}$" if d['prev_wk_high'] else '—'} | قاع: {f"{d['prev_wk_low']}$" if d['prev_wk_low'] else '—'}
+   📆 الشهر السابق   → قمة: {f"{d['prev_mo_high']}$" if d['prev_mo_high'] else '—'} | قاع: {f"{d['prev_mo_low']}$" if d['prev_mo_low'] else '—'}
+   ═════════════════════════════
+   🔴 المقاومات: R1: {d['r1']}$ | R2: {d['r2']}$
+   💠 المحور: Pivot: {d['pivot']}$
+   🟢 الدعوم: S1: {d['s1']}$ | S2: {d['s2']}$
+   ═════════════════════════════
    🟡 {fib_line}
+   ═════════════════════════════
    📊 {range_line}
-   🔍 تباين:{d['divergence']} | طلب:{f"{d['sd_demand']}$" if d['sd_demand'] else '—'} | عرض:{f"{d['sd_supply']}$" if d['sd_supply'] else '—'}
+   ═════════════════════════════
+   🔍 التباين (Divergence): {d['divergence']}
+   🛒 منطقة الطلب القوية: {f"{d['sd_demand']}$" if d['sd_demand'] else '—'}
+   🩸 منطقة العرض القوية: {f"{d['sd_supply']}$" if d['sd_supply'] else '—'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 {bias_section}
 🛒 صفقات الشراء:
@@ -3425,7 +3437,7 @@ def _split_fixed_report(report_text: str, mode_label: str) -> list:
     """
     markers = [
         "📐 تحليل العائد الحقيقي",
-        "🔢 المستويات",
+        "🔢 خريطة المستويات والصفقات",
         "📊 تقرير قوة الذهب",
         "📈 توقعات السعر",
     ]

@@ -2878,33 +2878,64 @@ def _build_template_5(d: dict) -> str:
 
 def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: str, t4: str, t5: str) -> str:
     """بناء القالب السادس والأخير (الخلاصة الذكية) عبر الذكاء الاصطناعي"""
+    from groq import Groq
+    import random
+    import re
+    
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
         return "⚠️ لا يمكن توليد تقرير الخلاصة لعدم توفر مفتاح Groq."
 
     pivot_val = d.get('pivot', '---')
-
-    import re
     clean_t0 = re.sub(r'[╭─╮├┤│╰╯]', '', t0) if t0 else ""
-    conf = d.get('confluence', {})
-    bullish = conf.get('bullish', 0)
-    bearish = conf.get('bearish', 0)
-    neutral = conf.get('neutral', 0)
-    n_conf = conf.get('n', 1)
     
-    # Calculate robust probability based on indicators
-    up_raw = bullish + (neutral / 2.0)
-    up_prob = int(round((up_raw / max(1, n_conf)) * 100))
-    up_prob = max(15, min(85, up_prob)) # Cap realistically between 15% and 85%
+    # Calculate robust weighted probability
+    score = 0
+    total_weight = 0
+    
+    # 1. Trend (weight 3)
+    if d.get('ema20', 0) > d.get('ema50', 0) > d.get('ema200', 0): score += 3
+    elif d.get('ema20', 0) < d.get('ema50', 0) < d.get('ema200', 0): score -= 3
+    total_weight += 3
+    
+    # 2. Momentum (weight 2)
+    macd_hist = d.get('macd_hist', 0)
+    if macd_hist > 0: score += 2
+    elif macd_hist < 0: score -= 2
+    total_weight += 2
+    
+    rsi = d.get('rsi', 50)
+    if rsi > 55: score += 2
+    elif rsi < 45: score -= 2
+    total_weight += 2
+    
+    # 3. Volume / OBV (weight 2)
+    obv_trend = d.get('obv_trend', '')
+    if "صعودي" in obv_trend: score += 2
+    elif "هبوطي" in obv_trend: score -= 2
+    total_weight += 2
+    
+    # 4. Multi-Timeframe (weight 3)
+    tf_scores = [d.get('tf_weekly', {}).get('score',0), d.get('tf_daily', {}).get('score',0), d.get('tf_hourly', {}).get('score',0)]
+    mtf = sum(tf_scores)
+    if mtf > 0: score += 3
+    elif mtf < 0: score -= 3
+    total_weight += 3
+    
+    # Convert score (-12 to +12) to percentage (0% to 100%)
+    up_prob_calc = 50 + (score / total_weight) * 45  # Cap at max 95% / min 5%
+    up_prob = int(round(up_prob_calc))
+    up_prob = max(10, min(90, up_prob))
     down_prob = 100 - up_prob
 
-    template = f"""🎯 خلاصة انحياز الذهب | التحديث المباشر
+    static_header = f"""🎯 خلاصة انحياز الذهب | التحديث المباشر
 
 📈 نسبة الصعود نحو القمة: {up_prob}%
 📉 نسبة الهبوط نحو القاع: {down_prob}%
 
-🧭 الخلاصة:
-[سطرين أو ثلاثة فقط تلخص الموقف العام للذهب بناء على كل التقارير المرفقة مع إعطاء قرار نهائي واضح. اكتب بلغة يفهمها المبتدئون]
+🧭 الخلاصة:"""
+
+    template_for_llm = f"""[سطرين أو ثلاثة فقط تلخص الموقف العام للذهب بناء على كل التقارير المرفقة مع إعطاء قرار نهائي واضح. اكتب بلغة يفهمها المبتدئون]
 
 📍 نقطة الفصل اليومية (Pivot):
 {pivot_val}$ [اشرح دلالة التداول حالياً فوق أو تحت هذا المستوى]
@@ -2916,15 +2947,15 @@ def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: st
 [اكتب قراراً استراتيجياً حاسماً ونهائياً يجمع كل المعطيات السابقة ويوجه المتداول للخلاصة النهائية (شراء، بيع، أو انتظار) مع ذكر السبب الرئيسي بإيجاز واحترافية]"""
 
     prompt = f"""أنت "المحلل الأكبر" والمستشار المالي النهائي. 
-لقد قام فريقك بإعداد تقارير شاملة حول الذهب تشمل (الصفقات الأساسية، الصفقات المتقدمة، التحليل الفني، الاقتصاد، المخاطرة، العوائد، والعملات).
+لقد قام فريقك بإعداد تقارير شاملة حول الذهب تشمل (الصفقات، التحليل الفني، الاقتصاد، والمخاطرة).
 الهدف الآن هو استخلاص عصارة هذه التقارير في "رسالة مختصرة ومباشرة للجمهور العام" تطابق هذا القالب بالضبط:
 
-{template}
+{template_for_llm}
 
 إليك جميع التقارير للتحليل:
 --- التقرير الأساسي (الصفقات ومستويات الدعم والمقاومة): ---
 {fixed_rep}
---- تقرير الصفقات المتقدمة (زيرو انعكاس ولوت عالي): ---
+--- تقرير الصفقات المتقدمة: ---
 {clean_t0}
 --- التقرير 1 (الفني والزخم): ---
 {t1}
@@ -2932,37 +2963,39 @@ def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: st
 {t2}
 --- التقرير 3 (المخاطرة): ---
 {t3}
---- التقرير 4 (العوائد): ---
-{t4}
---- التقرير 5 (العملات): ---
-{t5}
 
 المطلوب:
 1. اقرأ جميع التقارير والصفقات المرفقة بعناية فائقة.
-2. لا تغير أبداً نسب الصعود والهبوط المكتوبة في القالب (فهي محسوبة رياضياً ومؤكدة)، اتركها كما هي.
-3. اكتب خلاصة مكثفة في سطرين أو ثلاثة كحد أقصى للاتجاه العام، تتوافق تماماً مع النسب المذكورة أعلاه.
-4. ابحث في التقارير المرفقة (خاصة التقرير الأساسي وتقرير الصفقات المتقدمة والفني) عن أبرز مناطق البيع 🔴 والشراء 🟢 وانقلها بأرقامها الدقيقة إلى قسم المستويات. لا تؤلف أرقاماً.
-5. لا تكتب أي مقدمات أو تحيات، فقط أخرج القالب المملوء."""
+2. اكتب خلاصة مكثفة في سطرين أو ثلاثة كحد أقصى للاتجاه العام. نسبة الصعود المحسوبة آلياً هي {up_prob}%، فاجعل كلامك متوافقاً مع هذا الاتجاه.
+3. ابحث في التقارير المرفقة عن أبرز مناطق البيع 🔴 والشراء 🟢 وانقلها بأرقامها الدقيقة إلى قسم المستويات. لا تؤلف أرقاماً.
+4. لا تكتب أي مقدمات أو تحيات، فقط أخرج القالب المملوء."""
 
     for model_name in GROQ_MODELS:
         try:
             log.info(f"🤖 جاري توليد الخلاصة النهائية (القالب 6) عبر {model_name}...")
             resp = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت المحلل المالي الأكبر. اصدر حكماً نهائياً قصيراً ودقيقاً للجمهور والتزم بالقالب الحرفي."},
-                    {"role": "user", "content": prompt},
-                ],
                 model=model_name,
+                messages=[
+                    {"role": "system", "content": "أنت خبير أسواق مالية صارم يكتب تقارير مباشرة ودقيقة بدون أي حشو."},
+                    {"role": "user", "content": prompt}
+                ],
                 temperature=0.3,
-                max_tokens=600,
+                max_tokens=800
             )
-            return resp.choices[0].message.content
-        except Exception as e:
-            log.warning(f"⚠️ [{model_name}] فشل في توليد الخلاصة: {e}")
-            time.sleep(10)
-            continue
+            llm_text = resp.choices[0].message.content.strip()
             
-    return "⚠️ تعذر توليد الخلاصة النهائية."
+            # Remove repeated header if the LLM hallucinated it
+            llm_text = re.sub(r'🎯 خلاصة انحياز الذهب.*\n', '', llm_text, flags=re.IGNORECASE)
+            llm_text = re.sub(r'📈 نسبة الصعود.*\n', '', llm_text)
+            llm_text = re.sub(r'📉 نسبة الهبوط.*\n', '', llm_text)
+            llm_text = re.sub(r'🧭 الخلاصة:\s*', '', llm_text)
+            
+            return f"{static_header}\n{llm_text.strip()}"
+        except Exception as e:
+            log.warning(f"❌ فشل الموديل {model_name} في القالب 6: {e}")
+            continue
+
+    return "⚠️ تعذر توليد التقرير الأخير من جميع الموديلات."
 
 def _build_template_0(d: dict) -> str:
     """بناء القالب التمهيدي 0 (الصفقات المتقدمة والاتجاهات) عبر الذكاء الاصطناعي"""

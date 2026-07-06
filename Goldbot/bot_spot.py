@@ -3687,6 +3687,25 @@ def _cci_gold_impact(cci: float) -> str:
         note = "📌 الذهب يتحرك بشكل طبيعي ضمن متوسطاته ولا توجد إشارات شاذة أو تشبعات."
     return f"{base}\n        {note}"
 
+def _wr_gold_impact(wr: float) -> str:
+    if wr > -20:
+        base = f"🔴 W%R مرتفع ({wr:.1f}) — تشبع شرائي"
+        note = "📌 السعر يتداول بالقرب من أعلى مستوى له في آخر 14 فترة زمنية. احتمالية الهبوط لتفريغ المؤشر واردة جداً."
+    elif wr < -80:
+        base = f"🟢 W%R منخفض ({wr:.1f}) — تشبع بيعي"
+        note = "📌 السعر يتداول بالقرب من أدنى مستوى له في آخر 14 فترة زمنية. فرصة صعود واردة جداً."
+    else:
+        base = f"⚪ W%R محايد ({wr:.1f})"
+        note = "📌 السعر في منتصف النطاق الزمني الأخير. الاتجاه طبيعي."
+    return f"{base}\n        {note}"
+
+
+def _atr_gold_impact(atr: float, gold: float) -> str:
+    if not atr or atr <= 0: return "—"
+    base = f"📊 ATR: {atr:.2f}$"
+    note = f"📌 مؤشر التقلب اللحظي. السعر قد يتحرك بمتوسط {atr:.2f}$ صعوداً وهبوطاً. ينصح بجعل وقف الخسارة اللحظي لا يقل عن نصف قيمة المؤشر ({round(atr/2, 2)}$) لتجنب الضرب الوهمي."
+    return f"{base}\n        {note}"
+
 def _build_template_9(d: dict) -> str:
     """تقرير اتجاه الذهب اليومي"""
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None

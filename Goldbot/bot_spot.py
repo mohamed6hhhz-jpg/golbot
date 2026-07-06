@@ -2598,8 +2598,7 @@ def _split_message(text: str) -> list:
         return [text]
 
     SEPARATOR = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    lines   = text.split("
-")
+    lines   = text.split("\n")
     chunks  = []
     current = ""
     in_table = False
@@ -2608,22 +2607,15 @@ def _split_message(text: str) -> list:
         if "╭─" in line:
             in_table = True
             if _tg_len(current) > CHUNK_SIZE - 800:
-                chunks.append(current.strip() + "
+                chunks.append(current.strip() + "\n\n(يتبع...)")
+                current = "(تكملة القالب السابق...)\n"
 
-(يتبع...)")
-                current = "(تكملة القالب السابق...)
-"
-
-        new_block = (current + "
-" + line) if current else line
+        new_block = (current + "\n" + line) if current else line
         
         if _tg_len(new_block) > CHUNK_SIZE:
             if current:
-                chunks.append(current.strip() + "
-
-(يتبع...)")
-                current = "(تكملة القالب السابق...)
-" + line
+                chunks.append(current.strip() + "\n\n(يتبع...)")
+                current = "(تكملة القالب السابق...)\n" + line
             else:
                 current = line
         else:
@@ -2634,11 +2626,8 @@ def _split_message(text: str) -> list:
 
         next_line = lines[i + 1] if i + 1 < len(lines) else ""
         if (next_line.startswith(SEPARATOR) and _tg_len(current) > CHUNK_SIZE * 0.70):
-            chunks.append(current.strip() + "
-
-(يتبع...)")
-            current = "(تكملة القالب السابق...)
-"
+            chunks.append(current.strip() + "\n\n(يتبع...)")
+            current = "(تكملة القالب السابق...)\n"
 
     if current and current.strip() and current.strip() != "(تكملة القالب السابق...)":
         chunks.append(current.strip())
@@ -4925,8 +4914,7 @@ def _build_spot_s9(d: dict) -> str:
         f"- **مؤشر الدولار (DXY):** {dxy_p:.4f}\n"
         "- **قوة العملات:**\n"
         f"{fx_block}\n\n"
-        "### 🎯 مصفوفة استراتيجيات التداول الشاملة (Trading Matrix) 🎯
-*(بناءً على تفصيل الصفقات في القوالب السابقة، نضع بين يديك الآن "المصفوفة الشاملة" لإدارة رأس المال وتوزيع المخاطرة للسكالبينج والسوينج)*\n\n"
+        "### 🎯 مصفوفة استراتيجيات التداول الشاملة (Trading Matrix) 🎯\n*(بناءً على تفصيل الصفقات في القوالب السابقة، نضع بين يديك الآن \"المصفوفة الشاملة\" لإدارة رأس المال وتوزيع المخاطرة للسكالبينج والسوينج)*\n\n"
         "#### ⚡ 1. السكالبينج (خطف سريع - مخاطرة عالية)\n"
         f"- **🟢 شراء:** الدخول {sb.get('entry',0):.2f}$ | الوقف {sb.get('sl',0):.2f}$ | الأهداف {sb.get('t1',0):.2f}$ - {sb.get('t2',0):.2f}$ - {sb.get('t3',0):.2f}$\n"
         f"- **🔴 بيع:** الدخول {ss.get('entry',0):.2f}$ | الوقف {ss.get('sl',0):.2f}$ | الأهداف {ss.get('t1',0):.2f}$ - {ss.get('t2',0):.2f}$ - {ss.get('t3',0):.2f}$\n\n"
@@ -5198,8 +5186,7 @@ def _build_spot_s12(d: dict) -> str:
                   "إيجابية: تراجع الدولار وانخفاض العائد الحقيقي يوفر أرضية صلبة لارتفاعات الذهب")
 
     return (
-        "### 👑 الخلاصة المحورية الشاملة (Master Summary) 👑
-*(هذه الخلاصة المحورية هي مسك الختام وعصارة التقارير السابقة، وتعتبر المرجع النهائي والأدق لقرارك اليوم)*\n"
+        "### 👑 الخلاصة المحورية الشاملة (Master Summary) 👑\n*(هذه الخلاصة المحورية هي مسك الختام وعصارة التقارير السابقة، وتعتبر المرجع النهائي والأدق لقرارك اليوم)*\n"
         "#### 📊 تقييم السيولة والنطاقات بدقة متناهية 📊\n"
         f"- **السعر اللحظي الدقيق:** **{gold:.2f}$** 💰\n"
         f"- **نقطة الارتكاز المحورية (Pivot):** **{pivot:.2f}$** ⚖️\n"
@@ -5540,7 +5527,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
         # القالب الذكي الجديد CFTC (t11)
         if 't11' in locals() and t11: bot2_reports.append(("📰 تقرير CFTC", t11, None))
-                if 't13' in locals() and t13: 
+        if 't13' in locals() and t13: 
             import re
             t13_clean = re.sub(r'\[.*?\]', '', t13, flags=re.DOTALL)
             t13_clean = re.sub(r'\n\s*\n', '\n\n', t13_clean).strip()

@@ -2620,8 +2620,7 @@ def _split_message(text: str) -> list:
         return [text]
 
     SEPARATOR = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    lines   = text.split("
-")
+    lines   = text.split("\n")
     chunks  = []
     current = ""
     in_table = False
@@ -2630,22 +2629,15 @@ def _split_message(text: str) -> list:
         if "╭─" in line:
             in_table = True
             if _tg_len(current) > CHUNK_SIZE - 800:
-                chunks.append(current.strip() + "
+                chunks.append(current.strip() + "\n\n(يتبع...)")
+                current = "(تكملة القالب السابق...)\n"
 
-(يتبع...)")
-                current = "(تكملة القالب السابق...)
-"
-
-        new_block = (current + "
-" + line) if current else line
+        new_block = (current + "\n" + line) if current else line
         
         if _tg_len(new_block) > CHUNK_SIZE:
             if current:
-                chunks.append(current.strip() + "
-
-(يتبع...)")
-                current = "(تكملة القالب السابق...)
-" + line
+                chunks.append(current.strip() + "\n\n(يتبع...)")
+                current = "(تكملة القالب السابق...)\n" + line
             else:
                 current = line
         else:
@@ -2656,11 +2648,8 @@ def _split_message(text: str) -> list:
 
         next_line = lines[i + 1] if i + 1 < len(lines) else ""
         if (next_line.startswith(SEPARATOR) and _tg_len(current) > CHUNK_SIZE * 0.70):
-            chunks.append(current.strip() + "
-
-(يتبع...)")
-            current = "(تكملة القالب السابق...)
-"
+            chunks.append(current.strip() + "\n\n(يتبع...)")
+            current = "(تكملة القالب السابق...)\n"
 
     if current and current.strip() and current.strip() != "(تكملة القالب السابق...)":
         chunks.append(current.strip())
@@ -4116,7 +4105,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
         # القالب الذكي الجديد CFTC (t11)
         if 't11' in locals() and t11: bot2_reports.append(("📰 تقرير CFTC", t11, None))
-                if 't13' in locals() and t13: 
+        if 't13' in locals() and t13: 
             import re
             t13_clean = re.sub(r'\[.*?\]', '', t13, flags=re.DOTALL)
             t13_clean = re.sub(r'\n\s*\n', '\n\n', t13_clean).strip()

@@ -4040,6 +4040,8 @@ def _build_template_13(d: dict) -> str:
 
     iv_estimate  = round((atr / gold) * 252**0.5 * 100, 2)
     hv_estimate  = round(variance / gold * 100 * 252**0.5, 2) if variance else round(iv_estimate * 0.85, 2)
+    ema200_note = "Trend: Above EMA200" if gold > d.get('ema200', 0) else "Trend: Below EMA200"
+    stoch_note = "Stochastic: Overbought" if d.get('stoch', 50) > 80 else "Stochastic: Neutral/Oversold"
     max_pain_est = round((r1 + s1) / 2, 2)
     expected_move= round(gold * (iv_estimate / 100) / (365**0.5), 2)
     daily_high   = round(gold + expected_move, 2)
@@ -4337,8 +4339,15 @@ def _s_trades(d, n):
         if not t:
             ent = round(r1 - (r1 - pv) * 0.25, 2)
             slv = round(ent + a * 0.4, 2)
-            t = {'entry': ent, 'sl': slv, 'risk': round(slv - ent, 2),
-                 't1': round(ent - a * 0.45, 2), 't2': round(pv, 2), 't3': round(s1, 2)}
+            risk = round(slv - ent, 2)
+            _t1 = round(ent - a * 0.45, 2)          # هدف أول: أقرب (R:R ~1.1x)
+            _t2 = round(ent - a * 0.72, 2)           # هدف ثاني: أبعد دائماً (R:R ~1.8x)
+            _t3 = round(s1, 2)                        # هدف ثالث: S1
+            # ضمان الترتيب التنازلي للبيع (T1 > T2 > T3)
+            if _t2 >= _t1: _t2 = round(_t1 - a * 0.1, 2)
+            if _t3 >= _t2: _t3 = round(_t2 - a * 0.1, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': risk,
+                 't1': _t1, 't2': _t2, 't3': _t3}
     elif n == 'swing_buy':
         t = adv.get('swing_buy') or adv.get('long_swing_buy')
         if not t:
@@ -4788,6 +4797,26 @@ def _build_spot_s7(d: dict) -> str:
         f"  - R1: {r1:.2f}$ | R2: {r2:.2f}$\n  - S1: {s1:.2f}$ | S2: {s2:.2f}$"
     )
 
+    # FIX: حساب تنبيه EMA200 قبل return
+    if gold < ema200:
+        ema200_note = f"- \u26a0\ufe0f **تحذير هيكلي:** السعر ({gold:.2f}$) أسفل EMA200 ({ema200:.2f}$) \u2014 إشارة هبوطية بنيوية قوية تُضعف فرص الشراء الاستراتيجي"
+    else:
+        ema200_note = f"- \u2705 السعر ({gold:.2f}$) فوق EMA200 ({ema200:.2f}$) \u2014 الهيكل العام صعودي"
+
+    # FIX: حساب تنبيه EMA200 قبل return
+    if gold < ema200:
+        ema200_note = f"- \u26a0\ufe0f **تحذير هيكلي:** السعر ({gold:.2f}$) أسفل EMA200 ({ema200:.2f}$) \u2014 إشارة هبوطية بنيوية قوية تُضعف فرص الشراء الاستراتيجي"
+    else:
+        ema200_note = f"- \u2705 السعر ({gold:.2f}$) فوق EMA200 ({ema200:.2f}$) \u2014 الهيكل العام صعودي"
+
+    # FIX: حساب تنبيه تباين Stochastic قبل return
+    if stoch > 80 and rsi < 50:
+        stoch_note = f"- \u26a0\ufe0f **تباين مؤشرات الزخم:** Stochastic K={stoch:.1f} (تشبع شرائي>80) يتعارض مع RSI={rsi:.1f} (محايد/هبوطي) \u2014 Stochastic يعكس ارتداداً لحظياً، والوزن الأكبر للـ RSI على المدى المتوسط"
+    elif (stoch > 50) == (rsi > 50):
+        stoch_note = f"- \u2705 مؤشرات الزخم (RSI={rsi:.1f}, Stoch={stoch:.1f}) متوافقة في الاتجاه"
+    else:
+        stoch_note = f"- \U0001f4ca مؤشرات الزخم في منطقة محايدة (RSI={rsi:.1f}, Stoch={stoch:.1f})"
+
     return (
         "### تحليل فني وزخم للذهب 📊\n"
         "#### نظرة عامة على السوق 🌐\n"
@@ -4801,7 +4830,8 @@ def _build_spot_s7(d: dict) -> str:
         f"- Williams %R: **{wr:.2f}** 📉\n\n"
         "#### المتوسطات المتحركة 📊\n"
         f"- EMA20: **{ema20:.2f}$** | EMA50: **{ema50:.2f}$** | EMA200: **{ema200:.2f}$**\n"
-        f"- التقييم: {ema_note}\n\n"
+        f"- التقييم: {ema_note}\n"
+        f"{ema200_note}\n\n"
         "#### بولنجر باندز 📊\n"
         f"- الحد العلوي: **{bb_up:.2f}$** | الحد السفلي: **{bb_lo:.2f}$**\n"
         f"- السعر {'قريب من الحد العلوي — مقاومة' if gold > (bb_up + bb_lo) / 2 else 'قريب من الحد السفلي — دعم'}\n\n"
@@ -4814,7 +4844,8 @@ def _build_spot_s7(d: dict) -> str:
         f"- **شراء**: دخول **{sb.get('entry',0):.2f}$** | وقف **{sb.get('sl',0):.2f}$** | هدف **{sb.get('t1',0):.2f}$**، **{sb.get('t2',0):.2f}$**، **{sb.get('t3',0):.2f}$** 🎯\n"
         f"- **بيع**: دخول **{ss.get('entry',0):.2f}$** | وقف **{ss.get('sl',0):.2f}$** | هدف **{ss.get('t1',0):.2f}$**، **{ss.get('t2',0):.2f}$**، **{ss.get('t3',0):.2f}$** 🎯\n\n"
         "#### تحليل الزخم 💪\n"
-        f"- ATR: **{atr:.2f}$** (المدى اليومي المتوقع — تقلبات {'عالية' if atr > 60 else 'متوسطة' if atr > 30 else 'منخفضة'})\n\n"
+        f"- ATR: **{atr:.2f}$** (المدى اليومي المتوقع — تقلبات {'عالية' if atr > 60 else 'متوسطة' if atr > 30 else 'منخفضة'})\n"
+        f"{stoch_note}\n\n"
         "#### استنتاج 📝\n"
         f"- السوق في وضعية {'هبوطية' if rsi < 45 else 'صعودية'} مع RSI={rsi:.2f}.\n"
         f"- المتوسطات المتحركة تشير الى: {ema_note}\n"

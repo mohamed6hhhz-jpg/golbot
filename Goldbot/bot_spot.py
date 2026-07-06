@@ -5541,6 +5541,15 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         if t9: bot2_reports.append(("📊 تقرير اتجاه الذهب اليومي (الفوري)", t9, None))
         if t10: bot2_reports.append(("📆 التقرير الاسبوعي الشامل (الفوري)", t10, None))
         if t6: bot2_reports.append(("الخلاصة المحورية", t6, None))
+        
+        s12_report = _build_spot_s12(data)
+        if s12_report:
+            bot2_reports.append(("👑 الخلاصة المحورية والدقيقة (الجيل الخامس - Spot)", s12_report, None))
+            
+        s9_report = _build_spot_s9(data)
+        if s9_report:
+            bot2_reports.append(("👑 مصفوفة التداول السريعة والاسكالبينج الاحترافي (Spot)", s9_report, None))
+
 
         # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──
 

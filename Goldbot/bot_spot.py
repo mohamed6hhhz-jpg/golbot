@@ -3532,40 +3532,42 @@ def _split_fixed_report(report_text: str, mode_label: str) -> list:
 
 def _build_template_7(d: dict) -> str:
     """قالب الصفقات المتخصصة والفريمات الزمنية (اللوت العالي والسكالبينج الشامل)"""
-    gold = d.get('gold', 0)
+    gold = d.get('gold', 2000)
     atr = d.get('atr', 20)
     
+    # Accurate S2/R2 for High Lot Liquidity Sweeps
     s2 = d.get('s2', gold - atr * 1.5)
     r2 = d.get('r2', gold + atr * 1.5)
     
-    hl_buy_entry = round(s2, 2)
-    hl_buy_tp = round(s2 + (atr * 0.5), 2)
-    hl_buy_sl = round(s2 - (atr * 0.15), 2)
+    # High Lot logic: entry slightly beyond S2/R2 to catch the sweep (Liquidity Grab), strict SL
+    hl_buy_entry = round(s2 - (atr * 0.05), 2)
+    hl_buy_tp = round(s2 + (atr * 0.6), 2)
+    hl_buy_sl = round(s2 - (atr * 0.25), 2)
     
-    hl_sell_entry = round(r2, 2)
-    hl_sell_tp = round(r2 - (atr * 0.5), 2)
-    hl_sell_sl = round(r2 + (atr * 0.15), 2)
+    hl_sell_entry = round(r2 + (atr * 0.05), 2)
+    hl_sell_tp = round(r2 - (atr * 0.6), 2)
+    hl_sell_sl = round(r2 + (atr * 0.25), 2)
     
     out = [
-        "🎯 صفقات اللوت العالي (High Lot)",
-        "(أهداف دقيقة بوقف خسارة صارم جداً يعتمد على الانعكاس الرياضي الكامل)",
+        "🎯 صفقات اللوت العالي (High Lot Sniper)",
+        "(أهداف دقيقة بوقف خسارة صارم جداً يعتمد على اصطياد السيولة عند الانعكاس الكامل)",
         f"🟢 صفقة الشراء: الدخول {hl_buy_entry}$ | الهدف {hl_buy_tp}$ | الوقف {hl_buy_sl}$",
         f"🔴 صفقة البيع: الدخول {hl_sell_entry}$ | الهدف {hl_sell_tp}$ | الوقف {hl_sell_sl}$",
         "",
-        "⚡ مصفوفة الصفقات والفريمات الزمنية الشاملة",
-        "(كل فريم زمني يحتوي على صفقة منفصلة ومستقلة تماماً بناءً على الزخم اللحظي)"
+        "🔥 صفقات السكالبينج والتداول اللحظي (لكل فريم زمني)",
+        "(كل فريم زمني يحتوي على صفقة منفصلة ومستقلة تماماً بناءً على الزخم اللحظي ونقاط الارتكاز)"
     ]
     
     tfs = [
-        ('5 دقائق', 'tf_5m', 0.1),
-        ('10 دقائق', 'tf_10m', 0.15),
-        ('15 دقيقة', 'tf_15m', 0.2),
+        ('5 دقائق', 'tf_5m', 0.05),
+        ('10 دقائق', 'tf_10m', 0.1),
+        ('15 دقيقة', 'tf_15m', 0.15),
         ('30 دقيقة', 'tf_30m', 0.25),
-        ('1 ساعة', 'tf_hourly', 0.35),
-        ('4 ساعات', 'tf_4h', 0.6),
-        ('يومي', 'tf_daily', 1.0),
-        ('أسبوعي', 'tf_weekly', 2.0),
-        ('شهري', 'tf_monthly', 4.0)
+        ('1 ساعة', 'tf_hourly', 0.4),
+        ('4 ساعات', 'tf_4h', 0.7),
+        ('يومي', 'tf_daily', 1.2),
+        ('أسبوعي', 'tf_weekly', 2.5),
+        ('شهري', 'tf_monthly', 4.5)
     ]
     
     for label, key, atr_mult in tfs:
@@ -3586,20 +3588,25 @@ def _build_template_7(d: dict) -> str:
             r2 = tf_data.get('r2', gold + atr * atr_mult)
             s2 = tf_data.get('s2', gold - atr * atr_mult)
             
-        if 'bull' in str(bias).lower() or 'صاعد' in str(bias):
+        # High quality entry logic: buy slightly below pivot in an uptrend, sell slightly above in a downtrend
+        if 'bull' in str(bias).lower() or 'صاعد' in str(bias) or 'إيجابي' in str(bias):
             dir_str = "🟢 شراء"
-            entry = round(s1, 2)
+            entry = round(piv - (atr * atr_mult * 0.2), 2)
             tp = round(r1, 2)
-            sl = round(s2, 2)
-            if entry >= gold: entry = round(piv, 2)
-            if sl >= entry: sl = round(entry - atr * atr_mult * 0.5, 2)
+            sl = round(piv - (atr * atr_mult * 0.6), 2)
+            # Ensure logical order
+            if entry >= gold and label in ['5 دقائق', '10 دقائق', '15 دقيقة']:
+                entry = round(gold - (atr * atr_mult * 0.2), 2)
+            if sl >= entry: sl = round(entry - (atr * atr_mult * 0.4), 2)
         else:
             dir_str = "🔴 بيع"
-            entry = round(r1, 2)
+            entry = round(piv + (atr * atr_mult * 0.2), 2)
             tp = round(s1, 2)
-            sl = round(r2, 2)
-            if entry <= gold: entry = round(piv, 2)
-            if sl <= entry: sl = round(entry + atr * atr_mult * 0.5, 2)
+            sl = round(piv + (atr * atr_mult * 0.6), 2)
+            # Ensure logical order
+            if entry <= gold and label in ['5 دقائق', '10 دقائق', '15 دقيقة']:
+                entry = round(gold + (atr * atr_mult * 0.2), 2)
+            if sl <= entry: sl = round(entry + (atr * atr_mult * 0.4), 2)
                 
         out.append(f"\n⏱️ فريم {label}:")
         out.append(f"- الاتجاه: {dir_str}")
@@ -3607,11 +3614,10 @@ def _build_template_7(d: dict) -> str:
         out.append(f"- الهدف: {tp}$")
         out.append(f"- وقف الخسارة: {sl}$")
         
-    out.append("\n💡 الحكم النهائي للذهب (خلاصة الصفقات):")
-    out.append("- تُنفذ صفقات اللوت العالي عند الأطراف القصوى فقط (S2/R2) مع الالتزام التام بالوقف الضيق. أما صفقات الفريمات المتعددة، فتُتداول وفقاً لاتجاه كل فريم بشكل مستقل وبدون دمج لتوزيع المخاطر واقتناص أفضل التحركات بدقة متناهية.")
+    out.append("\n💡 الحكم النهائي للتداول المتعدد:")
+    out.append("- تُنفذ صفقات (اللوت العالي) عند انعكاسات السيولة القصوى فقط مع الالتزام التام بالوقف الضيق. أما صفقات (السكالبينج الشامل)، فتُتداول وفقاً لاتجاه كل فريم بشكل مستقل لاقتناص تحركات السوق العميقة بأعلى جودة ودقة.")
     
     return "\n".join(out)
-
 def _build_template_8(d: dict) -> str:
     """قالب تأثير الأسواق والمؤسسات (الحيتان)"""
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None

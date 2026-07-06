@@ -292,7 +292,7 @@ def calc_atr(df, period: int = 14) -> float:
 
 def calc_atr_regime(df, period: int = 14) -> str:
     if df is None or len(df) < period * 2 + 1:
-        return "غير محدد"
+        return "محايد/عرضي"
     h, l, c = df['High'].values, df['Low'].values, df['Close'].values
     tr_list = [max(h[i]-l[i], abs(h[i]-c[i-1]), abs(l[i]-c[i-1])) for i in range(1, len(df))]
     atr_now = np.mean(tr_list[-period:])
@@ -1937,7 +1937,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 ملخص السوق
-   الزخم        : {ent['momentum']} {'→ تسارع بيع، الذهب عرضة للهبوط' if 'هابط' in ent['momentum'] else '→ تسارع شراء، الذهب في دعم' if 'صاعد' in ent['momentum'] else '→ حركة غير محددة'}
+   الزخم        : {ent['momentum']} {'→ تسارع بيع، الذهب عرضة للهبوط' if 'هابط' in ent['momentum'] else '→ تسارع شراء، الذهب في دعم' if 'صاعد' in ent['momentum'] else '→ تجميع سيولة وتذبذب في النطاق'}
    الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ السوق في نطاق عرضي — تداول بين الدعم والمقاومة'}
    السيولة       : {ent['liquidity']} {'→ الحركات موثوقة ✅' if 'مرتفعة' in ent['liquidity'] else '→ انتبه: حركات وهمية محتملة ⚠️'}
 
@@ -2463,7 +2463,7 @@ def _build_today_ohlc_section(d: dict) -> str:
     else:
         if diff_1d > 0: hit_first = 'القمة أولاً 🔺 (ميل إيجابي طفيف)'
         elif diff_1d < 0: hit_first = 'القاع أولاً 🔻 (ميل سلبي طفيف)'
-        else: hit_first = 'غير محدد ⚖️ (سوق عرضي بحت)'
+        else: hit_first = 'نطاق تجميعي ⚖️ (احتمالات متساوية لضرب القمة أو القاع)'
 
     lines_out = [
         "\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501",
@@ -2620,28 +2620,51 @@ def _split_message(text: str) -> list:
         return [text]
 
     SEPARATOR = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    lines   = text.split("\n")
+    lines   = text.split("
+")
     chunks  = []
     current = ""
+    in_table = False
 
     for i, line in enumerate(lines):
-        new_block = (current + "\n" + line) if current else line
+        if "╭─" in line:
+            in_table = True
+            if _tg_len(current) > CHUNK_SIZE - 800:
+                chunks.append(current.strip() + "
+
+(يتبع...)")
+                current = "(تكملة القالب السابق...)
+"
+
+        new_block = (current + "
+" + line) if current else line
+        
         if _tg_len(new_block) > CHUNK_SIZE:
             if current:
-                chunks.append(current.strip())
-            current = line
+                chunks.append(current.strip() + "
+
+(يتبع...)")
+                current = "(تكملة القالب السابق...)
+" + line
+            else:
+                current = line
         else:
             current = new_block
 
-        # لو السطر التالي فاصل والجزء الحالي فوق 70% من الحد → اقطع هنا
-        next_line = lines[i + 1] if i + 1 < len(lines) else ""
-        if (next_line.startswith(SEPARATOR) and
-                _tg_len(current) > CHUNK_SIZE * 0.70):
-            chunks.append(current.strip())
-            current = ""
+        if "╰─" in line:
+            in_table = False
 
-    if current:
+        next_line = lines[i + 1] if i + 1 < len(lines) else ""
+        if (next_line.startswith(SEPARATOR) and _tg_len(current) > CHUNK_SIZE * 0.70):
+            chunks.append(current.strip() + "
+
+(يتبع...)")
+            current = "(تكملة القالب السابق...)
+"
+
+    if current and current.strip() and current.strip() != "(تكملة القالب السابق...)":
         chunks.append(current.strip())
+        
     return chunks
 
 
@@ -3989,8 +4012,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
 
 
-        if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الآجل)", t0, None))
-        if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الآجل)", t1, None))
+        # if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الآجل)", t0, None))
+        # if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الآجل)", t1, None))
         if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الآجل)", t2, None))
         if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الآجل)", t3, None))
         if t4: raw_reports.append(("📈 تقرير عوائد السندات (الآجل)", t4, None))

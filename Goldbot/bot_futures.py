@@ -3944,7 +3944,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 for attempt in range(3):
                     try:
                         res = await asyncio.to_thread(func, *args)
-                        if "تعذر توليد" in str(res) or "⚠️" in str(res):
+                        if "تعذر توليد" in str(res):
                             log.warning(f"Rate limit or failure hit for T{idx}, attempt {attempt+1}/3. Waiting 25s...")
                             await asyncio.sleep(25)
                             continue

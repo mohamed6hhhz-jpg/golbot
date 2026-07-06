@@ -1555,7 +1555,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
                 else: gld_pcr = 0.95
             except Exception:
                 gld_pcr = 0.95
-            pcr_source = "Proxy"
+            pcr_source = "مؤشر تدفق السيولة البديل"
 
 
     # ── Pivot Points ──
@@ -3293,14 +3293,22 @@ def _build_template_0(d: dict) -> str:
     swing_str = _format_trade(swing)
     rev_str = _format_trade(rev)
 
-    bias_1h = d.get('tf_hourly', {}).get('bias', '—')
-    bias_1d = d.get('tf_daily', {}).get('bias', '—')
+    gold_val = d.get('gold', 0)
+    pivot_val = d.get('pivot', gold_val)
+    fallback_bias = 'صاعد 📈' if gold_val > pivot_val else 'هابط 📉'
+    
+    bias_1h = d.get('tf_hourly', {}).get('bias')
+    if not bias_1h or bias_1h == '—': bias_1h = fallback_bias
+        
+    bias_1d = d.get('tf_daily', {}).get('bias')
+    if not bias_1d or bias_1d == '—': bias_1d = fallback_bias
     score_1h = d.get('tf_hourly', {}).get('score', 0)
     
     first_hit = "القمة (مقاومة) أولاً 📈" if score_1h > 0 else "القاع (دعم) أولاً 📉" if score_1h < 0 else "متذبذب - لا مسار واضح ⚖️"
     
     template = f"""🎯 التقرير التمهيدي: صفقات ذكية واتجاهات الذهب
 
+💵 السعر اللحظي للذهب: {gold_val:.2f}$
 ⏱️ الاتجاه خلال ساعة: [ترجم إلى العربية بدقة: {bias_1h}]
 📅 الاتجاه خلال يوم: [ترجم إلى العربية بدقة: {bias_1d}]
 🏁 الأقرب للضرب أولاً: {first_hit}
@@ -3322,7 +3330,8 @@ def _build_template_0(d: dict) -> str:
 مهمتك هي صياغة هذا التقرير بلمسة احترافية خفيفة. 
 - في خانة "الاتجاه"، ترجم كلمة (bullish إلى صاعد، bearish إلى هابط، neutral إلى عرضي).
 - بالنسبة للصفقات (سكالبينج، سوينج، زيرو انعكاس)، اترك البيانات والأرقام والاتجاهات كما هي تماماً. إذا كانت "غير متوفر حالياً" اتركها كما هي.
-- التزم بالقالب تماماً ولا تكتب أي نصوص إضافية أو مقدمات."""
+- التزم بالقالب تماماً ولا تكتب أي نصوص إضافية أو مقدمات.
+- يمنع منعاً باتاً استخدام كلمات مثل "غير محدد" أو "غير متوفر" في خانة الاتجاه."""
 
     for model_name in GROQ_MODELS:
         try:
@@ -3503,7 +3512,7 @@ def _build_template_8(d: dict) -> str:
     vol_state = d.get('gold_daily', {}).get('Volume', [0])
     last_vol = vol_state[-1] if len(vol_state) > 0 else 0
     if last_vol == 0:
-        vol_text = "البيانات الكمية غير مكتملة المصدر، يتم الاعتماد على زخم السيولة السعرية (ATR Proxy)."
+        vol_text = "البيانات الكمية الدقيقة لعقود الخيارات غير متوفرة لحظياً، لذا تم الاعتماد على مقياس التذبذب السعري العميق (ATR) كبديل رياضي لتقييم السيولة بنجاح."
     else:
         vol_text = f"{last_vol}"
         

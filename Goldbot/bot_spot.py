@@ -376,18 +376,47 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     def _rr(gain, risk): return round(gain / risk, 1) if risk > 0 else 0
     MIN_RR = 1.2   # حد أدنى للعائد/المخاطرة عند T1 — أي صفقة أقل تُحذف
 
-    # ── سكالبينج (15 دقيقة) ──
-    sl_sc = 8.0
-    t = dict(entry=round(s_n, 2), sl=round(s_n - sl_sc, 2), risk=sl_sc,
-             t1=round(s_n + 15, 2), t2=round(s_n + 28, 2), t3=round(s_n + 45, 2),
-             market=market_name, tf='15د', typ='سكالبينج 🏹', dir='buy')
-    if bias in ('bull', 'neutral') and _rr(15, sl_sc) >= MIN_RR:
-        trades['scalp_buy'] = t
-    t = dict(entry=round(r_n, 2), sl=round(r_n + sl_sc, 2), risk=sl_sc,
-             t1=round(r_n - 15, 2), t2=round(r_n - 28, 2), t3=round(r_n - 45, 2),
-             market=market_name, tf='15د', typ='سكالبينج 🏹', dir='sell')
-    if bias in ('bear', 'neutral') and _rr(15, sl_sc) >= MIN_RR:
-        trades['scalp_sell'] = t
+    # ── سكالبينج (5د، 15د، 30د، 1س، 4س) ──
+    # 5m Scalp
+    atr_5m = round(atr * (5/1380)**0.5, 2)
+    sl_5m = max(round(atr_5m * 0.8, 2), 3.0)
+    sc_5m = d.get('tf_5m', {}).get('score', 0)
+    if sc_5m >= 0:
+        trades['scalp_5m_buy'] = dict(entry=round(gold, 2), sl=round(gold - sl_5m, 2), risk=sl_5m, t1=round(gold + atr_5m*1.5, 2), t2=round(gold + atr_5m*2.5, 2), t3=round(gold + atr_5m*4.0, 2), market=market_name, tf='5د', typ='سكالبينج ⚡', dir='buy')
+    elif sc_5m < 0:
+        trades['scalp_5m_sell'] = dict(entry=round(gold, 2), sl=round(gold + sl_5m, 2), risk=sl_5m, t1=round(gold - atr_5m*1.5, 2), t2=round(gold - atr_5m*2.5, 2), t3=round(gold - atr_5m*4.0, 2), market=market_name, tf='5د', typ='سكالبينج ⚡', dir='sell')
+
+    # 15m Scalp
+    sl_sc = max(round(atr * (15/1380)**0.5, 2), 3.0)
+    t_buy15 = dict(entry=round(s_n, 2), sl=round(s_n - sl_sc, 2), risk=sl_sc, t1=round(s_n + 15, 2), t2=round(s_n + 28, 2), t3=round(s_n + 45, 2), market=market_name, tf='15د', typ='سكالبينج 🏹', dir='buy')
+    t_sell15 = dict(entry=round(r_n, 2), sl=round(r_n + sl_sc, 2), risk=sl_sc, t1=round(r_n - 15, 2), t2=round(r_n - 28, 2), t3=round(r_n - 45, 2), market=market_name, tf='15د', typ='سكالبينج 🏹', dir='sell')
+    if bias == 'bull': trades['scalp_buy'] = t_buy15
+    elif bias == 'bear': trades['scalp_sell'] = t_sell15
+    elif bias == 'neutral': trades['scalp_buy' if _rr(15, sl_sc) >= _rr(15, sl_sc) else 'scalp_sell'] = t_buy15
+
+    # 30m Scalp
+    atr_30m = max(round(atr * (30/1380)**0.5, 2), 4.0)
+    sc_30m = d.get('tf_30m', {}).get('score', 0)
+    if sc_30m >= 0:
+        trades['scalp_30m_buy'] = dict(entry=round(gold, 2), sl=round(gold - atr_30m, 2), risk=atr_30m, t1=round(gold + atr_30m*1.5, 2), t2=round(gold + atr_30m*2.5, 2), t3=round(gold + atr_30m*4.0, 2), market=market_name, tf='30د', typ='سكالبينج ⚡', dir='buy')
+    elif sc_30m < 0:
+        trades['scalp_30m_sell'] = dict(entry=round(gold, 2), sl=round(gold + atr_30m, 2), risk=atr_30m, t1=round(gold - atr_30m*1.5, 2), t2=round(gold - atr_30m*2.5, 2), t3=round(gold - atr_30m*4.0, 2), market=market_name, tf='30د', typ='سكالبينج ⚡', dir='sell')
+
+    # 1h Scalp
+    atr_1h = max(round(atr * (60/1380)**0.5, 2), 5.0)
+    sc_1h = d.get('tf_hourly', {}).get('score', 0)
+    if sc_1h >= 0:
+        trades['scalp_1h_buy'] = dict(entry=round(gold, 2), sl=round(gold - atr_1h, 2), risk=atr_1h, t1=round(gold + atr_1h*1.5, 2), t2=round(gold + atr_1h*2.5, 2), t3=round(gold + atr_1h*4.0, 2), market=market_name, tf='1س', typ='سكالبينج ⚡', dir='buy')
+    elif sc_1h < 0:
+        trades['scalp_1h_sell'] = dict(entry=round(gold, 2), sl=round(gold + atr_1h, 2), risk=atr_1h, t1=round(gold - atr_1h*1.5, 2), t2=round(gold - atr_1h*2.5, 2), t3=round(gold - atr_1h*4.0, 2), market=market_name, tf='1س', typ='سكالبينج ⚡', dir='sell')
+
+    # 4h Scalp
+    atr_4h = max(round(atr * (240/1380)**0.5, 2), 8.0)
+    sc_4h = d.get('tf_4h', {}).get('score', 0)
+    if sc_4h >= 0:
+        trades['scalp_4h_buy'] = dict(entry=round(gold, 2), sl=round(gold - atr_4h, 2), risk=atr_4h, t1=round(gold + atr_4h*1.5, 2), t2=round(gold + atr_4h*2.5, 2), t3=round(gold + atr_4h*4.0, 2), market=market_name, tf='4س', typ='سكالبينج ⚡', dir='buy')
+    elif sc_4h < 0:
+        trades['scalp_4h_sell'] = dict(entry=round(gold, 2), sl=round(gold + atr_4h, 2), risk=atr_4h, t1=round(gold - atr_4h*1.5, 2), t2=round(gold - atr_4h*2.5, 2), t3=round(gold - atr_4h*4.0, 2), market=market_name, tf='4س', typ='سكالبينج ⚡', dir='sell')
 
     # ── يومية ── (الدخول من Pivot فقط لو بين الدعم والمقاومة)
     sl_d = round(atr * 0.4, 2)
@@ -398,13 +427,19 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
     t = dict(entry=buy_entry_d, sl=round(buy_entry_d - sl_d, 2), risk=sl_d,
              t1=r_n, t2=r_f, t3=round(r_f + atr * 0.3, 2),
              market=market_name, tf='1ي', typ='يومية 📅', dir='buy')
-    if bias in ('bull', 'neutral') and _rr(r_n - buy_entry_d, sl_d) >= MIN_RR:
-        trades['daily_buy'] = t
-    t = dict(entry=sell_entry_d, sl=round(sell_entry_d + sl_d, 2), risk=sl_d,
+    t_buy = t
+    t_sell = dict(entry=sell_entry_d, sl=round(sell_entry_d + sl_d, 2), risk=sl_d,
              t1=s_n, t2=s_f, t3=round(s_f - atr * 0.3, 2),
              market=market_name, tf='1ي', typ='يومية 📅', dir='sell')
-    if bias in ('bear', 'neutral') and _rr(sell_entry_d - s_n, sl_d) >= MIN_RR:
-        trades['daily_sell'] = t
+             
+    rr_buy = _rr(r_n - buy_entry_d, sl_d)
+    rr_sell = _rr(sell_entry_d - s_n, sl_d)
+    
+    if bias == 'bull' and rr_buy >= MIN_RR: trades['daily_buy'] = t_buy
+    elif bias == 'bear' and rr_sell >= MIN_RR: trades['daily_sell'] = t_sell
+    elif bias == 'neutral':
+        if rr_buy >= rr_sell and rr_buy >= MIN_RR: trades['daily_buy'] = t_buy
+        elif rr_sell > rr_buy and rr_sell >= MIN_RR: trades['daily_sell'] = t_sell
 
     # ── أسبوعية ──
     sl_w_b = round(abs(s_n - (pw_l - 5)), 2) if pw_l else round(atr * 1.0, 2)  # FIX: abs() to prevent negative risk
@@ -471,23 +506,6 @@ def calc_advanced_trades(d: dict, bias: str) -> dict:
                  t1=round(gold - atr*0.4, 2), t2=round(gold - atr*0.8, 2), t3=round(gold - atr*1.5, 2),
                  market=market_name, tf='1-4س', typ='زيرو انعكاس 🔄', dir='sell')
         trades['rev_sell'] = t
-    # ── صفقة كل 5 دقائق (5min scalp) ──
-    atr_5m = round(atr * (5/1380)**0.5, 2)  # FIX: 1380 min/day for Gold Futures (23h session)
-    sl_5m = max(round(atr_5m * 0.8, 2), 3.0)
-    sc_15m = d.get('tf_15m', {}).get('score', 0)
-    if sc_15m > 0:
-        t5m = dict(entry=round(gold, 2), sl=round(gold - sl_5m, 2), risk=sl_5m,
-                   t1=round(gold + atr_5m*1.5, 2), t2=round(gold + atr_5m*2.5, 2),
-                   t3=round(gold + atr_5m*4.0, 2),
-                   market=market_name, tf='5د', typ='سكالبينج 5د ⚡', dir='buy')
-        if True: trades['scalp_5m_buy'] = t5m
-    else:
-        t5m = dict(entry=round(gold, 2), sl=round(gold + sl_5m, 2), risk=sl_5m,
-                   t1=round(gold - atr_5m*1.5, 2), t2=round(gold - atr_5m*2.5, 2),
-                   t3=round(gold - atr_5m*4.0, 2),
-                   market=market_name, tf='5د', typ='سكالبينج 5د ⚡', dir='sell')
-        if True: trades['scalp_5m_sell'] = t5m
-
     # ── سوينج طويل الأمد (Long-Term Swing) ──
     pm_h_val = d.get('prev_mo_high') or round(sw_h + atr, 2)
     pm_l_val = d.get('prev_mo_low') or round(sw_l - atr, 2)
@@ -1969,7 +1987,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
         elif pct >= 45: dec = "\u26d4 \u0644\u0627 \u062a\u062f\u062e\u0644"
         else:           dec = "\u274c \u062a\u062c\u0627\u0647\u0644"
         return (f"\n   \u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n"
-                f"   \u2502 {arr} {t['typ']} | {t['market']} | {t['tf']}\n"
+                f"   \u2502 {arr} {t['typ']} | {t['tf']}\n"
                 f"   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n"
                 f"   \u2502 \U0001f4ca \u0627\u0644\u062b\u0642\u0629 : {pct}%  {lbl}\n"
                 f"   \u2502 \U0001f514 \u0627\u0644\u0642\u0631\u0627\u0631 : {dec}\n"
@@ -2041,7 +2059,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    • النطاق اليومي المتوقع ({daily_range}$): هو المسافة بين القمة والقاع المتوقعين لليوم، ويُحسب بدمج متوسط الحركة (ATR) مع قوة الاتجاه (ADX). معناه: الذهب مرشح للتحرك صعوداً وهبوطاً ضمن هذا الهامش اليوم.
    • التباين / الانحراف المعياري ({variance_val}$): يقيس درجة التشتت السعري لآخر 14 يوم. معناه: كلما زاد الرقم، دلّ على سيولة عنيفة واضطراب شديد للذهب، وكلما قل دلّ على تجميع وهدوء.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 صفقات متقدمة (فوري)
+📊 الصفقات المتقدمة
 {adv_block}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 

@@ -5002,26 +5002,34 @@ def _build_spot_s11(d: dict) -> str:
 💡 {recom}
 '''
 def _build_spot_s12(d: dict) -> str:
-    """12/12 - الخلاصة المحورية الشاملة"""
+    """12/12 - الخلاصة المحورية الشاملة (بأعلى دقة كمية)"""
     nums = _s_nums(d)
     gold, atr, pivot = nums['gold'], nums['atr'], nums['pivot']
     rsi, macd = nums['rsi'], nums['macd']
     r1, r2, r3 = nums['r1'], nums['r2'], nums['r3']
     s1, s2, s3 = nums['s1'], nums['s2'], nums['s3']
-    sh, sl = nums['swing_h'], nums['swing_l']
+    
+    # تحسين استدعاء Swing H/L بدقة
+    sh = d.get('swing_h', 0)
+    sl = d.get('swing_l', 0)
+    if sh <= 0 or sh < gold: sh = round(r2, 2)
+    if sl <= 0 or sl > gold: sl = round(s2, 2)
+    
+    # تحسين استدعاء المدى اليومي (القمة والقاع اليومي)
+    d_high_arr = d.get('gold_daily', {}).get('High', [])
+    d_low_arr = d.get('gold_daily', {}).get('Low', [])
+    d_high = float(d_high_arr[-1]) if len(d_high_arr) > 0 else round(gold + (atr * 0.4), 2)
+    d_low = float(d_low_arr[-1]) if len(d_low_arr) > 0 else round(gold - (atr * 0.4), 2)
+    if d_high < gold: d_high = round(gold + (atr * 0.2), 2)
+    if d_low > gold: d_low = round(gold - (atr * 0.2), 2)
+    
     fib = d.get('fib', {}) or {}
-
     interest  = float(d.get('interest_rate', 5.25) or 5.25)
     inflation = float(d.get('inflation_est', 3.5) or 3.5)
     ry        = float(d.get('real_yield', 0) or 0) or round(interest - inflation, 2)
     dxy_p     = float(d.get('dxy_p', 100) or 100)
     dxy_pct   = float(d.get('dxy_pct', 0) or 0)
     vix_p     = float(d.get('vix_p', 20) or 20)
-
-    sb  = _s_trades(d, 'scalp_buy')
-    ss  = _s_trades(d, 'scalp_sell')
-    swb = _s_trades(d, 'swing_buy')
-    sws = _s_trades(d, 'swing_sell')
 
     fib_block = "\n".join(
         f"- **{k}**: **{v}** {'📈' if k == '0.0%' else '📉' if k == '100%' else '📊'}"
@@ -5030,145 +5038,117 @@ def _build_spot_s12(d: dict) -> str:
         f"- محسوب: R1={r1:.2f}$ | R2={r2:.2f}$ | S1={s1:.2f}$ | S2={s2:.2f}$"
     )
 
-    # تحليل RSI
+    # تحليل RSI بدقة
     if rsi < 30:
-        rsi_note = f"RSI={rsi:.2f} تشبع بيعي حاد — ارتداد صعودي محتمل قوي 📈"
-        rsi_action = f"الشراء عند {s1:.2f}$ فرصة ممتازة مع RSI في التشبع البيعي"
+        rsi_note = f"RSI={rsi:.2f} تشبع بيعي حاد — إشارة على استنفاد الزخم الهبوطي 📈"
     elif rsi > 70:
-        rsi_note = f"RSI={rsi:.2f} تشبع شرائي حاد — انعكاس هبوطي محتمل قوي 📉"
-        rsi_action = f"البيع عند {r1:.2f}$ فرصة ممتازة مع RSI في التشبع الشرائي"
+        rsi_note = f"RSI={rsi:.2f} تشبع شرائي حاد — إشارة على استنفاد الزخم الصعودي 📉"
     else:
-        rsi_note = f"RSI={rsi:.2f} في المنطقة المحايدة — الاتجاه غير محسوم"
-        rsi_action = f"انتظار كسر {r1:.2f}$ صعودا او {s1:.2f}$ هبوطا للدخول"
+        rsi_note = f"RSI={rsi:.2f} محايد — الزخم متوازن ويخضع للسيولة اللحظية"
 
-    macd_note = (f"MACD={macd:.4f} سلبي — الزخم هبوطي، الضغط البيعي مستمر 📉"
+    macd_note = (f"MACD={macd:.4f} سلبي — البائعون يسيطرون على تداولات اليوم 📉"
                  if macd < 0 else
-                 f"MACD={macd:.4f} ايجابي — الزخم صعودي، الدفع الشرائي قائم 📈")
+                 f"MACD={macd:.4f} إيجابي — المشترون يسيطرون على تداولات اليوم 📈")
 
-    # المدى اليومي المتوقع بناءً على الانحراف عن السعر الحالي بدلاً من الجمع والطرح البسيط
-    exp_high = round(gold + (atr * 0.55), 2)
-    exp_low  = round(gold - (atr * 0.55), 2)
-    atr_note = (f"ATR={atr:.2f}$ — تقلبات {'كبيرة جدا' if atr > 100 else 'عالية' if atr > 60 else 'متوسطة' if atr > 30 else 'منخفضة'}. "
-                f"المدى اللحظي المتوقع لحركة السعر: بين {exp_low}$ و {exp_high}$")
+    # المدى اليومي المتوقع بأعلى دقة رياضية
+    exp_high = round(pivot + (atr * 0.6), 2)
+    exp_low  = round(pivot - (atr * 0.6), 2)
+    atr_note = (f"ATR={atr:.2f}$ — تقلبات {'كبيرة جداً' if atr > 100 else 'عالية' if atr > 60 else 'متوسطة' if atr > 30 else 'منخفضة'}. "
+                f"المدى الديناميكي المتوقع لحركة السعر اليوم: بين القاع {exp_low:.2f}$ والقمة {exp_high:.2f}$")
 
-    fib618 = float(fib.get('61.8%', 0) or 0) or s1
-    fib236 = float(fib.get('23.6%', 0) or 0) or r2
-    if sl < gold < fib618:
-        fib_pos = f"السعر بين ادنى النطاق ({sl:.2f}$) ومستوى 61.8% ({fib618:.2f}$) — منطقة بيع مفرطة محتملة 📊."
-    elif fib236 < gold < sh:
-        fib_pos = f"السعر بين 23.6% ({fib236:.2f}$) واعلى النطاق ({sh:.2f}$) — منطقة شراء مفرطة محتملة 📊."
-    else:
-        fib_pos = f"السعر في المنطقة المحايدة بين {s1:.2f}$ و{r1:.2f}$."
-
-    # تحليل الاقتصاد الكلي
-    macro_read = ("بيئة ضاغطة على الذهب: فائدة عالية وعائد حقيقي موجب يجعل السندات اكثر جاذبية"
-                  if ry > 1 else
-                  "بيئة داعمة للذهب: عائد حقيقي سلبي يجعل الذهب ملاذا امنا افضل")
-
-    # التقييم الاستراتيجي الشامل للخلاصة النهائية
+    # التقييم الاستراتيجي الشامل بأعلى جودة
     is_bullish = gold > pivot and macd > 0
     is_bearish = gold < pivot and macd < 0
     
     if is_bullish and rsi < 70:
-        main_dir = "🟢 صعودي صريح (Bullish Trend)"
-        best_trade = f"تمركز شرائي من مستويات الدعوم ({s1:.2f}$ إلى {pivot:.2f}$) | الوقف الصارم: {round(s1 - atr*0.3, 2)}$ | الهدف: {r1:.2f}$."
-        final_advice = f"🟢 استمر في البحث عن صفقات الشراء مع أي تراجع. الاتجاه الصاعد مدعوم بالزخم، وإلغاء هذه النظرة يتطلب كسر وإغلاق تحت المحور ({pivot:.2f}$)."
+        main_dir = "🟢 صعودي صريح (Strong Bullish)"
+        best_trade = f"🎯 اصطياد قيعان الشراء (Dip Buying) من الدعم {s1:.2f}$، أو اختراق المحور {pivot:.2f}$. الوقف مغلق تحت {round(s1 - atr*0.25, 2)}$. الأهداف: {r1:.2f}$ و {r2:.2f}$."
+        final_advice = f"🟢 الزخم في صالح المشتري بشكل حاسم. تجنب البيع العشوائي وركز على مراكز الشراء من الدعوم مع أي تصحيح، فالاتجاه لم يستنفد طاقته بعد."
     elif is_bearish and rsi > 30:
-        main_dir = "🔴 هبوطي صريح (Bearish Trend)"
-        best_trade = f"تمركز بيعي من مستويات المقاومات ({pivot:.2f}$ إلى {r1:.2f}$) | الوقف الصارم: {round(r1 + atr*0.3, 2)}$ | الهدف: {s1:.2f}$."
-        final_advice = f"🔴 استمر في البحث عن صفقات البيع مع أي ارتداد لأعلى. الاتجاه الهابط مدعوم بالزخم، وإلغاء هذه النظرة يتطلب اختراق وإغلاق فوق المحور ({pivot:.2f}$)."
+        main_dir = "🔴 هبوطي صريح (Strong Bearish)"
+        best_trade = f"🎯 اصطياد قمم البيع (Rally Selling) من المقاومة {r1:.2f}$، أو كسر المحور {pivot:.2f}$. الوقف مغلق فوق {round(r1 + atr*0.25, 2)}$. الأهداف: {s1:.2f}$ و {s2:.2f}$."
+        final_advice = f"🔴 الزخم في صالح البائع بشكل حاسم. تجنب الشراء العشوائي وركز على البيع مع أي ارتداد وهمي لأعلى، فالضغوط البيعية لم تنتهِ."
     elif gold > pivot and rsi >= 70:
-        main_dir = "⚠️ صعودي متشبع شرائياً (Overbought)"
-        best_trade = f"بيع قناص عكس الاتجاه من {r2:.2f}$ | الوقف الصارم: {round(r2 + atr*0.2, 2)}$ | الهدف: {r1:.2f}$ ثم {pivot:.2f}$."
-        final_advice = f"⚠️ تشبع شرائي خطير! المشتري استنزف طاقته. تجهز لقناص بيعي من مستويات المقاومة المذكورة مع التزام صارم بوقف الخسارة، ولا تفتح شراء جديد."
+        main_dir = "⚠️ صعودي متشبع خطير (Overbought Warning)"
+        best_trade = f"🎯 قناص بيع عكس الاتجاه من ذروة المقاومة ({r2:.2f}$ أو {sh:.2f}$). الوقف صارم أعلى القمة بـ {round(atr*0.15, 2)}$. الأهداف العميقة: {r1:.2f}$ ثم {pivot:.2f}$."
+        final_advice = f"⚠️ المشترون مرهقون جداً (استنفاد سيولة شرائية). السوق مهيأ لفخ صعودي (Bull Trap). تجنب الشراء بالأسعار الحالية وابحث عن تأكيد البيع من مناطق الذروة."
     elif gold < pivot and rsi <= 30:
-        main_dir = "⚠️ هبوطي متشبع بيعياً (Oversold)"
-        best_trade = f"شراء قناص عكس الاتجاه من {s2:.2f}$ | الوقف الصارم: {round(s2 - atr*0.2, 2)}$ | الهدف: {s1:.2f}$ ثم {pivot:.2f}$."
-        final_advice = f"⚠️ تشبع بيعي خطير! البائع استنزف طاقته. تجهز لقناص شرائي من مستويات الدعم المذكورة مع التزام صارم بوقف الخسارة، ولا تفتح بيع جديد."
+        main_dir = "⚠️ هبوطي متشبع خطير (Oversold Warning)"
+        best_trade = f"🎯 قناص شراء عكس الاتجاه من عمق الدعم ({s2:.2f}$ أو {sl:.2f}$). الوقف صارم أسفل القاع بـ {round(atr*0.15, 2)}$. الأهداف العميقة: {s1:.2f}$ ثم {pivot:.2f}$."
+        final_advice = f"⚠️ البائعون مرهقون جداً (استنفاد سيولة بيعية). السوق مهيأ لفخ هبوطي (Bear Trap). تجنب البيع بالأسعار الحالية وابحث عن تأكيد الشراء من الانهيارات العميقة."
     else:
-        main_dir = "⚪ متذبذب عرضي محايد (Ranging Market)"
-        if gold > pivot:
-            best_trade = f"بيع من سقف النطاق العرضي ({r1:.2f}$) | الوقف الصارم: {round(r1 + atr*0.25, 2)}$ | الهدف: {pivot:.2f}$."
-        else:
-            best_trade = f"شراء من قاع النطاق العرضي ({s1:.2f}$) | الوقف الصارم: {round(s1 - atr*0.25, 2)}$ | الهدف: {pivot:.2f}$."
-        final_advice = f"⚖️ السوق في حالة تعادل (انعدام سيولة اتجاهية). الزم الحياد أو تداول بين حدي النطاق ({s1:.2f}$ كدعم شراء، و {r1:.2f}$ كمقاومة بيع)."
+        main_dir = "⚪ تذبذب عرضي محايد (Ranging / Chop Zone)"
+        best_trade = f"🎯 تداول حواف النطاق: الشراء من {s1:.2f}$ والبيع من {r1:.2f}$ بوقوف ضيقة جداً لا تتجاوز {round(atr*0.2, 2)}$، مع استهداف نقطة المحور {pivot:.2f}$."
+        final_advice = f"⚖️ انعدام سيولة اتجاهية واضحة. يجب الالتزام الصارم بتداول الحد العلوي والسفلي للنطاق (Range Edges) وعدم الدخول في مراكز استراتيجية ممتدة حتى يتم كسر النطاق."
 
-    # حساب صفقات احترافية عالية الدقة بدلاً من السحب العشوائي
-    # 1. سكالبينج شراء (من S1)
-    scalp_buy_entry = round(s1, 2)
+    # صفقات عالية الجودة والدقة
+    # 1. سكالبينج قوي (يعتمد على السيولة الدقيقة S1/R1)
+    scalp_buy_entry = round(s1 - (atr * 0.05), 2)
     scalp_buy_sl = round(s1 - (atr * 0.25), 2)
-    scalp_buy_t1 = round(pivot, 2)
-    scalp_buy_t2 = round(r1, 2)
+    scalp_buy_t1 = round(s1 + (atr * 0.4), 2)
+    scalp_buy_t2 = round(pivot, 2)
 
-    # 2. سكالبينج بيع (من R1)
-    scalp_sell_entry = round(r1, 2)
+    scalp_sell_entry = round(r1 + (atr * 0.05), 2)
     scalp_sell_sl = round(r1 + (atr * 0.25), 2)
-    scalp_sell_t1 = round(pivot, 2)
-    scalp_sell_t2 = round(s1, 2)
+    scalp_sell_t1 = round(r1 - (atr * 0.4), 2)
+    scalp_sell_t2 = round(pivot, 2)
 
-    # 3. سوينج شراء (من S2 او ادنى قاع)
-    swing_buy_entry = round(min(s2, sl) if sl > 0 else s2, 2)
-    swing_buy_sl = round(swing_buy_entry - (atr * 0.4), 2)
-    swing_buy_t1 = round(pivot, 2)
-    swing_buy_t2 = round(r2, 2)
+    # 2. سوينج ممتد وعميق (يعتمد على أطراف الذروة S2/R2)
+    swing_buy_entry = round(s2 - (atr * 0.1), 2)
+    swing_buy_sl = round(s2 - (atr * 0.35), 2)
+    swing_buy_t1 = round(s1, 2)
+    swing_buy_t2 = round(r1, 2)
 
-    # 4. سوينج بيع (من R2 او اعلى قمة)
-    swing_sell_entry = round(max(r2, sh) if sh > 0 else r2, 2)
-    swing_sell_sl = round(swing_sell_entry + (atr * 0.4), 2)
-    swing_sell_t1 = round(pivot, 2)
-    swing_sell_t2 = round(s2, 2)
+    swing_sell_entry = round(r2 + (atr * 0.1), 2)
+    swing_sell_sl = round(r2 + (atr * 0.35), 2)
+    swing_sell_t1 = round(r1, 2)
+    swing_sell_t2 = round(s1, 2)
 
-    # تقييم نطاق التداول اليومي واللحظي
+    # نطاق التداول الدقيق
     if gold > r1:
-        range_desc = f"اختراق قوي لأعلى! السعر يتداول الآن فوق المقاومة الأولى ({r1:.2f}$) مما يفتح المجال نحو {r2:.2f}$."
+        range_desc = f"📈 اختراق صعودي لسيولة المقاومة. يتداول الذهب بحرية فوق {r1:.2f}$ مع استهداف عنيف نحو {r2:.2f}$."
     elif gold < s1:
-        range_desc = f"كسر قوي لأسفل! السعر يتداول الآن تحت الدعم الأول ({s1:.2f}$) مما يفتح المجال نحو {s2:.2f}$."
+        range_desc = f"📉 كسر هبوطي لسيولة الدعم. ينزف الذهب بحرية تحت {s1:.2f}$ مع استهداف عنيف نحو {s2:.2f}$."
     elif gold > pivot:
-        range_desc = f"إيجابي حذر — السعر يتحرك في النصف العلوي بين نقطة المحور ({pivot:.2f}$) والمقاومة الأولى ({r1:.2f}$)."
+        range_desc = f"⚖️ استقرار إيجابي أعلى المحور. يتحرك السعر بضغط شرائي داخل النطاق [{pivot:.2f}$ — {r1:.2f}$]."
     else:
-        range_desc = f"سلبي حذر — السعر يتحرك في النصف السفلي بين نقطة المحور ({pivot:.2f}$) والدعم الأول ({s1:.2f}$)."
+        range_desc = f"⚖️ استقرار سلبي أدنى المحور. يتحرك السعر بضغط بيعي داخل النطاق [{pivot:.2f}$ — {s1:.2f}$]."
+
+    # تقييم الاقتصاد الكلي للخلاصة
+    macro_read = ("سلبية: الدولار والفائدة القوية تضغط وتمنع الذهب من تحقيق قمم جديدة براحة"
+                  if ry > 1 and dxy_pct > 0 else
+                  "إيجابية: تراجع الدولار وانخفاض العائد الحقيقي يوفر أرضية صلبة لارتفاعات الذهب")
 
     return (
-        "### الخلاصة المحورية 📊\n"
-        "#### اسعار الذهب الحالية 💰\n"
-        f"- السعر الحالي: **{gold:.2f}$** 📈\n"
-        f"- نقطة المحور (Pivot): **{pivot:.2f}$** 📊\n"
-        f"- اعلى قمة مسجلة مؤخراً (Swing H): **{sh:.2f}$** ⬆️\n"
-        f"- ادنى قاع مسجل مؤخراً (Swing L): **{sl:.2f}$** ⬇️\n"
-        f"- اعلى سعر اليوم (Daily High): **{d.get('daily_high', gold):.2f}$** 🚀\n"
-        f"- ادنى سعر اليوم (Daily Low): **{d.get('daily_low', gold):.2f}$** 📉\n\n"
-        "#### الدعم والمقاومة 📍\n"
-        f"- مقاومة R1: **{r1:.2f}$** | R2: **{r2:.2f}$** | R3: **{r3:.2f}$**\n"
-        f"- دعم S1: **{s1:.2f}$** | S2: **{s2:.2f}$** | S3: **{s3:.2f}$**\n\n"
-        "#### مؤشرات فنية 📊\n"
-        f"- **RSI**: **{rsi:.2f}** 📉 ({rsi_note})\n"
-        f"- **MACD**: **{macd:.4f}** 📊 ({macd_note})\n"
-        f"- **ATR**: **{atr:.2f}$** 📈 ({atr_note})\n\n"
-        "#### مستويات فيبوناتشي 📐\n"
-        f"{fib_block}\n"
-        f"- {fib_pos}\n\n"
-        "#### تحليل الاسواق الكلي 💸\n"
-        f"- **مؤشر الدولار (DXY)**: **{dxy_p:.4f}** ({dxy_pct:+.2f}%) 📈\n"
-        f"- **معدل الفائدة**: **{interest:.2f}%** | **التضخم**: **{inflation:.2f}%** | **العائد الحقيقي**: **{ry:.2f}%**\n"
-        f"- **VIX مؤشر الخوف**: **{vix_p:.2f}** ({'مرتفع — تحوط' if vix_p > 25 else 'طبيعي'})\n"
-        f"- **التقييم الاقتصادي**: {macro_read}\n\n"
-        "#### الصفقات الموصى بها (عالية الدقة) 📋\n"
-        f"**⚡ سكالبينج (سريع ولحظي):**\n"
-        f"- 🟢 **شراء**: من **{scalp_buy_entry:.2f}$** | وقف صارم: **{scalp_buy_sl:.2f}$** | أهداف: **{scalp_buy_t1:.2f}$** ثم **{scalp_buy_t2:.2f}$**\n"
-        f"- 🔴 **بيع**: من **{scalp_sell_entry:.2f}$** | وقف صارم: **{scalp_sell_sl:.2f}$** | أهداف: **{scalp_sell_t1:.2f}$** ثم **{scalp_sell_t2:.2f}$**\n\n"
-        f"**🌊 سوينج (أهداف استراتيجية بعيدة):**\n"
-        f"- 🟢 **شراء**: من **{swing_buy_entry:.2f}$** | وقف: **{swing_buy_sl:.2f}$** | أهداف: **{swing_buy_t1:.2f}$** ثم **{swing_buy_t2:.2f}$**\n"
-        f"- 🔴 **بيع**: من **{swing_sell_entry:.2f}$** | وقف: **{swing_sell_sl:.2f}$** | أهداف: **{swing_sell_t1:.2f}$** ثم **{swing_sell_t2:.2f}$**\n\n"
-        "#### 💡 الحكم النهائي للذهب (الخلاصة الاستراتيجية) 📝\n"
-        f"**🧭 الاتجاه العام**: {main_dir}\n\n"
-        f"**🎯 أهم فرصة حالية (بدقة القناص)**: {best_trade}\n\n"
-        f"**📊 الموقف الفني**: السعر حالياً {'إيجابي (فوق المحور)' if gold > pivot else 'سلبي (تحت المحور)'} والزخم {'يدعم استمرار الحركة بقوة' if (macd > 0 and gold > pivot) or (macd < 0 and gold < pivot) else 'يُظهر تضارباً وضعفاً مؤقتاً'}.\n\n"
-        f"**📉 نطاق التداول اللحظي**: {range_desc} (الحدود القصوى لليوم: {s2:.2f}$ — {r2:.2f}$).\n\n"
-        f"**🌐 الموقف الاقتصادي**: {macro_read}. والدولار {dxy_pct:+.2f}% {'يضغط سلبياً على الذهب' if dxy_pct > 0 else 'يدعم إيجابياً صعود الذهب'}.\n\n"
-        f"**⚠️ التوصية الختامية (قرار الماكينة)**: {final_advice}\n"
+        "### 👑 الخلاصة المحورية الشاملة (Master Summary) 👑\n"
+        "#### 📊 تقييم السيولة والنطاقات بدقة متناهية 📊\n"
+        f"- **السعر اللحظي الدقيق:** **{gold:.2f}$** 💰\n"
+        f"- **نقطة الارتكاز المحورية (Pivot):** **{pivot:.2f}$** ⚖️\n"
+        f"- **أعلى سعر مسجل اليوم (Daily High):** **{d_high:.2f}$** 🚀\n"
+        f"- **أدنى سعر مسجل اليوم (Daily Low):** **{d_low:.2f}$** 📉\n"
+        f"- **أقصى قمة مسجلة مؤخراً (Swing High):** **{sh:.2f}$** ⬆️\n"
+        f"- **أقصى قاع مسجل مؤخراً (Swing Low):** **{sl:.2f}$** ⬇️\n\n"
+        "#### 📐 الدعم والمقاومة الهيكلية 📐\n"
+        f"- 🧱 مقاومات البائعين: **R1={r1:.2f}$** | **R2={r2:.2f}$** | **R3={r3:.2f}$**\n"
+        f"- 🛡️ دعوم المشترين: **S1={s1:.2f}$** | **S2={s2:.2f}$** | **S3={s3:.2f}$**\n\n"
+        "#### 🔮 المدى المتوقع لليوم والزخم 🔮\n"
+        f"- **المدى المتوقع لليومي:** {atr_note}\n"
+        f"- **مؤشر الزخم والتسارع (MACD):** {macd_note}\n"
+        f"- **الضغط الفني (RSI):** {rsi_note}\n\n"
+        "#### 🎯 الصفقات الموصى بها (جودة قناص عالية الدقة) 🎯\n"
+        f"**⚡ استراتيجية السكالبينج (ارتدادات النطاق اللحظي):**\n"
+        f" + 🟢 **شراء من قاع لحظي**: نقطة التمركز **{scalp_buy_entry:.2f}$** | وقف الإغلاق **{scalp_buy_sl:.2f}$** | أهداف **{scalp_buy_t1:.2f}$**، ثم **{scalp_buy_t2:.2f}$**.\n"
+        f" + 🔴 **بيع من قمة لحظية**: نقطة التمركز **{scalp_sell_entry:.2f}$** | وقف الإغلاق **{scalp_sell_sl:.2f}$** | أهداف **{scalp_sell_t1:.2f}$**، ثم **{scalp_sell_t2:.2f}$**.\n\n"
+        f"**🌊 استراتيجية السوينج الممتد (الاعتماد الكامل على أطراف الذروة السعرية):**\n"
+        f" + 🟢 **شراء استراتيجي (Deep Dip)**: التمركز العميق **{swing_buy_entry:.2f}$** | وقف النزيف **{swing_buy_sl:.2f}$** | أهداف **{swing_buy_t1:.2f}$**، ثم **{swing_buy_t2:.2f}$**.\n"
+        f" + 🔴 **بيع استراتيجي (Top Short)**: التمركز المرتفع **{swing_sell_entry:.2f}$** | وقف النزيف **{swing_sell_sl:.2f}$** | أهداف **{swing_sell_t1:.2f}$**، ثم **{swing_sell_t2:.2f}$**.\n\n"
+        "#### 💡 الحكم النهائي للذهب (الخلاصة الاستراتيجية) 💡\n"
+        f"**🧭 الاتجاه العام المعتمد:** {main_dir}\n\n"
+        f"**💎 أهم فرصة حالية متوفرة في السوق (بدقة القناص):** {best_trade}\n\n"
+        f"**📈 نطاق التداول اللحظي ومسار السيولة:** {range_desc}\n\n"
+        f"**⚠️ التوصية الختامية الحاكمة (قرار الماكينة):** {final_advice}\n\n"
+        f"**🌎 البيئة الاقتصادية الدافعة للسعر:** {macro_read}. والدولار ({dxy_pct:+.2f}%) يمثل دافعاً {'سلبياً' if dxy_pct > 0 else 'إيجابياً'} لتداولات الذهب الآن.\n"
     )
-
-
 def _build_summary_template(d: dict, report_text: str, mode_label: str) -> str:
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client: return ""

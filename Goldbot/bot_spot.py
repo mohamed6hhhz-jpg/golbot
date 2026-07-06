@@ -4351,8 +4351,11 @@ def _s_trades(d, n):
         if not t:
             ent = round(r2, 2)
             slv = round(r2 + a * 0.5, 2)
-            t = {'entry': ent, 'sl': slv, 'risk': round(slv - ent, 2),
-                 't1': round(r1, 2), 't2': round(pv, 2), 't3': round(s1, 2)}
+            risk = round(slv - ent, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': risk,
+                 't1': round(r1, 2),          # هدف أول: R1 (مكسب فوري)
+                 't2': round(pv, 2),           # هدف ثاني: المحور (سوينج متوسط)
+                 't3': round(s1, 2)}           # هدف ثالث: S1 (سوينج ممتد)
     elif n == 'rev_buy':
         t = adv.get('rev_buy')
         if not t:

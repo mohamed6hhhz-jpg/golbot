@@ -2071,15 +2071,19 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
     adv_lines = []
     order_groups = [
-        ('\U0001f6d2 \u0635\u0641\u0642\u0627\u062a \u0633\u0643\u0627\u0644\u0628\u064a\u0646\u062c \u0633\u0631\u064a\u0639',
+        ('🛒 صفقات السكالبينج السريع (5 - 10 دقائق)',
          ['scalp_5m_buy','scalp_5m_sell','tight_scalp_buy','tight_scalp_sell']),
-        ('\U0001f4c5 \u0635\u0641\u0642\u0627\u062a \u064a\u0648\u0645\u064a\u0629 \u0648\u0623\u0633\u0628\u0648\u0639\u064a\u0629',
+        ('🏹 صفقات السكالبينج الممتد (15 - 30 دقيقة)',
+         ['scalp_buy','scalp_sell','scalp_30m_buy','scalp_30m_sell']),
+        ('⏱️ صفقات التداول اللحظي (ساعة - 4 ساعات)',
+         ['scalp_1h_buy','scalp_1h_sell','scalp_4h_buy','scalp_4h_sell']),
+        ('📅 صفقات يومية وأسبوعية (Intraday / Weekly)',
          ['daily_buy','daily_sell','weekly_buy','weekly_sell']),
-        ('\U0001f30a \u0633\u0648\u064a\u0646\u062c \u0637\u0648\u064a\u0644 \u0648\u0634\u0647\u0631\u064a',
+        ('🌊 سوينج طويل وشهري (Swing / Monthly)',
          ['long_swing_buy','long_swing_sell','monthly_buy','monthly_sell','swing_buy','swing_sell']),
-        ('\U0001f4b0 \u0635\u0641\u0642\u0627\u062a \u0644\u0648\u062a \u0639\u0627\u0644\u064a (\u0628\u0627\u0644\u0645\u064a\u0644\u064a - \u062c\u0648\u062f\u0629 > 90%)',
+        ('💰 صفقات لوت عالي (بالميلي - جودة > 90%)',
          ['high_lot_buy','high_lot_sell']),
-        ('\U0001f504 \u0635\u0641\u0642\u0627\u062a \u0632\u064a\u0631\u0648 \u0627\u0646\u0639\u0643\u0627\u0633 (Counter-trend - \u062c\u0648\u062f\u0629 > 90%)',
+        ('🔄 صفقات زيرو انعكاس (Counter-trend - جودة > 90%)',
          ['rev_buy','rev_sell']),
     ]
     adv_blocks = []

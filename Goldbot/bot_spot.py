@@ -3806,7 +3806,27 @@ def _build_template_8(d: dict) -> str:
                 import time
                 time.sleep(5)
                 continue
-    return "⚠️ تعذر توليد قالب الحيتان."
+    # Static fallback — build whale report from pre-computed variables
+    vix_val = d.get('vix', 0)
+    real_yield = d.get('real_yield', 0)
+    _vix_state = "ارتفاع الخوف" if vix_val > 25 else ("انخفاض الخوف" if vix_val < 18 else "مستوى متوسط")
+    _ry_eff = "يضغط على الذهب" if real_yield > 1.5 else ("يدعم الذهب" if real_yield < 0 else "تأثير محدود")
+    return f"""تقرير تأثير الأسواق والمؤسسات (الحيتان) للذهب:
+
+🐋 متابعة سيولة الحيتان:
+- {vol_text}
+
+🎯 تمركزات الحيتان (Liquidity Voids):
+- السيولة الشرائية: بين مستويات {liq_buy1}$ و {liq_buy2}$، مما يشير إلى وجود حيتان شرائية في هذه المنطقة.
+- السيولة البيعية: بين مستويات {liq_sell1}$ و {liq_sell2}$، مما يشير إلى وجود حيتان بيعية في هذه المنطقة.
+
+🌍 تأثير الأسواق المترابطة:
+- 🥈 تأثير الفضة (Silver Impact): الفضة تتبع حركة الذهب العامة مع ميل {'إيجابي' if real_yield < 1 else 'سلبي'} نسبياً.
+- السندات: العائد الحقيقي ({real_yield}%) {_ry_eff}.
+- عقود الخيارات (VIX): مؤشر VIX عند {vix_val:.1f}، يشير إلى {_vix_state} في السوق.
+
+💡 الحكم النهائي للذهب:
+- بناءً على تمركزات السيولة والأسواق المترابطة، الاتجاه الأرجح {'صعودي مع مراقبة الحيتان البيعية' if real_yield < 1 else 'هبوطي مع الحذر من مناطق السيولة'} للذهب."""
 
 def _cci_gold_impact(cci: float) -> str:
     if cci > 100:
@@ -3910,7 +3930,43 @@ def _build_template_9(d: dict) -> str:
                 import time
                 time.sleep(5)
                 continue
-    return "⚠️ تعذر توليد تقرير اتجاه الذهب اليومي."
+    # Static fallback — build daily trend from pre-computed TF data
+    def _tf_dir(bias):
+        b = str(bias).lower()
+        if 'صاعد' in b or 'bull' in b: return '🟢 صعودي معتدل', 'إيجابي'
+        if 'هابط' in b or 'bear' in b: return '🔴 هبوطي معتدل', 'سلبي'
+        return '⚪ محايد', 'محايد'
+    d15, v15 = _tf_dir(bias_15)
+    d1h, v1h = _tf_dir(bias_1h)
+    d4h, v4h = _tf_dir(bias_4h)
+    d1d, v1d = _tf_dir(bias_1d)
+    _bull_count = sum(1 for b in [bias_15, bias_1h, bias_4h, bias_1d] if 'صاعد' in str(b) or 'bull' in str(b).lower())
+    _verdict = 'الاتجاه السائد صعودي — يُفضل الشراء من مناطق الدعم.' if _bull_count >= 2 else 'الاتجاه سائد هبوطي أو محايد — يُفضل الحذر والانتظار.'
+    return f"""📊 تقرير اتجاه الذهب وتوافق الفريمات الزمنية
+
+⏱️ فريم 15 دقيقة (الزخم اللحظي):
+- الاتجاه: {d15}
+- RSI: {rsi_15:.1f} | MACD Histogram: {macd_15:.4f}
+💡 الحكم للتأثير النهائي على التداول اللحظي: {v15}.
+
+⏱️ فريم 1 ساعة (هيكل الجلسة):
+- الاتجاه: {d1h}
+- RSI: {rsi_1h:.1f} | MACD Histogram: {macd_1h:.4f}
+💡 الحكم للتأثير النهائي على تداولات اليوم: {v1h}.
+
+⏰ فريم 4 ساعات (الاتجاه التأسيسي):
+- الاتجاه: {d4h}
+- RSI: {rsi_4h:.1f} | MACD Histogram: {macd_4h:.4f}
+💡 الحكم للتأثير النهائي على الصفقات الممتدة: {v4h}.
+
+📅 فريم اليومي (المسار العام):
+- الاتجاه: {d1d}
+- RSI: {rsi_1d:.1f} | MACD Histogram: {macd_1d:.4f}
+💡 الحكم للتأثير النهائي على المسار العام: {v1d}.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 الحكم النهائي للتداول (Master Trade Verdict):
+{_verdict}"""
 
 def _build_template_10(d: dict) -> str:
     """التقرير الأسبوعي الشامل"""
@@ -3946,7 +4002,21 @@ def _build_template_10(d: dict) -> str:
             )
             return resp.choices[0].message.content
         except: pass
-    return "⚠️ تعذر توليد التقرير الأسبوعي."
+    # Static fallback — build weekly report from pre-computed data
+    _w_dir = 'صاعد' if w_rsi > 55 else ('هابط' if w_rsi < 45 else 'محايد')
+    return f"""التقرير الأسبوعي للذهب:
+
+📅 الهيكل الأسبوعي الكلي:
+الاتجاه العام في السوق هو {_w_dir}، {'مما يشير إلى استمرار الضغط البيعي' if w_rsi < 45 else ('مما يدعم التوجه الشرائي الأسبوعي' if w_rsi > 55 else 'مما يشير إلى عدم وجود توجيه واضح')}.
+
+📊 الزخم ومؤشرات المدى الطويل:
+- مؤشر RSI هو {w_rsi:.1f}، مما يشير إلى {'تشبع شرائي وإمكانية تصحيح' if w_rsi > 65 else ('تشبع بيعي وفرصة انتعاش' if w_rsi < 35 else 'حالة توازن بين المشترين والبائعين')}.
+
+🎯 تأثير ذلك على صفقات السوينج:
+- استراتيجية السوينج الموصى بها هذا الأسبوع هي {'الشراء من مناطق الدعم مع هدف المقاومة' if w_rsi > 50 else 'البيع من مناطق المقاومة مع استهداف الدعم'}.
+
+💡 الحكم للتأثير النهائي على الذهب:
+الذهب {'يحتفظ بزخمه الصعودي الأسبوعي' if w_rsi > 55 else ('يواجه ضغطاً هبوطياً أسبوعياً' if w_rsi < 45 else 'يتداول في نطاق عرضي أسبوعي')} — RSI={w_rsi:.1f}، الاتجاه: {w_bias}."""
 
 
 def _build_template_11(d: dict) -> str:
@@ -5673,11 +5743,15 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         # القالب الجديد للمستويات
         bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
         # القالب الذكي الجديد CFTC (t11)
-        if 't11' in locals() and t11: bot2_reports.append(("📰 تقرير CFTC", t11, None))
-        if 't13' in locals() and t13: 
+        bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(data), None))
+        t13_src = t13 if t13 and 'تعذر' not in str(t13) else ''
+        if t13_src:
             import re
-            t13_clean = re.sub(r'\[.*?\]', '', t13, flags=re.DOTALL)
+            t13_clean = re.sub(r'\[.*?\]', '', t13_src, flags=re.DOTALL)
             t13_clean = re.sub(r'\n\s*\n', '\n\n', t13_clean).strip()
+        else:
+            t13_clean = None
+        if t13_clean:
             bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13_clean, None))
 
         # القوالب الفورية S1-S12 — البوت الثالث @Dsssoppp78_bot
@@ -5699,19 +5773,18 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         except Exception as _se:
             log.warning(f"[S1-S12] خطا في توليد القوالب الفورية: {_se}")
 
-        if t7: bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7, None))
-        if t8: bot2_reports.append(("🐋 تاثير الاسواق والمؤسسات (الفوري)", t8, None))
-        if t9: bot2_reports.append(("📊 تقرير اتجاه الذهب اليومي (الفوري)", t9, None))
-        if t10: bot2_reports.append(("📆 التقرير الاسبوعي الشامل (الفوري)", t10, None))
-        if t6: bot2_reports.append(("الخلاصة المحورية", t6, None))
+        bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7 or _build_template_7(data), None))
+        bot2_reports.append(("🐋 تاثير الاسواق والمؤسسات (الفوري)", t8 or _build_template_8(data), None))
+        bot2_reports.append(("📊 تقرير اتجاه الذهب اليومي (الفوري)", t9 or _build_template_9(data), None))
+        bot2_reports.append(("📆 التقرير الاسبوعي الشامل (الفوري)", t10 or _build_template_10(data), None))
+        _t6_text = t6 if t6 and 'تعذر' not in str(t6) else f"الخلاصة: اتجاه {data.get('confluence', {}).get('verdict', 'محايد')} — السعر {data.get('gold', 0):.2f}$"
+        bot2_reports.append(("الخلاصة المحورية", _t6_text, None))
         
         s12_report = _build_spot_s12(data)
-        if s12_report:
-            bot2_reports.append(("👑 الخلاصة المحورية والدقيقة (الجيل الخامس - Spot)", s12_report, None))
+        bot2_reports.append(("👑 الخلاصة المحورية والدقيقة (الجيل الخامس - Spot)", s12_report or f"الخلاصة المحورية: السعر {data.get('gold',0):.2f}$", None))
             
         s9_report = _build_spot_s9(data)
-        if s9_report:
-            bot2_reports.append(("👑 مصفوفة التداول السريعة والاسكالبينج الاحترافي (Spot)", s9_report, None))
+        bot2_reports.append(("👑 مصفوفة التداول السريعة والاسكالبينج الاحترافي (Spot)", s9_report or f"مصفوفة التداول: السعر {data.get('gold',0):.2f}$", None))
 
 
         # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──

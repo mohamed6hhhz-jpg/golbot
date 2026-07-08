@@ -3902,7 +3902,9 @@ Breakeven Call: {breakeven_c}$ | Breakeven Put: {breakeven_p}$
                 time.sleep(15)
                 continue
             log.error(f"❌ [T13] {model_name}: {e}")
-    return ""
+    # Static fallback for T13
+    _static_t13 = "━━━━━━━━━━━━━━━━━━━━━━━━━━" + "━━━━━━━━━━━━━━━━━━━━━━━━━━".join(prompt.split("━━━━━━━━━━━━━━━━━━━━━━━━━━")[1:])
+    return _static_t13
 
 
 def _build_summary_template(d: dict, fixed_rep: str, bot_type: str) -> str:
@@ -4164,15 +4166,14 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
         # القالب الذكي الجديد CFTC (t11)
         bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(data), None))
-        t13_src = t13 if t13 and 'تعذر' not in str(t13) else ''
-        if t13_src:
-            import re
-            t13_clean = re.sub(r'\[.*?\]', '', t13_src, flags=re.DOTALL)
-            t13_clean = re.sub(r'\n\s*\n', '\n\n', t13_clean).strip()
-        else:
-            t13_clean = None
-        if t13_clean:
-            bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13_clean, None))
+        t13_src = t13 if t13 and 'تعذر' not in str(t13) else _build_template_13(data)
+        if not t13_src:
+            t13_src = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        import re
+        t13_clean = re.sub(r'\[.*?\]', '', t13_src, flags=re.DOTALL)
+        t13_clean = re.sub(r'\n\s*\n', '\n\n', t13_clean).strip()
+        bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13_clean, None))
 
         bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الآجل)", t7 or _build_template_7(data), None))
         bot2_reports.append(("🐋 تأثير الأسواق والمؤسسات (الآجل)", t8 or _build_template_8(data), None))

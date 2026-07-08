@@ -1578,17 +1578,33 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         )
 
 
-    # ── [4] مستويات محسّنة: VWAP + سابق أسبوع/شهر + مناطق الطلب/عرض ──
-    # VWAP (سعر مرجح بالحجم) من بيانات الساعي
+    # ── [4] مستويات محسّنة: VWAP الحقيقي (Intraday) ──
     vwap = None
-    if gold_hourly is not None and len(gold_hourly) > 0:
+    if gold_5m is not None and not gold_5m.empty:
         try:
-            h = gold_hourly.copy()
-            h['tp']     = (h['High'] + h['Low'] + h['Close']) / 3
-            h['tp_vol'] = h['tp'] * h['Volume']
-            total_vol   = h['Volume'].sum()
-            vwap = round(float(h['tp_vol'].sum() / total_vol), 2) if total_vol > 0 else None
-        except Exception:
+            h = gold_5m.copy()
+            import pandas as pd
+            # التعامل مع MultiIndex في مكتبة yfinance الجديدة
+            if isinstance(h.columns, pd.MultiIndex):
+                h.columns = h.columns.droplevel(1)
+            
+            # فلترة بيانات اليوم الحالي فقط لحساب Intraday VWAP
+            today_str = h.index[-1].strftime('%Y-%m-%d')
+            h = h.loc[today_str]
+            
+            if not h.empty:
+                h['tp'] = (h['High'] + h['Low'] + h['Close']) / 3
+                h['tp_vol'] = h['tp'] * h['Volume']
+                total_vol = h['Volume'].sum()
+                vwap_val = float(h['tp_vol'].sum() / total_vol) if total_vol > 0 else None
+                
+                if vwap_val is not None:
+                    vwap = round(vwap_val, 2)
+                    # تعديل سعر الفوليوم للفوري بناء على الفارق بين العقود الآجلة والفوري (Contango/Basis)
+                    if "spot" == "futures" and gold_spot and gold_futures:
+                        basis = gold_futures - gold_spot
+                        vwap = round(vwap_val - basis, 2)
+        except Exception as e:
             vwap = None
 
     # سابق الأسبوع High/Low

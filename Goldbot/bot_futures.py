@@ -1920,12 +1920,8 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
     # مستويات فيبوناتشي الرئيسية
     fib = d['fib']
-    fib_line = (f"فيبوناتشي (آجل): "
-                f"0%={round(d.get('swing_low', fib.get('23.6%', 0)), 2)}$ | "
-                f"23.6%={fib['23.6%']}$ | 38.2%={fib['38.2%']}$ | "
-                f"50.0%={fib['50.0%']}$ | 61.8%={fib['61.8%']}$ | "
-                f"78.6%={fib['78.6%']}$ | "
-                f"100%={round(d.get('swing_high', fib.get('78.6%', 0)), 2)}$")
+    fib_line = (f"فيبوناتشي (آجل): 0%={fib['0.0%']}$ | 23.6%={fib['23.6%']}$ | 38.2%={fib['38.2%']}$ | "
+                f"50.0%={fib['50.0%']}$ | 61.8%={fib['61.8%']}$ | 78.6%={fib['78.6%']}$ | 100%={fib['100%']}$")
     # نطاق اليوم المتوقع من ATR
     exp_low  = round(gold - d['atr'] * 0.65, 2)
     exp_high = round(gold + d['atr'] * 0.65, 2)

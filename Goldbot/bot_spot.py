@@ -2587,7 +2587,7 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
 # ══════════════════════════════════════════════
 #  8. إرسال تيليجرام
 # ══════════════════════════════════════════════
-CHUNK_SIZE = 3800   # أقل من 4096 (حد تيليجرام بـ UTF-16) — هامش أمان للإيموجي
+CHUNK_SIZE = 3400   # أقل من 4096 (حد تيليجرام) — هامش أمان يحسب الـ header [i/total] + subtitle (~200 حرف)
 
 def _tg_len(text: str) -> int:
     """طول النص بحسب UTF-16 code units — الطريقة التي يحسب بها تيليجرام الأحرف"""
@@ -2607,7 +2607,7 @@ def _split_message(text: str) -> list:
     for i, line in enumerate(lines):
         if "╭─" in line:
             in_table = True
-            if _tg_len(current) > CHUNK_SIZE - 800:
+            if _tg_len(current) > CHUNK_SIZE - 500:
                 chunks.append(current.strip() + "\n\n(يتبع...)")
                 current = "(تكملة القالب السابق...)\n"
 

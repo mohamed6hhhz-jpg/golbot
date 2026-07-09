@@ -1584,13 +1584,11 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         try:
             h = gold_5m.copy()
             import pandas as pd
-            # التعامل مع MultiIndex في مكتبة yfinance الجديدة
             if isinstance(h.columns, pd.MultiIndex):
                 h.columns = h.columns.droplevel(1)
             
-            # فلترة بيانات اليوم الحالي فقط لحساب Intraday VWAP
-            today_str = h.index[-1].strftime('%Y-%m-%d')
-            h = h.loc[today_str]
+            # حساب VWAP دقيق: أخذ آخر 24 ساعة من التداول الفعلي بدلا من الاعتماد على تاريخ اليوم فقط لتجنب مشكلة فروق التوقيت
+            h = h.tail(288) # 288 شمعة 5 دقائق = 24 ساعة
             
             if not h.empty:
                 h['tp'] = (h['High'] + h['Low'] + h['Close']) / 3
@@ -1600,8 +1598,8 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
                 
                 if vwap_val is not None:
                     vwap = round(vwap_val, 2)
-                    # تعديل سعر الفوليوم للفوري بناء على الفارق بين العقود الآجلة والفوري (Contango/Basis)
-                    if "spot" == "futures" and gold_spot and gold_futures:
+                    # تعديل سعر الفوليوم للفوري بناء على الفارق بين العقود الآجلة والفوري
+                    if False:
                         basis = gold_futures - gold_spot
                         vwap = round(vwap_val - basis, 2)
         except Exception as e:
@@ -4034,11 +4032,11 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         t0, t1, t2, t3, t4, t5, t7, t8, t9, t10, t11, t13, t6 = results
         
         # Inject the Master Summary & High Lot Sniper into Bot2 (the 13-chunk report)
-        s12_report = _build_futures_s12(data)
+        s12_report = None  # Not implemented for futures
         if s12_report:
             raw_reports.append(("👑 الخلاصة المحورية لليوم (الآجل - Futures)", s12_report, None))
             
-        s9_report = _build_futures_s9(data)
+        s9_report = None   # Not implemented for futures
         if s9_report:
             raw_reports.append(("👑 مصفوفة التداول السريعة (الآجل - Futures)", s9_report, None))
             
@@ -4169,11 +4167,11 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         _t6_text = t6 if t6 and 'تعذر' not in str(t6) else f"الخلاصة: اتجاه {data.get('confluence', {}).get('verdict', 'محايد')} — السعر {data.get('gold', 0):.2f}$"
         bot2_reports.append(("الخلاصة المحورية", _t6_text, None))
         
-        s12_report = _build_futures_s12(data)
+        s12_report = None  # Not implemented for futures
         if s12_report:
             bot2_reports.append(("👑 الخلاصة المحورية والدقيقة (الجيل الخامس - Futures)", s12_report, None))
             
-        s9_report = _build_futures_s9(data)
+        s9_report = None   # Not implemented for futures
         if s9_report:
             bot2_reports.append(("👑 مصفوفة التداول السريعة والاسكالبينج الاحترافي (Futures)", s9_report, None))
         bot2_reports.append(("[16/16] المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, True), None))
@@ -4222,7 +4220,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 
                 # Send to SovereignMaaregFund if 4 hours have passed
                 if send_to_4h_channel and not chat_id:
-                    _send_single(final_text, is_public, "@SovereignMaaregFund")
+                    _send_single(final_text, is_public, "@Maaregsovereinefund")
                     
                 log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
                 time.sleep(2)
@@ -4244,7 +4242,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     ok2 = _send_single_bot2(final_text2, is_public, chat_id2)
                     
                     if send_to_4h_channel and not chat_id2:
-                        _send_single_bot2(final_text2, is_public, "@SovereignMaaregFund")
+                        _send_single_bot2(final_text2, is_public, "@Maaregsovereinefund")
                         
                     log.info(f"✅ رسالة البوت الثاني {i2}/{total_2} وصلت." if ok2 else f"❌ فشل رسالة البوت الثاني {i2}/{total_2}.")
                     time.sleep(2)

@@ -5654,6 +5654,37 @@ def _build_spot_s15(data: dict) -> str:
 """
     return template.strip()
 
+def _build_spot_s16(data: dict) -> str:
+    """القالب الجديد: استراتيجية التداول بحجم اللوت الكامل (Full Lot Strategy)"""
+    current = data.get('gold', 0.0)
+    s1 = data.get('s1', current - 15)
+    s2 = data.get('s2', current - 30)
+    s3 = data.get('s3', current - 50)
+    r1 = data.get('r1', current + 15)
+    r2 = data.get('r2', current + 30)
+    r3 = data.get('r3', current + 50)
+
+    template = f"""
+👑 **الخطة التكتيكية للسيولة (Full Lot Strategy)** 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🟢 **1. استراتيجية الشراء (الدعوم الحيوية):**
+🛒 **نشتري لوت كامل:** **{s1:.2f}$**
+🎯 **الهدف:** **{r1:.2f}$**
+🛑 **الاستوب:** إغلاق شمعة ساعة أسفل **{s2:.2f}$**
+
+🔴 **2. استراتيجية تأكيد الكسر (التحول البيعي):**
+🔻 **بيع لوت كامل** بعد إغلاق شمعة ساعة أسفل: **{s2:.2f}$**
+🎯 **الهدف الممتد:** **{s3:.2f}$**
+
+🩸 **3. استراتيجية البيع العكسي (القمم):**
+📉 **بيع لوت كامل:** **{r2:.2f}$**
+🎯 **الهدف الممتد:** **{s3:.2f}$**
+🛑 **الاستوب:** إغلاق شمعة يومية أعلى **{r3:.2f}$**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 *تنويه: يُرجى الالتزام التام بشروط الإغلاق الموضحة في وقف الخسارة لحماية رأس المال.*
+"""
+    return template.strip()
+
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache
 
@@ -5870,6 +5901,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             bot3_reports.append(("[فوري] 13/13 المستهدف الأسبوعي", _build_friday_target(data, False), None))
             bot3_reports.append(("[فوري] 14/14 مسار القمة والقاع", _build_spot_s14(data), None))
             bot3_reports.append(("[فوري] 15/15 الرادار المؤسساتي والسيولة", _build_spot_s15(data), None))
+            bot3_reports.append(("[فوري] 16/16 استراتيجية اللوت الكامل", _build_spot_s16(data), None))
             log.info(f"[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي")
         except Exception as _se:
             log.warning(f"[S1-S12] خطا في توليد القوالب الفورية: {_se}")
@@ -5889,6 +5921,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("[16/16] المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
         bot2_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
         bot2_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
+        bot2_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
 
 
         # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──
@@ -5896,6 +5929,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         # ── تسطيح وإرسال ──
         raw_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
         raw_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
+        raw_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
         flat_chunks = []
         for title, txt, chat_id in raw_reports:
             for chunk in _split_message(txt):

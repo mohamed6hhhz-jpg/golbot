@@ -5547,6 +5547,113 @@ def _build_all_tf_levels(data: dict) -> str:
         
     return "\n".join(lines)
 
+def _build_spot_s14(data: dict) -> str:
+    """القالب الجديد: القمة والقاع وسعر الإغلاق والاتجاه الأول"""
+    current = data.get('gold', 0.0)
+    high = data.get('daily_high', current + 15)
+    low = data.get('daily_low', current - 15)
+    close = data.get('prev_close', current)
+
+    confluence = data.get('confluence', {})
+    trend = confluence.get('verdict', 'محايد')
+    rsi = data.get('rsi', 50)
+    
+    dist_high = abs(high - current)
+    dist_low = abs(current - low)
+    
+    if dist_high < 1.5 and dist_low > 5.0:
+        first_target = "📈 السعر يختبر القمة بالفعل (احتمالية اختراق أو ارتداد من القمة)."
+        reason = "التداول يتم بالقرب من قمة اليوم."
+    elif dist_low < 1.5 and dist_high > 5.0:
+        first_target = "📉 السعر يختبر القاع بالفعل (احتمالية كسر أو ارتداد من القاع)."
+        reason = "التداول يتم بالقرب من قاع اليوم."
+    elif "شراء" in trend or "صاعد" in trend or rsi > 55:
+        first_target = "📈 استهداف القمة أولاً (مسار صاعد)"
+        reason = f"زخم المشترين أقوى (RSI: {rsi:.1f}) والاتجاه العام يدعم الصعود، مما يدعم الاندفاع نحو {high:.2f}$ أولاً."
+    elif "بيع" in trend or "هابط" in trend or rsi < 45:
+        first_target = "📉 استهداف القاع أولاً (مسار هابط)"
+        reason = f"سيطرة بيعية واضحة (RSI: {rsi:.1f}) والاتجاه يدعم الهبوط، مما يرجح اختبار القاع {low:.2f}$ أولاً."
+    else:
+        if dist_high < dist_low:
+            first_target = "📈 استهداف القمة أولاً (مسار عرضي/متذبذب)"
+            reason = f"السوق متذبذب، ولكن السعر أقرب حالياً للقمة {high:.2f}$ ويستعد لاختبارها قبل القاع."
+        else:
+            first_target = "📉 استهداف القاع أولاً (مسار عرضي/متذبذب)"
+            reason = f"السوق متذبذب، ولكن السعر أقرب للقاع {low:.2f}$ والأقرب هو اختباره قبل القمة."
+
+    template = f"""
+👑 **الخارطة السعرية الحيوية: القمة والقاع** 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 **أهم مستويات اليوم الحالية**
+💰 السعر اللحظي: **{current:.2f}$**
+🔺 القمة المسجلة (High): **{high:.2f}$**
+🔻 القاع المسجل (Low): **{low:.2f}$**
+🔒 الإغلاق السابق (Close): **{close:.2f}$**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 **البوصلة الزمنية: أيهما يُضرب أولاً اليوم؟**
+⚡ {first_target}
+
+🔬 **التفسير الميكانيكي:**
+{reason}
+"""
+    return template.strip()
+
+def _build_spot_s15(data: dict) -> str:
+    """القالب الجديد: الحجم والسيولة والزخم وهل الاختراق حقيقي أم وهمي"""
+    current = data.get('gold', 0.0)
+    vol = data.get('rel_vol', 1.0)
+    rsi = data.get('rsi', 50.0)
+    macd_hist = data.get('macd_hist', 0.0)
+    
+    if vol > 1.5:
+        vol_state = "🔵 سيولة مؤسساتية ضخمة (حجم تداول مرتفع جداً)"
+        vol_score = "ممتاز ✅"
+    elif vol > 1.0:
+        vol_state = "🟢 سيولة نشطة (حجم تداول فوق المتوسط)"
+        vol_score = "جيد ☑️"
+    elif vol > 0.7:
+        vol_state = "🟡 سيولة طبيعية (حجم تداول متوسط)"
+        vol_score = "مقبول ➖"
+    else:
+        vol_state = "🔴 سيولة ضعيفة/جفاف (حجم تداول منخفض)"
+        vol_score = "ضعيف ❌"
+
+    if rsi >= 65 and macd_hist > 0:
+        mom_state = "🚀 زخم شرائي انفجاري"
+    elif rsi <= 35 and macd_hist < 0:
+        mom_state = "🩸 زخم بيعي عنيف"
+    elif rsi > 50:
+        mom_state = "📈 زخم شرائي معتدل"
+    elif rsi < 50:
+        mom_state = "📉 زخم بيعي معتدل"
+    else:
+        mom_state = "⚖️ زخم محايد (انعدام اتجاه واضح)"
+
+    if vol >= 1.2:
+        if rsi >= 55:
+            breakout_state = "✅ الاختراقات الصاعدة (Breakouts) حقيقية وموثوقة (مدعومة بسيولة شراء قوية)."
+        elif rsi <= 45:
+            breakout_state = "✅ الكسور الهابطة (Breakdowns) حقيقية وموثوقة (مدعومة بسيولة بيع قوية)."
+        else:
+            breakout_state = "⚠️ الحركات السعرية الحالية تحتاج تأكيد بإغلاق الشموع (حرب سيولة ومحاولة للسيطرة)."
+    else:
+        breakout_state = "❌ احذر: الاختراقات والكسور الحالية غالباً **(وهمية - Fakeouts)** بسبب ضعف الفوليوم والسيولة الداعمة (مصيدة صناع السوق)."
+
+    template = f"""
+👑 **الرادار المؤسساتي: كشف السيولة والكسور الوهمية** 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌊 **مؤشرات الفوليوم وتدفق السيولة (Liquidity)**
+🔹 حالة السيولة اللحظية: **{vol_state}**
+🔹 قوة الزخم (Momentum): **{mom_state}**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 **كشف التلاعب: هل الاختراقات والكسور حقيقية؟**
+🚨 **التقييم الخوارزمي:** 
+{breakout_state}
+
+💡 *القاعدة الذهبية: لا تثق بأي اختراق لمقاومة أو كسر لدعم ما لم يكن مصحوباً بسيولة مؤسساتية مؤكدة لتجنب مصيدة صناع السوق.*
+"""
+    return template.strip()
+
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache
 
@@ -5761,6 +5868,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             bot3_reports.append(("[فوري] 11/12 قوة العملات DXY",             _build_spot_s11(data), None))
             bot3_reports.append(("[فوري] 12/12 الخلاصة المحورية",            _build_spot_s12(data), None))
             bot3_reports.append(("[فوري] 13/13 المستهدف الأسبوعي", _build_friday_target(data, False), None))
+            bot3_reports.append(("[فوري] 14/14 مسار القمة والقاع", _build_spot_s14(data), None))
+            bot3_reports.append(("[فوري] 15/15 الرادار المؤسساتي والسيولة", _build_spot_s15(data), None))
             log.info(f"[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي")
         except Exception as _se:
             log.warning(f"[S1-S12] خطا في توليد القوالب الفورية: {_se}")
@@ -5778,11 +5887,15 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         s9_report = _build_spot_s9(data)
         bot2_reports.append(("👑 مصفوفة التداول السريعة والاسكالبينج الاحترافي (Spot)", s9_report or f"مصفوفة التداول: السعر {data.get('gold',0):.2f}$", None))
         bot2_reports.append(("[16/16] المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
+        bot2_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
+        bot2_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
 
 
         # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──
 
         # ── تسطيح وإرسال ──
+        raw_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
+        raw_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
         flat_chunks = []
         for title, txt, chat_id in raw_reports:
             for chunk in _split_message(txt):

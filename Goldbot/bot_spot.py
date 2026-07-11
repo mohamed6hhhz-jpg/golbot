@@ -5596,53 +5596,56 @@ def _build_all_tf_levels(data: dict) -> str:
     return "\n".join(lines)
 
 def _build_spot_s14(data: dict) -> str:
-    """القالب الجديد: القمة والقاع وسعر الإغلاق والاتجاه الأول"""
-    current = data.get('gold', 0.0)
-    high = data.get('daily_high', current + 15)
-    low = data.get('daily_low', current - 15)
+    """القالب الجديد: القمة المتوقعة والقاع المتوقع وسعر الإغلاق والاتجاه الأول"""
+    nums = _s_nums(data)
+    current = nums.get('gold', data.get('gold', 0.0))
+    atr = nums.get('atr', 20.0)
+    pivot = nums.get('pivot', current)
+    
+    # Expected Extremes for the day (not what has been recorded so far)
+    expected_high = nums.get('r2', current + atr)
+    expected_low = nums.get('s2', current - atr)
+    
+    rsi = nums.get('rsi', 50)
+    macd = nums.get('macd', 0.0)
+    
+    dist_high = abs(expected_high - current)
+    dist_low = abs(current - expected_low)
+    
     close = data.get('prev_close', current)
-
     confluence = data.get('confluence', {})
     trend = confluence.get('verdict', 'محايد')
-    rsi = data.get('rsi', 50)
     
-    dist_high = abs(high - current)
-    dist_low = abs(current - low)
-    
-    if dist_high < 1.5 and dist_low > 5.0:
-        first_target = "📈 السعر يختبر القمة بالفعل (احتمالية اختراق أو ارتداد من القمة)."
-        reason = "التداول يتم بالقرب من قمة اليوم."
-    elif dist_low < 1.5 and dist_high > 5.0:
-        first_target = "📉 السعر يختبر القاع بالفعل (احتمالية كسر أو ارتداد من القاع)."
-        reason = "التداول يتم بالقرب من قاع اليوم."
-    elif "شراء" in trend or "صاعد" in trend or rsi > 55:
-        first_target = "📈 استهداف القمة أولاً (مسار صاعد)"
-        reason = f"زخم المشترين أقوى (RSI: {rsi:.1f}) والاتجاه العام يدعم الصعود، مما يدعم الاندفاع نحو {high:.2f}$ أولاً."
-    elif "بيع" in trend or "هابط" in trend or rsi < 45:
-        first_target = "📉 استهداف القاع أولاً (مسار هابط)"
-        reason = f"سيطرة بيعية واضحة (RSI: {rsi:.1f}) والاتجاه يدعم الهبوط، مما يرجح اختبار القاع {low:.2f}$ أولاً."
+    if "شراء" in trend or "صاعد" in trend or (rsi > 55 and macd > 0):
+        first_target = f"📈 استهداف القمة المتوقعة أولاً ({expected_high:.2f}$)"
+        reason = f"السيولة تتدفق بقوة نحو الأعلى (RSI: {rsi:.1f})، والاتجاه العام صاعد ومستقر. من المرجح جداً أن يندفع السعر لاختبار مناطق المقاومة العنيفة عند القمة المتوقعة قبل أي محاولة هبوط."
+    elif "بيع" in trend or "هابط" in trend or (rsi < 45 and macd < 0):
+        first_target = f"📉 استهداف القاع المتوقع أولاً ({expected_low:.2f}$)"
+        reason = f"السوق يخضع لضغوط بيعية واضحة (RSI: {rsi:.1f})، والاتجاه العام يميل بقوة للهبوط. التوقعات تشير لضرب مستويات الدعم العميقة عند القاع المتوقع قبل أي ارتداد."
     else:
         if dist_high < dist_low:
-            first_target = "📈 استهداف القمة أولاً (مسار عرضي/متذبذب)"
-            reason = f"السوق متذبذب، ولكن السعر أقرب حالياً للقمة {high:.2f}$ ويستعد لاختبارها قبل القاع."
+            first_target = f"📈 الأقرب رياضياً هو القمة ({expected_high:.2f}$)"
+            reason = f"السوق حالياً في مسار متذبذب (عرضي)، ولكن السعر يتمركز في النصف العلوي وأقرب لمناطق القمة، مما يرجح اختبارها أولاً لتفريغ السيولة الشرائية المتبقية."
         else:
-            first_target = "📉 استهداف القاع أولاً (مسار عرضي/متذبذب)"
-            reason = f"السوق متذبذب، ولكن السعر أقرب للقاع {low:.2f}$ والأقرب هو اختباره قبل القمة."
+            first_target = f"📉 الأقرب رياضياً هو القاع ({expected_low:.2f}$)"
+            reason = f"السوق حالياً في مسار متذبذب (عرضي)، ولكن السعر يتمركز في النصف السفلي وأقرب لمناطق القاع، مما يرجح اختباره أولاً لتجميع سيولة شرائية جديدة."
 
     template = f"""
-👑 **الخارطة السعرية الحيوية: القمة والقاع** 👑
+👑 **خارطة المسار اليومي المتوقع (Daily Expected Range)** 👑
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 **أهم مستويات اليوم الحالية**
-💰 السعر اللحظي: **{current:.2f}$**
-🔺 القمة المسجلة (High): **{high:.2f}$**
-🔻 القاع المسجل (Low): **{low:.2f}$**
-🔒 الإغلاق السابق (Close): **{close:.2f}$**
+🎯 **المحطات السعرية الأقصى توقعاً اليوم (Spot)**
+💰 السعر اللحظي الحالي: **{current:.2f}$**
+🔺 القمة اليومية المتوقعة (Expected High): **{expected_high:.2f}$**
+🔻 القاع اليومي المتوقع (Expected Low): **{expected_low:.2f}$**
+🔒 سعر الإغلاق السابق (Prev Close): **{close:.2f}$**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 **البوصلة الزمنية: أيهما يُضرب أولاً اليوم؟**
+🧭 **البوصلة الزمنية: إلى أين نتجه أولاً؟**
 ⚡ {first_target}
 
-🔬 **التفسير الميكانيكي:**
+🔬 **التحليل الميكانيكي الدقيق للمسار:**
 {reason}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 *تنويه: القمة والقاع هنا ليسا ما تم تسجيله بالفعل، بل هما الأهداف القصوى (القمة المتوقعة والقاع المتوقع) التي يتجه لها السعر اليوم بناءً على خوارزميات قياس الزخم والسيولة (ATR).*
 """
     return template.strip()
 

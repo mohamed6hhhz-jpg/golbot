@@ -3427,14 +3427,26 @@ def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: st
     
     # Convert score (-12 to +12) to percentage (0% to 100%)
     up_prob_calc = 50 + (score / total_weight) * 45  # Cap at max 95% / min 5%
-    up_prob = int(round(up_prob_calc))
-    up_prob = max(10, min(90, up_prob))
-    down_prob = 100 - up_prob
+    up_prob_raw = int(round(up_prob_calc))
+    up_prob_raw = max(10, min(90, up_prob_raw))
+    down_prob_raw = 100 - up_prob_raw
+    osc_prob_raw = max(10, 100 - abs(up_prob_raw - down_prob_raw))
+    
+    # Normalize to 100
+    tot = up_prob_raw + down_prob_raw + osc_prob_raw
+    up_prob = int(round(up_prob_raw / tot * 100))
+    down_prob = int(round(down_prob_raw / tot * 100))
+    osc_prob = 100 - (up_prob + down_prob)
+    
+    r2_val = round(d.get('gold', 2000) + d.get('atr', 20) * 1.5, 2)
+    s2_val = round(d.get('gold', 2000) - d.get('atr', 20) * 1.5, 2)
+    gld_val = round(d.get('gold', 2000), 2)
 
     static_header = f"""🎯 خلاصة انحياز الذهب | التحديث المباشر
 
-📈 نسبة الصعود نحو القمة: {up_prob}%
-📉 نسبة الهبوط نحو القاع: {down_prob}%
+📈 احتمال صعود للقمه: {up_prob}% (نحو {r2_val}$)
+📉 احتمال هبوط نحو القاع: {down_prob}% (نحو {s2_val}$)
+🔀 احتمالية التذبذب: {osc_prob}% (حول {gld_val}$)
 
 🧭 الخلاصة:"""
 
@@ -3590,7 +3602,14 @@ def _build_combined_summary(
             raw = re.sub(r'📈 نسبة الصعود.*?%\n', '', raw)
             raw = re.sub(r'📉 نسبة الهبوط.*?%\n', '', raw)
             # Prepend correct static probabilities
-            static_probs = f"📈 نسبة الصعود: {bull_pct}%\n📉 نسبة الهبوط: {bear_pct}%\n"
+            osc_pct = max(10, 100 - abs(bull_pct - bear_pct))
+            tot = bull_pct + bear_pct + osc_pct
+            b_p = int(round(bull_pct / tot * 100))
+            be_p = int(round(bear_pct / tot * 100))
+            o_p = 100 - (b_p + be_p)
+            r2_val = round(gold_spot + spot_data.get('atr', 20) * 1.5, 2)
+            s2_val = round(gold_spot - spot_data.get('atr', 20) * 1.5, 2)
+            static_probs = f"📈 احتمال صعود للقمه: {b_p}% (نحو {r2_val}$)\n📉 احتمال هبوط نحو القاع: {be_p}% (نحو {s2_val}$)\n🔀 احتمالية التذبذب: {o_p}% (حول {gold_spot}$)\n"
             return static_probs + raw.strip()
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل الخلاصة المشتركة: {e}")
@@ -5511,8 +5530,9 @@ RSI: {rsi} | MACD: {macd_val} | العائد الحقيقي: {ry}%
 
 🎯 خلاصة انحياز الذهب | {mode_label} | التحديث المباشر
 
-📈 نسبة الصعود: [توقعك كنسبة]%
-📉 نسبة الهبوط: [توقعك كنسبة]%
+📈 احتمال صعود للقمه: [توقعك كنسبة]% (نحو {r2}$)
+📉 احتمال هبوط نحو القاع: [توقعك كنسبة]% (نحو {s2}$)
+🔀 احتمالية التذبذب: [توقعك كنسبة]% (حول {gold}$)
 
 🧭 الخلاصة:
 [فقرة قصيرة جداً من سطرين تلخص وضع السوق والقرار المناسب بناء على الأرقام أعلاه]
@@ -5607,6 +5627,12 @@ def _build_spot_s14(data: dict) -> str:
     expected_high = nums.get('r2', current + atr)
     expected_low = nums.get('s2', current - atr)
     
+    # Recorded extremes
+    recorded_high = data.get('daily_high', current)
+    if recorded_high <= current: recorded_high = current + (atr * 0.2)
+    recorded_low = data.get('daily_low', current)
+    if recorded_low >= current: recorded_low = current - (atr * 0.2)
+    
     rsi = nums.get('rsi', 50)
     macd = nums.get('macd', 0.0)
     
@@ -5636,8 +5662,11 @@ def _build_spot_s14(data: dict) -> str:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 **المحطات السعرية الأقصى توقعاً اليوم (Spot)**
 💰 السعر اللحظي الحالي: **{current:.2f}$**
-🔺 القمة اليومية المتوقعة (Expected High): **{expected_high:.2f}$**
-🔻 القاع اليومي المتوقع (Expected Low): **{expected_low:.2f}$**
+📌 القمة المسجلة حتى الآن: **{recorded_high:.2f}$**
+📌 القاع المسجل حتى الآن: **{recorded_low:.2f}$**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 القمة المتوقعة (المستهدفة): **{expected_high:.2f}$**
+⚓ القاع المتوقع (المستهدف): **{expected_low:.2f}$**
 🔒 سعر الإغلاق السابق (Prev Close): **{close:.2f}$**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧭 **البوصلة الزمنية: إلى أين نتجه أولاً؟**

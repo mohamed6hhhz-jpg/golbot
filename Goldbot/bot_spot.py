@@ -5815,6 +5815,57 @@ def _build_spot_s16(data: dict) -> str:
 """
     return template.strip()
 
+def _build_early_warning_alert(data: dict) -> str:
+    """القالب الجديد: تنبيه مبكر — انعكاس مرتقب"""
+    current = data.get('gold', 0.0)
+    rsi = data.get('tf_hourly', {}).get('rsi', 50)
+    atr = data.get('atr', 20.0)
+    
+    if rsi >= 70:
+        grade = "A"
+        expected_price = data.get('r3', current + atr * 2.5)
+        hours_to_rev = 12
+    elif rsi <= 30:
+        grade = "A"
+        expected_price = data.get('s3', current - atr * 2.5)
+        hours_to_rev = 12
+    elif rsi > 55:
+        grade = "B"
+        expected_price = data.get('r2', current + atr * 1.5)
+        hours_to_rev = 24
+    elif rsi < 45:
+        grade = "B"
+        expected_price = data.get('s2', current - atr * 1.5)
+        hours_to_rev = 24
+    else:
+        grade = "C"
+        expected_price = data.get('r1', current + atr * 0.8) if current > data.get('pivot', current) else data.get('s1', current - atr * 0.8)
+        hours_to_rev = 48
+        
+    rev_date = datetime.now(CAIRO_TZ) + timedelta(hours=hours_to_rev)
+    today_date = datetime.now(CAIRO_TZ).date()
+    
+    if rev_date.date() == today_date:
+        day_str = "اليوم"
+    elif rev_date.date() == today_date + timedelta(days=1):
+        day_str = "غداً"
+    else:
+        day_str = "قريباً"
+        
+    date_formatted = rev_date.strftime("%d %b %Y %H:00")
+    
+    template = f"""
+⏰ **تنبيه مبكر — انعكاس مرتقب**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 **XAUUSD | H1**
+⏳ **{day_str} — {date_formatted}**
+💲 **السعر المتوقع:** **{expected_price:.2f}$**
+🧠 **درجة:** **{grade}**
+⚠️ **استعد وراقب السعر**
+#تنبيه_مبكر
+"""
+    return template.strip()
+
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache
 
@@ -6052,6 +6103,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
         bot2_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
         bot2_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
+        bot2_reports.append(("⏰ تنبيه مبكر — انعكاس مرتقب", _build_early_warning_alert(data), None))
 
 
         # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──
@@ -6060,6 +6112,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         raw_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
         raw_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
         raw_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
+        raw_reports.append(("⏰ تنبيه مبكر — انعكاس مرتقب", _build_early_warning_alert(data), None))
         flat_chunks = []
         for title, txt, chat_id in raw_reports:
             for chunk in _split_message(txt):

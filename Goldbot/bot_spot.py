@@ -688,7 +688,7 @@ def tf_gold_impact(score: int, rsi: float = 50) -> str:
     if score >= 1:  return "↑ دعم صعودي خفيف → ميل إيجابي للذهب"
     if score <= -3: return "↓↓ ضغط هبوطي قوي → الذهب مرشح للهبوط"
     if score <= -1: return "↓ ضغط هبوطي خفيف → ميل سلبي للذهب"
-    return "↔ محايد — لا تأثير واضح على الذهب"
+    return "↔ محايد — مسار عرضي تجميعي للذهب (ترقب للسيولة)"
 
 
 def _rsi_gold_impact(rsi: float) -> str:
@@ -704,7 +704,7 @@ def _rsi_gold_impact(rsi: float) -> str:
 def _macd_gold_impact(macd_hist: float) -> str:
     if macd_hist > 0.5:   return "🟢 زخم صعودي → يدفع الذهب للأعلى"
     elif macd_hist < -0.5: return "🔴 زخم هبوطي → يضغط الذهب للأسفل"
-    return "⚪ زخم ضعيف → لا تأثير واضح على الذهب"
+    return "⚪ زخم ضعيف → تذبذب عرضي للذهب (ترقب لضخ السيولة)"
 
 
 def _indicators_verdict(d: dict) -> str:
@@ -2022,7 +2022,8 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 📡 الأسواق
    DXY:{d['dxy']:.1f}({d['dxy_bias']}) {'→🟢دعم ذهب' if d['dxy']<101 else '→🔴ضغط' if d['dxy']>104 else '→⚪محايد'} | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | 10Y:{d['tnx']:.2f}% | 30Y:{f"{d['tty']:.2f}%" if d['tty'] else '—'} | Spread(10Y-2Y):{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
    VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'}) {'→🟢خوف=طلب ملاذء' if d['vix'] and d['vix']>25 else '→🔴هدوء=تراجع ملاذء' if d['vix'] else ''} | 🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
-   🎯 نسبة P/C:{f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
+   🎯 نسبة (Put/Call Ratio): {f"{d['gld_pcr']}" if d['gld_pcr'] else '—'} {'→ تشاؤم مؤسساتي (سيطرة عقود البيع)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→ تفاؤل مؤسساتي (سيطرة عقود الشراء)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→ تعادل مؤسساتي (توازن بين البيع والشراء)' if d['gld_pcr'] else ''}
+   💡 (شرح مؤشر الـ P/C: يقيس معنويات كبار المستثمرين في عقود الأوبشن؛ إذا كانت النسبة أعلى من 1.0 يعني تحوط وتوقع هبوط، وإذا كانت أقل من 1.0 يعني تفاؤل وتوقع صعود)
    {d['real_yield_brief']}
 {d['real_yield_signal']}
 

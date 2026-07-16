@@ -5850,29 +5850,48 @@ def _build_early_warning_alert(data: dict) -> str:
         expected_price = data.get('r1', current + atr * 0.8) if current > data.get('pivot', current) else data.get('s1', current - atr * 0.8)
         hours_to_rev = 48
         
-    rev_date = datetime.now(CAIRO_TZ) + timedelta(hours=hours_to_rev)
-    today_date = datetime.now(CAIRO_TZ).date()
-    
-    if rev_date.date() == today_date:
-        day_str = "اليوم"
-    elif rev_date.date() == today_date + timedelta(days=1):
-        day_str = "غداً"
-    else:
-        day_str = "قريباً"
+    try:
+        from datetime import datetime, timedelta
+        import pytz
+        CAIRO_TZ = pytz.timezone('Africa/Cairo')
+        rev_date = datetime.now(CAIRO_TZ) + timedelta(hours=hours_to_rev)
+        today_date = datetime.now(CAIRO_TZ).date()
         
-    date_formatted = rev_date.strftime("%d %b %Y %H:00")
-    
+        if rev_date.date() == today_date:
+            day_str = "اليوم"
+        elif rev_date.date() == today_date + timedelta(days=1):
+            day_str = "غداً"
+        else:
+            day_str = "قريباً"
+            
+        date_formatted = rev_date.strftime("%d %b %Y %H:00")
+    except:
+        day_str = "قريباً"
+        date_formatted = ""
+
+    if grade == "A":
+        grade_desc = "تشبع حاد ومفرط (انعكاس وشيك جداً وعنيف)"
+    elif grade == "B":
+        grade_desc = "بداية تشبع وزخم قوي ممتد (انعكاس محتمل قريباً)"
+    else:
+        grade_desc = "تذبذب سيولة (انعكاس ضعيف يعتمد على الدعوم/المقاومات)"
+        
     template = f"""
 ⏰ **تنبيه مبكر — انعكاس مرتقب**
+*(هذا التنبيه يخبرك بأن الاتجاه الحالي شارف على الانتهاء وسيعكس مساره)*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 **XAUUSD | H1**
-⏳ **{day_str} — {date_formatted}**
-💲 **السعر المتوقع:** **{expected_price:.2f}$**
-🧠 **درجة:** **{grade}**
-⚠️ **استعد وراقب السعر**
-#تنبيه_مبكر
+⏳ **الإطار الزمني المتوقع للانعكاس:** {day_str} — {date_formatted}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 **نقطة الارتطام (السعر المتوقع):** **{expected_price:.2f}$**
+*(هي النقطة التي سينتهي عندها المسار الحالي وينعكس منها السوق، وهي أفضل منطقة لتعليق أوامر Limit عكسية)*
+
+🧠 **قوة التأكيد (الدرجة {grade}):** **{grade_desc}**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ **استعد وراقب السعر عند نقطة الارتطام لتقتنص الانعكاس.**
 """
     return template.strip()
+
 
 
 def _fetch_breaking_news() -> str:

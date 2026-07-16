@@ -29,10 +29,8 @@ log = logging.getLogger(__name__)
 
 import random
 GROQ_KEYS = [
-    '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',
-    "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",
-    "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",
-    "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"
+    "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",
+    "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"
 ]
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN   = "8135586080:AAFS1ZI2XcsPrnjtTvAPlXxlTMrSO_Lu3Qc"

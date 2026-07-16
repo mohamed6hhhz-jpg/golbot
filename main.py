@@ -158,7 +158,7 @@ async def startup_event():
 
     # Start Goldbots V4
     threading.Thread(target=run_spot, daemon=True, name="Goldbot-Spot").start()
-    threading.Thread(target=run_futures, daemon=True, name="Goldbot-Futures").start()
+    # threading.Thread(target=run_futures, daemon=True, name="Goldbot-Futures").start()
     print("[Orchestrator] Goldbot V5 Grand Orchestrator task created.")
 
     # 2. Start auto-copy Telegram bot on the main asyncio event loop

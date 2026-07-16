@@ -6202,6 +6202,61 @@ def _build_etf_flows_report(d: dict) -> str:
 """
     return report
 
+
+def _build_liquidity_time_targets(data: dict) -> str:
+    """القالب الجديد: أهداف السيولة الزمنية (جلسة، يوم، أسبوع، شهر)"""
+    current = float(data.get('gold', 2000.0))
+    atr = float(data.get('atr', 20.0))
+    
+    rsi = float(data.get('rsi', 50.0))
+    macd = float(data.get('macd', 0.0))
+    confluence = data.get('confluence', {})
+    trend = confluence.get('verdict', 'محايد')
+    
+    if "شراء" in trend or "صاعد" in trend or (rsi > 55 and macd > 0):
+        flow_dir = 1
+        flow_text = "🟢 تدفق شرائي (Bullish Liquidity)"
+    elif "بيع" in trend or "هابط" in trend or (rsi < 45 and macd < 0):
+        flow_dir = -1
+        flow_text = "🔴 تدفق بيعي (Bearish Liquidity)"
+    else:
+        flow_dir = 1 if rsi >= 50 else -1
+        flow_text = "⚪ سيولة متذبذبة (Neutral / Choppy)"
+
+    target_session = round(current + (flow_dir * atr * 0.35), 2)
+    target_day = round(current + (flow_dir * atr * 0.85), 2)
+    target_week = round(current + (flow_dir * atr * 2.5), 2)
+    target_month = round(current + (flow_dir * atr * 8.0), 2)
+
+    icon_s = "📈" if flow_dir == 1 else "📉"
+    
+    template = f"""
+👑 **أهداف السيولة الزمنية المتراكمة (Time-Based Liquidity Targets)** 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧭 **اتجاه السيولة المهيمن الآن:** **{flow_text}**
+💰 **السعر اللحظي الراهن:** **{current:.2f}$**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 **رقم السيولة المستهدف إلى نهاية الجلسة (Session):**
+{icon_s} السعر الدقيق: **{target_session:.2f}$**
+*(يمثل المحطة القادمة لضرب سيولة المضاربين اللحظيين)*
+
+🎯 **رقم السيولة المستهدف إلى نهاية اليوم (Daily):**
+{icon_s} السعر الدقيق: **{target_day:.2f}$**
+*(يمثل إغلاق شمعة اليوم وتمركز سيولة التبييت)*
+
+🎯 **رقم السيولة المستهدف إلى نهاية الأسبوع (Weekly):**
+{icon_s} السعر الدقيق: **{target_week:.2f}$**
+*(يمثل نقطة تمركز صناع السوق وصناديق التحوط للأسبوع)*
+
+🎯 **رقم السيولة المستهدف إلى نهاية الشهر (Monthly):**
+{icon_s} السعر الدقيق: **{target_month:.2f}$**
+*(يمثل الهدف الماكرو-اقتصادي للسيولة المؤسساتية الاستراتيجية)*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ *ملاحظة كمية: هذه الأرقام ديناميكية وتتحدث فورياً مع تحرك مؤشرات التذبذب (ATR) وتدفقات الفوليوم.*
+"""
+    return template.strip()
+
+
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache
 

@@ -4076,6 +4076,168 @@ def _build_etf_flows_report(d: dict) -> str:
 """
     return report
 
+
+def _build_liquidity_time_targets(data: dict) -> str:
+    """القالب الجديد: أهداف السيولة الزمنية (جلسة، يوم، أسبوع، شهر)"""
+    current = float(data.get('gold', 2000.0))
+    atr = float(data.get('atr', 20.0))
+    
+    rsi = float(data.get('rsi', 50.0))
+    macd = float(data.get('macd', 0.0))
+    confluence = data.get('confluence', {})
+    trend = confluence.get('verdict', 'محايد')
+    
+    if "شراء" in trend or "صاعد" in trend or (rsi > 55 and macd > 0):
+        flow_dir = 1
+        flow_text = "🟢 تدفق شرائي (Bullish Liquidity)"
+    elif "بيع" in trend or "هابط" in trend or (rsi < 45 and macd < 0):
+        flow_dir = -1
+        flow_text = "🔴 تدفق بيعي (Bearish Liquidity)"
+    else:
+        flow_dir = 1 if rsi >= 50 else -1
+        flow_text = "⚪ سيولة متذبذبة (Neutral / Choppy)"
+
+    target_session = round(current + (flow_dir * atr * 0.35), 2)
+    target_day = round(current + (flow_dir * atr * 0.85), 2)
+    target_week = round(current + (flow_dir * atr * 2.5), 2)
+    target_month = round(current + (flow_dir * atr * 8.0), 2)
+
+    icon_s = "📈" if flow_dir == 1 else "📉"
+    
+    template = f"""
+👑 **أهداف السيولة الزمنية المتراكمة (Time-Based Liquidity Targets)** 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧭 **اتجاه السيولة المهيمن الآن:** **{flow_text}**
+💰 **السعر اللحظي الراهن:** **{current:.2f}$**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 **رقم السيولة المستهدف إلى نهاية الجلسة (Session):**
+{icon_s} السعر الدقيق: **{target_session:.2f}$**
+*(يمثل المحطة القادمة لضرب سيولة المضاربين اللحظيين)*
+
+🎯 **رقم السيولة المستهدف إلى نهاية اليوم (Daily):**
+{icon_s} السعر الدقيق: **{target_day:.2f}$**
+*(يمثل إغلاق شمعة اليوم وتمركز سيولة التبييت)*
+
+🎯 **رقم السيولة المستهدف إلى نهاية الأسبوع (Weekly):**
+{icon_s} السعر الدقيق: **{target_week:.2f}$**
+*(يمثل نقطة تمركز صناع السوق وصناديق التحوط للأسبوع)*
+
+🎯 **رقم السيولة المستهدف إلى نهاية الشهر (Monthly):**
+{icon_s} السعر الدقيق: **{target_month:.2f}$**
+*(يمثل الهدف الماكرو-اقتصادي للسيولة المؤسساتية الاستراتيجية)*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ *ملاحظة كمية: هذه الأرقام ديناميكية وتتحدث فورياً مع تحرك مؤشرات التذبذب (ATR) وتدفقات الفوليوم.*
+"""
+    return template.strip()
+
+
+def _s_nums(d):
+    """مساعد: يرجع كل الارقام الاساسية مع ضمان عدم وجود اصفار او None"""
+    gold  = float(d.get('gold', 0) or 0)
+    atr   = float(d.get('atr', 0) or 0) or 50.0
+    pivot = float(d.get('pivot', 0) or 0) or gold
+    rsi   = float(d.get('rsi', 50) or 50)
+    macd  = float(d.get('macd', 0) or 0)
+    r1 = float(d.get('r1', 0) or 0) or round(pivot + atr * 0.9, 2)
+    r2 = float(d.get('r2', 0) or 0) or round(pivot + atr * 1.8, 2)
+    r3 = float(d.get('r3', 0) or 0) or round(pivot + atr * 2.7, 2)
+    s1 = float(d.get('s1', 0) or 0) or round(pivot - atr * 0.9, 2)
+    s2 = float(d.get('s2', 0) or 0) or round(pivot - atr * 1.8, 2)
+    s3 = float(d.get('s3', 0) or 0) or round(pivot - atr * 2.7, 2)
+    swing_h = float(d.get('swing_high', 0) or 0) or r2
+    swing_l = float(d.get('swing_low',  0) or 0) or s2
+    return dict(gold=gold, atr=atr, pivot=pivot, rsi=rsi, macd=macd,
+                r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
+                swing_h=swing_h, swing_l=swing_l)
+
+def _s_trades(d, n):
+    """مساعد: يرجع الصفقات من adv_trades او يحسبها رياضيا"""
+    adv  = d.get('adv_trades', {}) or {}
+    nums = _s_nums(d)
+    g, a, pv = nums['gold'], nums['atr'], nums['pivot']
+    r1, r2 = nums['r1'], nums['r2']
+    s1, s2 = nums['s1'], nums['s2']
+    sh, sl = nums['swing_h'], nums['swing_l']
+
+    if n == 'scalp_buy':
+        t = adv.get('scalp_buy')
+        if not t:
+            ent = round(s1 + (pv - s1) * 0.25, 2)
+            slv = round(ent - a * 0.4, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': round(ent - slv, 2),
+                 't1': round(ent + a * 0.45, 2), 't2': round(pv, 2), 't3': round(r1, 2)}
+    elif n == 'scalp_sell':
+        t = adv.get('scalp_sell')
+        if not t:
+            ent = round(r1 - (r1 - pv) * 0.25, 2)
+            slv = round(ent + a * 0.4, 2)
+            risk = round(slv - ent, 2)
+            _t1 = round(ent - a * 0.45, 2)          # هدف أول: أقرب (R:R ~1.1x)
+            _t2 = round(ent - a * 0.72, 2)           # هدف ثاني: أبعد دائماً (R:R ~1.8x)
+            _t3 = round(s1, 2)                        # هدف ثالث: S1
+            # ضمان الترتيب التنازلي للبيع (T1 > T2 > T3)
+            if _t2 >= _t1: _t2 = round(_t1 - a * 0.1, 2)
+            if _t3 >= _t2: _t3 = round(_t2 - a * 0.1, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': risk,
+                 't1': _t1, 't2': _t2, 't3': _t3}
+    elif n == 'swing_buy':
+        t = adv.get('swing_buy') or adv.get('long_swing_buy')
+        if not t:
+            ent = round(s2, 2)
+            slv = round(s2 - a * 0.5, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': round(ent - slv, 2),
+                 't1': round(s1, 2), 't2': round(pv, 2), 't3': round(r1, 2)}
+    elif n == 'swing_sell':
+        t = adv.get('swing_sell') or adv.get('long_swing_sell')
+        if not t:
+            ent = round(r2, 2)
+            slv = round(r2 + a * 0.5, 2)
+            risk = round(slv - ent, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': risk,
+                 't1': round(r1, 2),          # هدف أول: R1 (مكسب فوري)
+                 't2': round(pv, 2),           # هدف ثاني: المحور (سوينج متوسط)
+                 't3': round(s1, 2)}           # هدف ثالث: S1 (سوينج ممتد)
+    elif n == 'rev_buy':
+        t = adv.get('rev_buy')
+        if not t:
+            ent = round(sl + a * 0.3, 2)
+            slv = round(sl - a * 0.2, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': round(ent - slv, 2),
+                 't1': round(ent + a * 0.5, 2), 't2': round(pv, 2), 't3': round(r1, 2)}
+    elif n == 'rev_sell':
+        t = adv.get('rev_sell')
+        if not t:
+            ent = round(sh - a * 0.3, 2)
+            slv = round(sh + a * 0.2, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': round(slv - ent, 2),
+                 't1': round(ent - a * 0.5, 2), 't2': round(pv, 2), 't3': round(s1, 2)}
+    elif n == 'high_lot_buy':
+        t = adv.get('high_lot_buy')
+        if not t:
+            fib   = d.get('fib', {}) or {}
+            ent   = float(fib.get('61.8%', 0) or 0) or s2
+            slv   = round(ent - a * 0.25, 2)
+            t = {'entry': round(ent, 2), 'sl': slv, 'risk': round(ent - slv, 2),
+                 't1': round(fib.get('50.0%', pv) or pv, 2),
+                 't2': round(fib.get('38.2%', r1) or r1, 2),
+                 't3': round(fib.get('23.6%', r2) or r2, 2)}
+    elif n == 'high_lot_sell':
+        t = adv.get('high_lot_sell')
+        if not t:
+            fib   = d.get('fib', {}) or {}
+            ent   = float(fib.get('23.6%', 0) or 0) or r2
+            slv   = round(ent + a * 0.25, 2)
+            t = {'entry': round(ent, 2), 'sl': slv, 'risk': round(slv - ent, 2),
+                 't1': round(fib.get('38.2%', r1) or r1, 2),
+                 't2': round(fib.get('50.0%', pv) or pv, 2),
+                 't3': round(fib.get('61.8%', s1) or s1, 2)}
+    else:
+        t = {}
+    return t or {}
+
+
+
+
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache
 
@@ -6140,6 +6302,168 @@ def _build_etf_flows_report(d: dict) -> str:
 🟠 {point4}
 """
     return report
+
+
+def _build_liquidity_time_targets(data: dict) -> str:
+    """القالب الجديد: أهداف السيولة الزمنية (جلسة، يوم، أسبوع، شهر)"""
+    current = float(data.get('gold', 2000.0))
+    atr = float(data.get('atr', 20.0))
+    
+    rsi = float(data.get('rsi', 50.0))
+    macd = float(data.get('macd', 0.0))
+    confluence = data.get('confluence', {})
+    trend = confluence.get('verdict', 'محايد')
+    
+    if "شراء" in trend or "صاعد" in trend or (rsi > 55 and macd > 0):
+        flow_dir = 1
+        flow_text = "🟢 تدفق شرائي (Bullish Liquidity)"
+    elif "بيع" in trend or "هابط" in trend or (rsi < 45 and macd < 0):
+        flow_dir = -1
+        flow_text = "🔴 تدفق بيعي (Bearish Liquidity)"
+    else:
+        flow_dir = 1 if rsi >= 50 else -1
+        flow_text = "⚪ سيولة متذبذبة (Neutral / Choppy)"
+
+    target_session = round(current + (flow_dir * atr * 0.35), 2)
+    target_day = round(current + (flow_dir * atr * 0.85), 2)
+    target_week = round(current + (flow_dir * atr * 2.5), 2)
+    target_month = round(current + (flow_dir * atr * 8.0), 2)
+
+    icon_s = "📈" if flow_dir == 1 else "📉"
+    
+    template = f"""
+👑 **أهداف السيولة الزمنية المتراكمة (Time-Based Liquidity Targets)** 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧭 **اتجاه السيولة المهيمن الآن:** **{flow_text}**
+💰 **السعر اللحظي الراهن:** **{current:.2f}$**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 **رقم السيولة المستهدف إلى نهاية الجلسة (Session):**
+{icon_s} السعر الدقيق: **{target_session:.2f}$**
+*(يمثل المحطة القادمة لضرب سيولة المضاربين اللحظيين)*
+
+🎯 **رقم السيولة المستهدف إلى نهاية اليوم (Daily):**
+{icon_s} السعر الدقيق: **{target_day:.2f}$**
+*(يمثل إغلاق شمعة اليوم وتمركز سيولة التبييت)*
+
+🎯 **رقم السيولة المستهدف إلى نهاية الأسبوع (Weekly):**
+{icon_s} السعر الدقيق: **{target_week:.2f}$**
+*(يمثل نقطة تمركز صناع السوق وصناديق التحوط للأسبوع)*
+
+🎯 **رقم السيولة المستهدف إلى نهاية الشهر (Monthly):**
+{icon_s} السعر الدقيق: **{target_month:.2f}$**
+*(يمثل الهدف الماكرو-اقتصادي للسيولة المؤسساتية الاستراتيجية)*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ *ملاحظة كمية: هذه الأرقام ديناميكية وتتحدث فورياً مع تحرك مؤشرات التذبذب (ATR) وتدفقات الفوليوم.*
+"""
+    return template.strip()
+
+
+def _s_nums(d):
+    """مساعد: يرجع كل الارقام الاساسية مع ضمان عدم وجود اصفار او None"""
+    gold  = float(d.get('gold', 0) or 0)
+    atr   = float(d.get('atr', 0) or 0) or 50.0
+    pivot = float(d.get('pivot', 0) or 0) or gold
+    rsi   = float(d.get('rsi', 50) or 50)
+    macd  = float(d.get('macd', 0) or 0)
+    r1 = float(d.get('r1', 0) or 0) or round(pivot + atr * 0.9, 2)
+    r2 = float(d.get('r2', 0) or 0) or round(pivot + atr * 1.8, 2)
+    r3 = float(d.get('r3', 0) or 0) or round(pivot + atr * 2.7, 2)
+    s1 = float(d.get('s1', 0) or 0) or round(pivot - atr * 0.9, 2)
+    s2 = float(d.get('s2', 0) or 0) or round(pivot - atr * 1.8, 2)
+    s3 = float(d.get('s3', 0) or 0) or round(pivot - atr * 2.7, 2)
+    swing_h = float(d.get('swing_high', 0) or 0) or r2
+    swing_l = float(d.get('swing_low',  0) or 0) or s2
+    return dict(gold=gold, atr=atr, pivot=pivot, rsi=rsi, macd=macd,
+                r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
+                swing_h=swing_h, swing_l=swing_l)
+
+def _s_trades(d, n):
+    """مساعد: يرجع الصفقات من adv_trades او يحسبها رياضيا"""
+    adv  = d.get('adv_trades', {}) or {}
+    nums = _s_nums(d)
+    g, a, pv = nums['gold'], nums['atr'], nums['pivot']
+    r1, r2 = nums['r1'], nums['r2']
+    s1, s2 = nums['s1'], nums['s2']
+    sh, sl = nums['swing_h'], nums['swing_l']
+
+    if n == 'scalp_buy':
+        t = adv.get('scalp_buy')
+        if not t:
+            ent = round(s1 + (pv - s1) * 0.25, 2)
+            slv = round(ent - a * 0.4, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': round(ent - slv, 2),
+                 't1': round(ent + a * 0.45, 2), 't2': round(pv, 2), 't3': round(r1, 2)}
+    elif n == 'scalp_sell':
+        t = adv.get('scalp_sell')
+        if not t:
+            ent = round(r1 - (r1 - pv) * 0.25, 2)
+            slv = round(ent + a * 0.4, 2)
+            risk = round(slv - ent, 2)
+            _t1 = round(ent - a * 0.45, 2)          # هدف أول: أقرب (R:R ~1.1x)
+            _t2 = round(ent - a * 0.72, 2)           # هدف ثاني: أبعد دائماً (R:R ~1.8x)
+            _t3 = round(s1, 2)                        # هدف ثالث: S1
+            # ضمان الترتيب التنازلي للبيع (T1 > T2 > T3)
+            if _t2 >= _t1: _t2 = round(_t1 - a * 0.1, 2)
+            if _t3 >= _t2: _t3 = round(_t2 - a * 0.1, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': risk,
+                 't1': _t1, 't2': _t2, 't3': _t3}
+    elif n == 'swing_buy':
+        t = adv.get('swing_buy') or adv.get('long_swing_buy')
+        if not t:
+            ent = round(s2, 2)
+            slv = round(s2 - a * 0.5, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': round(ent - slv, 2),
+                 't1': round(s1, 2), 't2': round(pv, 2), 't3': round(r1, 2)}
+    elif n == 'swing_sell':
+        t = adv.get('swing_sell') or adv.get('long_swing_sell')
+        if not t:
+            ent = round(r2, 2)
+            slv = round(r2 + a * 0.5, 2)
+            risk = round(slv - ent, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': risk,
+                 't1': round(r1, 2),          # هدف أول: R1 (مكسب فوري)
+                 't2': round(pv, 2),           # هدف ثاني: المحور (سوينج متوسط)
+                 't3': round(s1, 2)}           # هدف ثالث: S1 (سوينج ممتد)
+    elif n == 'rev_buy':
+        t = adv.get('rev_buy')
+        if not t:
+            ent = round(sl + a * 0.3, 2)
+            slv = round(sl - a * 0.2, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': round(ent - slv, 2),
+                 't1': round(ent + a * 0.5, 2), 't2': round(pv, 2), 't3': round(r1, 2)}
+    elif n == 'rev_sell':
+        t = adv.get('rev_sell')
+        if not t:
+            ent = round(sh - a * 0.3, 2)
+            slv = round(sh + a * 0.2, 2)
+            t = {'entry': ent, 'sl': slv, 'risk': round(slv - ent, 2),
+                 't1': round(ent - a * 0.5, 2), 't2': round(pv, 2), 't3': round(s1, 2)}
+    elif n == 'high_lot_buy':
+        t = adv.get('high_lot_buy')
+        if not t:
+            fib   = d.get('fib', {}) or {}
+            ent   = float(fib.get('61.8%', 0) or 0) or s2
+            slv   = round(ent - a * 0.25, 2)
+            t = {'entry': round(ent, 2), 'sl': slv, 'risk': round(ent - slv, 2),
+                 't1': round(fib.get('50.0%', pv) or pv, 2),
+                 't2': round(fib.get('38.2%', r1) or r1, 2),
+                 't3': round(fib.get('23.6%', r2) or r2, 2)}
+    elif n == 'high_lot_sell':
+        t = adv.get('high_lot_sell')
+        if not t:
+            fib   = d.get('fib', {}) or {}
+            ent   = float(fib.get('23.6%', 0) or 0) or r2
+            slv   = round(ent + a * 0.25, 2)
+            t = {'entry': round(ent, 2), 'sl': slv, 'risk': round(slv - ent, 2),
+                 't1': round(fib.get('38.2%', r1) or r1, 2),
+                 't2': round(fib.get('50.0%', pv) or pv, 2),
+                 't3': round(fib.get('61.8%', s1) or s1, 2)}
+    else:
+        t = {}
+    return t or {}
+
+
+
 
 def send_reports(data: dict, report_text: str, prefix: str = ""):
     from Goldbot.send_lock import SEND_LOCK, _futures_cache

@@ -7128,20 +7128,25 @@ def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_tex
 def send_summary_to_bot(token, message, chat_id):
     import requests
     try:
-        # Fallback dynamic retrieval (if user messaged bot directly)
-        try:
-            url = f"https://api.telegram.org/bot{token}/getUpdates"
-            resp = requests.get(url, timeout=5).json()
-            if resp.get('ok') and resp.get('result'):
-                # Prioritize a private chat if available, else keep the group chat_id
-                for res in reversed(resp['result']):
-                    if 'message' in res and res['message']['chat']['type'] == 'private':
-                        chat_id = res['message']['chat']['id']
-                        break
-        except:
-            pass
-            
+        # Fallback dynamic retrieval
+        if str(chat_id).startswith("@"):
+            try:
+                url = f"https://api.telegram.org/bot{token}/getUpdates"
+                resp = requests.get(url, timeout=5).json()
+                if resp.get('ok') and resp.get('result'):
+                    for res in reversed(resp['result']):
+                        if 'message' in res:
+                            chat_id = res['message']['chat']['id']
+                            break
+                        elif 'my_chat_member' in res:
+                            chat_id = res['my_chat_member']['chat']['id']
+                            break
+            except Exception as e:
+                print(f"[Summary] getUpdates Error: {e}")
+                
         send_url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=10)
+        res = requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=10)
+        if not res.json().get('ok'):
+            print(f"[Summary Error] Telegram API Failed: {res.text}")
     except Exception as e:
         print(f"Failed to send summary: {e}")

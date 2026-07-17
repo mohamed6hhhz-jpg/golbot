@@ -162,11 +162,11 @@ async def startup_event():
     print("[Orchestrator] Goldbot V5 Grand Orchestrator task created.")
 
     # 2. Start auto-copy Telegram bot on the main asyncio event loop
-    asyncio.create_task(start_telethon_bot())
+    # asyncio.create_task(start_telethon_bot())
     print("[Orchestrator] Auto-copy Telethon bot task created.")
 
     # 3. Start Auto_Sheets_Bot Telegram bot on the main asyncio event loop
-    asyncio.create_task(start_sheets_bot())
+    # asyncio.create_task(start_sheets_bot())
     print("[Orchestrator] Auto_Sheets_Bot Telethon bot task created.")
 
     print("[Orchestrator] All background bots are running. FastAPI is ready to accept requests.")

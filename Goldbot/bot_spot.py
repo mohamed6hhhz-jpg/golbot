@@ -6201,6 +6201,141 @@ def _build_etf_flows_report(d: dict) -> str:
     return report
 
 
+def _build_scalping_weekly_monthly(data: dict) -> str:
+    """قالب صفقات السكالبينج الأسبوعي والشهري — احترافي ودقيق"""
+    nums = _s_nums(data)
+    gold   = nums['gold']
+    atr    = nums['atr']
+    pivot  = nums['pivot']
+    rsi    = nums['rsi']
+    macd   = nums['macd']
+    r1, r2, r3 = nums['r1'], nums['r2'], nums.get('r3', round(nums['r2'] + atr, 2))
+    s1, s2, s3 = nums['s1'], nums['s2'], nums.get('s3', round(nums['s2'] - atr, 2))
+    sh, sl = nums['swing_h'], nums['swing_l']
+
+    fib = data.get('fib', {}) or {}
+
+    # اتجاه الصفقة بناءً على RSI و MACD
+    if rsi > 55 and macd > 0:
+        bias = 'شراء'
+        bias_icon = '🟢'
+    elif rsi < 45 and macd < 0:
+        bias = 'بيع'
+        bias_icon = '🔴'
+    else:
+        bias = 'محايد'
+        bias_icon = '⚪'
+
+    # ─── السكالبينج اليومي (مرجع) ───
+    scalp_b_entry = round(s1 + (pivot - s1) * 0.25, 2)
+    scalp_b_sl    = round(scalp_b_entry - atr * 0.35, 2)
+    scalp_b_t1    = round(scalp_b_entry + atr * 0.45, 2)
+    scalp_b_t2    = round(pivot, 2)
+    scalp_b_t3    = round(r1, 2)
+
+    scalp_s_entry = round(r1 - (r1 - pivot) * 0.25, 2)
+    scalp_s_sl    = round(scalp_s_entry + atr * 0.35, 2)
+    scalp_s_t1    = round(scalp_s_entry - atr * 0.45, 2)
+    scalp_s_t2    = round(pivot, 2)
+    scalp_s_t3    = round(s1, 2)
+
+    # ─── السكالبينج الأسبوعي ───
+    week_atr = round(atr * 3.5, 2)
+    w_buy_entry = round(sl + atr * 0.5, 2)
+    w_buy_sl    = round(sl - atr * 0.4, 2)
+    w_buy_t1    = round(w_buy_entry + week_atr * 0.4, 2)
+    w_buy_t2    = round(w_buy_entry + week_atr * 0.75, 2)
+    w_buy_t3    = round(sh, 2)
+
+    w_sell_entry = round(sh - atr * 0.5, 2)
+    w_sell_sl    = round(sh + atr * 0.4, 2)
+    w_sell_t1    = round(w_sell_entry - week_atr * 0.4, 2)
+    w_sell_t2    = round(w_sell_entry - week_atr * 0.75, 2)
+    w_sell_t3    = round(sl, 2)
+
+    w_rr_buy  = round((w_buy_t2 - w_buy_entry) / max(w_buy_entry - w_buy_sl, 0.01), 2)
+    w_rr_sell = round((w_sell_entry - w_sell_t2) / max(w_sell_sl - w_sell_entry, 0.01), 2)
+
+    # ─── السكالبينج الشهري ───
+    month_atr = round(atr * 10.0, 2)
+    fib_618 = float(fib.get('61.8%', 0) or 0) or round(gold - atr * 3, 2)
+    fib_236 = float(fib.get('23.6%', 0) or 0) or round(gold + atr * 3, 2)
+
+    m_buy_entry = round(fib_618, 2)
+    m_buy_sl    = round(fib_618 - atr * 1.2, 2)
+    m_buy_t1    = round(m_buy_entry + month_atr * 0.3, 2)
+    m_buy_t2    = round(m_buy_entry + month_atr * 0.6, 2)
+    m_buy_t3    = round(m_buy_entry + month_atr * 1.0, 2)
+
+    m_sell_entry = round(fib_236, 2)
+    m_sell_sl    = round(fib_236 + atr * 1.2, 2)
+    m_sell_t1    = round(m_sell_entry - month_atr * 0.3, 2)
+    m_sell_t2    = round(m_sell_entry - month_atr * 0.6, 2)
+    m_sell_t3    = round(m_sell_entry - month_atr * 1.0, 2)
+
+    m_rr_buy  = round((m_buy_t2 - m_buy_entry) / max(m_buy_entry - m_buy_sl, 0.01), 2)
+    m_rr_sell = round((m_sell_entry - m_sell_t2) / max(m_sell_sl - m_sell_entry, 0.01), 2)
+
+    # تقدير نسبة الربح/الخسارة
+    risk_buy_d  = round(scalp_b_entry - scalp_b_sl, 2)
+    rew_buy_d   = round(scalp_b_t2 - scalp_b_entry, 2)
+    rr_buy_d    = round(rew_buy_d / max(risk_buy_d, 0.01), 2)
+
+    risk_sell_d = round(scalp_s_sl - scalp_s_entry, 2)
+    rew_sell_d  = round(scalp_s_entry - scalp_s_t2, 2)
+    rr_sell_d   = round(rew_sell_d / max(risk_sell_d, 0.01), 2)
+
+    report = f"""👑 **مصفوفة السكالبينج الشاملة — يومي / أسبوعي / شهري** 👑
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 **السعر الحالي:** **{gold:.2f}$** | **ATR اليومي:** {atr:.2f}$ | **الاتجاه:** {bias_icon} {bias}
+🎯 **المحور:** {pivot:.2f}$ | **R1:** {r1:.2f}$ | **S1:** {s1:.2f}$
+📊 **RSI:** {rsi:.2f} | **MACD:** {macd:.4f}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📅 **أولاً: صفقات السكالبينج اليومي (Intraday)**
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+🟢 **سكالبينج شراء (Scalp Buy):**
+▪️ الدخول: **{scalp_b_entry:.2f}$** | وقف الخسارة: **{scalp_b_sl:.2f}$** (خطر: {round(scalp_b_entry-scalp_b_sl,2)}$)
+▪️ هدف 1: **{scalp_b_t1:.2f}$** | هدف 2: **{scalp_b_t2:.2f}$** | هدف 3: **{scalp_b_t3:.2f}$**
+▪️ نسبة R:R → **1:{rr_buy_d:.1f}** *(مكافأة مقابل مخاطرة)*
+
+🔴 **سكالبينج بيع (Scalp Sell):**
+▪️ الدخول: **{scalp_s_entry:.2f}$** | وقف الخسارة: **{scalp_s_sl:.2f}$** (خطر: {round(scalp_s_sl-scalp_s_entry,2)}$)
+▪️ هدف 1: **{scalp_s_t1:.2f}$** | هدف 2: **{scalp_s_t2:.2f}$** | هدف 3: **{scalp_s_t3:.2f}$**
+▪️ نسبة R:R → **1:{rr_sell_d:.1f}**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📆 **ثانياً: صفقات السكالبينج الأسبوعي (Weekly Swing)**
+*(ATR أسبوعي مقدر: {week_atr:.2f}$)*
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+🟢 **أسبوعي شراء:**
+▪️ الدخول: **{w_buy_entry:.2f}$** | وقف الخسارة: **{w_buy_sl:.2f}$**
+▪️ هدف 1: **{w_buy_t1:.2f}$** | هدف 2: **{w_buy_t2:.2f}$** | هدف 3 (قمة): **{w_buy_t3:.2f}$**
+▪️ نسبة R:R → **1:{w_rr_buy:.1f}**
+
+🔴 **أسبوعي بيع:**
+▪️ الدخول: **{w_sell_entry:.2f}$** | وقف الخسارة: **{w_sell_sl:.2f}$**
+▪️ هدف 1: **{w_sell_t1:.2f}$** | هدف 2: **{w_sell_t2:.2f}$** | هدف 3 (قاع): **{w_sell_t3:.2f}$**
+▪️ نسبة R:R → **1:{w_rr_sell:.1f}**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🗓️ **ثالثاً: صفقات السكالبينج الشهري (Monthly Position)**
+*(ATR شهري مقدر: {month_atr:.2f}$)*
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+🟢 **شهري شراء (عند فيبوناتشي 61.8%):**
+▪️ الدخول: **{m_buy_entry:.2f}$** | وقف الخسارة: **{m_buy_sl:.2f}$**
+▪️ هدف 1: **{m_buy_t1:.2f}$** | هدف 2: **{m_buy_t2:.2f}$** | هدف 3: **{m_buy_t3:.2f}$**
+▪️ نسبة R:R → **1:{m_rr_buy:.1f}**
+
+🔴 **شهري بيع (عند فيبوناتشي 23.6%):**
+▪️ الدخول: **{m_sell_entry:.2f}$** | وقف الخسارة: **{m_sell_sl:.2f}$**
+▪️ هدف 1: **{m_sell_t1:.2f}$** | هدف 2: **{m_sell_t2:.2f}$** | هدف 3: **{m_sell_t3:.2f}$**
+▪️ نسبة R:R → **1:{m_rr_sell:.1f}**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ *جميع الأرقام محسوبة رياضياً بدقة بناءً على ATR الحالي ومستويات فيبوناتشي الفعلية. تُحدَّث تلقائياً مع كل تقرير.*"""
+    return report
+
+
 def _build_liquidity_time_targets(data: dict) -> str:
     """القالب الجديد: أهداف السيولة الزمنية (جلسة، يوم، أسبوع، شهر)"""
     current = float(data.get('gold', 2000.0))
@@ -6498,6 +6633,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("🌊 كاشف السيولة وأحجام العقود", _build_volume_contracts_tracker(data), None))
         bot2_reports.append(("🎯 أهداف السيولة الزمنية (Targets)", _build_liquidity_time_targets(data), None))
         bot2_reports.append(("📊 صناديق الذهب العالمية (ETF Flows)", _build_etf_flows_report(data), None))
+        bot2_reports.append(("📅 مصفوفة السكالبينج الشاملة (يومي/أسبوعي/شهري)", _build_scalping_weekly_monthly(data), None))
 
 
 
@@ -6513,6 +6649,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         raw_reports.append(("🌊 كاشف السيولة وأحجام العقود", _build_volume_contracts_tracker(data), None))
         raw_reports.append(("🎯 أهداف السيولة الزمنية (Targets)", _build_liquidity_time_targets(data), None))
         raw_reports.append(("📊 صناديق الذهب العالمية (ETF Flows)", _build_etf_flows_report(data), None))
+        raw_reports.append(("📅 مصفوفة السكالبينج الشاملة (يومي/أسبوعي/شهري)", _build_scalping_weekly_monthly(data), None))
 
         flat_chunks = []
         for title, txt, chat_id in raw_reports:

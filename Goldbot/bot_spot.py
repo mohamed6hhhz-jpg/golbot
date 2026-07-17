@@ -6698,7 +6698,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
             # ── خلاصة محورية 1 بعد انتهاء التقرير الأول ──
             try:
-                _summary1_text = _build_group_summary(data, "التقرير الأول (الكمي الأساسي)", total)
+                _summary1_text = _build_group_summary(data, "التقرير الأول (الكمي الأساسي)", flat_chunks)
                 send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary1_text, "@summary1Po_bot")
                 log.info("✅ [Summary1] تم إرسال خلاصة التقرير الأول.")
             except Exception as _e1:
@@ -6758,7 +6758,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
                 # ── خلاصة محورية 3 بعد انتهاء التقرير الثالث ──
                 try:
-                    _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", total_3)
+                    _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", flat_chunks_3)
                     send_summary_to_bot("8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA", _summary3_text, "@Summary3Lp_bot")
                     log.info("✅ [Summary3] تم إرسال خلاصة التقرير الثالث.")
                 except Exception as _e3:
@@ -6768,9 +6768,9 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 try:
                     _summary4_text = _build_final_combined_summary(
                         data,
-                        _summary1_text if '_summary1_text' in dir() else '',
-                        _summary2_text if '_summary2_text' in dir() else '',
-                        _summary3_text if '_summary3_text' in dir() else ''
+                        locals().get('_summary1_text', ''),
+                        locals().get('_summary2_text', ''),
+                        locals().get('_summary3_text', '')
                     )
                     send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary4_text, "@Summary4PEe_bot")
                     log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
@@ -7008,8 +7008,8 @@ import requests
 
 
 
-def _build_group_summary(data: dict, group_name: str, num_templates: int) -> str:
-    """خلاصة محورية مخصصة لكل مجموعة تقارير — مبنية على بيانات السوق الحية"""
+def _build_group_summary(data: dict, group_name: str, flat_chunks: list) -> str:
+    """خلاصة محورية مخصصة لكل مجموعة تقارير — مبنية على بيانات السوق الحية وتوليد الذكاء الاصطناعي"""
     nums = _s_nums(data)
     gold   = nums['gold']
     atr    = nums['atr']
@@ -7048,10 +7048,10 @@ def _build_group_summary(data: dict, group_name: str, num_templates: int) -> str
     import pytz
     now_str = datetime.now(pytz.timezone('Africa/Cairo')).strftime("%d/%m/%Y %H:%M")
 
-    lines = [
+    fallback_lines = [
         f"👑 الخلاصة المحورية — {group_name}",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"📅 التوقيت: {now_str} | القوالب المحللة: {num_templates}",
+        f"📅 التوقيت: {now_str} | القوالب المحللة: {len(flat_chunks)}",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
         f"💰 السعر الحالي: {gold:.2f}$",
         f"🧭 الاتجاه المهيمن: {dir_text}",
@@ -7067,9 +7067,52 @@ def _build_group_summary(data: dict, group_name: str, num_templates: int) -> str
         f"🏆 أفضل صفقة الآن: {best_action}",
         f"⚠️ المخاطر: {risk_note}",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "🤖 هذه الخلاصة محسوبة رياضياً وتلقائياً من جميع القوالب السابقة.",
+        "🤖 هذه الخلاصة محسوبة رياضياً وتلقائياً.",
     ]
-    return "\n".join(lines)
+    fallback_text = "\n".join(fallback_lines)
+
+    # ── توليد الذكاء الاصطناعي لجعل الخلاصة احترافية ومخصصة ──
+    try:
+        import random, requests
+        titles = [t[0] for t in flat_chunks]
+        titles_str = "\n".join(f"- {t}" for t in titles)
+        
+        prompt = f"""أنت كبير المحللين الماليين في سوق الذهب.
+قم بكتابة "خلاصة محورية احترافية جداً" مخصصة حصرياً لـ ({group_name}).
+هذه المجموعة التي أنهيناها للتو تغطي المواضيع التالية:
+{titles_str}
+
+البيانات الحية للسوق الآن للربط معها:
+السعر: {gold}$
+RSI: {rsi}
+MACD: {macd}
+محور الارتكاز (Pivot): {pivot}$
+المقاومات: {r1}$, {r2}$
+الدعوم: {s1}$, {s2}$
+الحكم الفني: {verdict}
+
+المطلوب:
+اكتب خلاصة قوية من 4-5 أسطر مكثفة جداً وواثقة ومكتوبة بلغة احترافية، تتحدث عن اتجاه الذهب الحالي بناءً على الأرقام أعلاه، وتبرز أهمية المواضيع والزوايا التي تم تغطيتها في هذه المجموعة تحديداً (اربط الأرقام بمواضيع المجموعة بطريقة عبقرية).
+تجنب التكرار تماماً مع أي مجموعات أخرى، اجعلها مخصصة لهذه المجموعة واسمها.
+لا تكتب مقدمات، فقط الخلاصة القوية المباشرة.
+استخدم الرموز التعبيرية 🟢🔴⚪ للتعبير عن الاتجاه والاحترافية.
+"""
+        api_key = random.choice(GROQ_API_KEYS)
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "max_tokens": 600
+        }
+        resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
+        resp.raise_for_status()
+        ai_summary = resp.json()["choices"][0]["message"]["content"].strip()
+        
+        return f"👑 الخلاصة المحورية — {group_name}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📅 التوقيت: {now_str} | القوالب: {len(titles)}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n{ai_summary}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🤖 تم توليد هذه الخلاصة بالذكاء الاصطناعي بناءً على القوالب والبيانات الحية."
+    except Exception as e:
+        log.error(f"[AI Summary] Failed to generate AI summary for {group_name}, using fallback. Error: {e}")
+        return fallback_text
 
 
 def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_text: str) -> str:
@@ -7101,7 +7144,7 @@ def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_tex
     now_str = datetime.now(pytz.timezone('Africa/Cairo')).strftime("%d/%m/%Y %H:%M")
     risk_note = "⚠️ VIX مرتفع — تداول بحجم صغير" if vix_p > 25 else "✅ بيئة مواتية للتداول"
 
-    lines = [
+    fallback_lines = [
         "🏆👑 الخلاصة النهائية الشاملة — مجمعة من ٣ تقارير 👑🏆",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
         f"📅 التوقيت: {now_str}",
@@ -7122,7 +7165,36 @@ def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_tex
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
         "🤖 هذه الخلاصة النهائية مبنية على تحليل اتوماتيكي شامل من جميع القوالب الثلاثة.",
     ]
-    return "\n".join(lines)
+    fallback_text = "\n".join(fallback_lines)
+
+    try:
+        import random, requests
+        prompt = f"""أنت مدير صندوق تحوط وخبير استراتيجي في سوق الذهب.
+اكتب "الخلاصة النهائية الشاملة" لليوم بناءً على الخلاصات الثلاث الفرعية التي أصدرناها للتو:
+خلاصة المجموعة 1: {s1_text}
+خلاصة المجموعة 2: {s2_text}
+خلاصة المجموعة 3: {s3_text}
+
+اكتب خلاصة ذهبية نهائية (Master Summary) تحدد القرار الاستثماري النهائي بوضوح شديد وثقة مطلقة (شراء، بيع، أم انتظار) مع تحديد مستويات الدخول والهدف بناءً على (السعر الحالي {gold}$ والدعوم {s1}$ والمقاومات {r1}$).
+اكتبها بأسلوب فخم جداً من 5 لـ 6 أسطر.
+لا تكتب مقدمات أو تحيات، ابدأ بالخلاصة مباشرة.
+"""
+        api_key = random.choice(GROQ_API_KEYS)
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "max_tokens": 600
+        }
+        resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
+        resp.raise_for_status()
+        ai_master_summary = resp.json()["choices"][0]["message"]["content"].strip()
+        
+        return f"🏆👑 الخلاصة النهائية الشاملة للمسار بأكمله 👑🏆\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📅 التوقيت: {now_str}\n💰 السعر: {gold:.2f}$ | ATR: {atr:.2f}$ | Pivot: {pivot:.2f}$\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n{ai_master_summary}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🤖 تم توليد هذه الخلاصة الذهبية بالذكاء الاصطناعي لدمج جميع التقارير معاً."
+    except Exception as e:
+        log.error(f"[AI Final Summary] Failed, using fallback. Error: {e}")
+        return fallback_text
 
 
 def send_summary_to_bot(token, message, chat_id):

@@ -6696,6 +6696,14 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
                 time.sleep(2)
 
+            # ── خلاصة محورية 1 بعد انتهاء التقرير الأول ──
+            try:
+                _summary1_text = _build_group_summary(data, "التقرير الأول (الكمي الأساسي)", total)
+                send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary1_text, "@summary1Po_bot")
+                log.info("✅ [Summary1] تم إرسال خلاصة التقرير الأول.")
+            except Exception as _e1:
+                log.error(f"❌ [Summary1] خطأ: {_e1}")
+
             # ── إرسال للبوت الجديد (القسم الثاني) ──
             if flat_chunks_2:
                 log.info(f"📤 إرسال {total_2} رسالة متسلسلة للبوت المستقل (الجزء الثاني)...")
@@ -6718,6 +6726,14 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     log.info(f"✅ رسالة البوت الثاني {i2}/{total_2} وصلت." if ok2 else f"❌ فشل رسالة البوت الثاني {i2}/{total_2}.")
                     time.sleep(2)
 
+            # ── خلاصة محورية 2 بعد انتهاء التقرير الثاني ──
+            try:
+                _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", total_2)
+                send_summary_to_bot("8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ", _summary2_text, "@Summary2Hho_bot")
+                log.info("✅ [Summary2] تم إرسال خلاصة التقرير الثاني.")
+            except Exception as _e2:
+                log.error(f"❌ [Summary2] خطأ: {_e2}")
+
             # ── البوت الثالث: القوالب الفورية S1-S12 (@Dsssoppp78_bot) ──
             if 'bot3_reports' in locals() and bot3_reports:
                 flat_chunks_3 = []
@@ -6739,6 +6755,27 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                         
                     log.info(f"{'✅' if ok3 else '❌'} [Bot3] {i3}/{total_3}")
                     time.sleep(2)
+
+                # ── خلاصة محورية 3 بعد انتهاء التقرير الثالث ──
+                try:
+                    _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", total_3)
+                    send_summary_to_bot("8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA", _summary3_text, "@Summary3Lp_bot")
+                    log.info("✅ [Summary3] تم إرسال خلاصة التقرير الثالث.")
+                except Exception as _e3:
+                    log.error(f"❌ [Summary3] خطأ: {_e3}")
+
+                # ── الخلاصة النهائية المجمعة من الثلاثة ──
+                try:
+                    _summary4_text = _build_final_combined_summary(
+                        data,
+                        _summary1_text if '_summary1_text' in dir() else '',
+                        _summary2_text if '_summary2_text' in dir() else '',
+                        _summary3_text if '_summary3_text' in dir() else ''
+                    )
+                    send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary4_text, "@Summary4PEe_bot")
+                    log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
+                except Exception as _e4:
+                    log.error(f"❌ [Summary4] خطأ: {_e4}")
 
             log.info("🔓 [Spot] تم الارسال، تحرير القفل لانتظار الخلاصة...")
 
@@ -6968,6 +7005,125 @@ if __name__ == "__main__":
         print("\nBot stopped by user.")
 
 import requests
+
+
+
+def _build_group_summary(data: dict, group_name: str, num_templates: int) -> str:
+    """خلاصة محورية مخصصة لكل مجموعة تقارير — مبنية على بيانات السوق الحية"""
+    nums = _s_nums(data)
+    gold   = nums['gold']
+    atr    = nums['atr']
+    pivot  = nums['pivot']
+    rsi    = nums['rsi']
+    macd   = nums['macd']
+    r1, r2 = nums['r1'], nums['r2']
+    s1, s2 = nums['s1'], nums['s2']
+    sh, sl = nums['swing_h'], nums['swing_l']
+    confluence = data.get('confluence', {}) or {}
+    verdict = confluence.get('verdict', 'محايد')
+    dxy_pct = float(data.get('dxy_pct', 0) or 0)
+    vix_p   = float(data.get('vix_p', 20) or 20)
+    interest  = float(data.get('interest_rate', 5.25) or 5.25)
+    inflation = float(data.get('inflation_est', 3.5) or 3.5)
+    ry = round(interest - inflation, 2)
+
+    if rsi > 57 and macd > 0:
+        dir_text = "🟢 صاعد (Bullish)"
+        best_action = f"الشراء من {s1:.2f}$ هدف {r1:.2f}$"
+    elif rsi < 43 and macd < 0:
+        dir_text = "🔴 هابط (Bearish)"
+        best_action = f"البيع من {r1:.2f}$ هدف {s1:.2f}$"
+    else:
+        dir_text = "⚪ محايد / متذبذب"
+        best_action = f"الانتظار بين {s1:.2f}$ و{r1:.2f}$"
+
+    conf_score = 0
+    if rsi > 55 or rsi < 45: conf_score += 1
+    if macd != 0: conf_score += 1
+    if abs(dxy_pct) > 0.3: conf_score += 1
+    conf_label = ["ضعيفة ⚠️", "متوسطة 🟡", "عالية 🟢", "قوية جداً 🎯"][min(conf_score, 3)]
+    risk_note = "ارتفاع VIX ⚠️ تداول بحذر" if vix_p > 25 else "VIX مستقر ✅ بيئة مناسبة"
+
+    from datetime import datetime
+    import pytz
+    now_str = datetime.now(pytz.timezone('Africa/Cairo')).strftime("%d/%m/%Y %H:%M")
+
+    lines = [
+        f"👑 الخلاصة المحورية — {group_name}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"📅 التوقيت: {now_str} | القوالب المحللة: {num_templates}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"💰 السعر الحالي: {gold:.2f}$",
+        f"🧭 الاتجاه المهيمن: {dir_text}",
+        f"🎯 الحكم النهائي: {verdict}",
+        f"💯 درجة الثقة: {conf_label}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "📊 الأرقام الجوهرية:",
+        f"▪️ RSI: {rsi:.2f} | MACD: {macd:.4f} | ATR: {atr:.2f}$",
+        f"▪️ محور: {pivot:.2f}$ | R1: {r1:.2f}$ | S1: {s1:.2f}$",
+        f"▪️ قمة السوينج: {sh:.2f}$ | قاع السوينج: {sl:.2f}$",
+        f"▪️ DXY: {dxy_pct:+.2f}% | VIX: {vix_p:.2f} | العائد الحقيقي: {ry:.2f}%",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"🏆 أفضل صفقة الآن: {best_action}",
+        f"⚠️ المخاطر: {risk_note}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "🤖 هذه الخلاصة محسوبة رياضياً وتلقائياً من جميع القوالب السابقة.",
+    ]
+    return "\n".join(lines)
+
+
+def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_text: str) -> str:
+    """الخلاصة النهائية المجمعة من الخلاصات الثلاث"""
+    nums = _s_nums(data)
+    gold   = nums['gold']
+    atr    = nums['atr']
+    pivot  = nums['pivot']
+    rsi    = nums['rsi']
+    macd   = nums['macd']
+    r1, r2 = nums['r1'], nums['r2']
+    s1, s2 = nums['s1'], nums['s2']
+    confluence = data.get('confluence', {}) or {}
+    verdict = confluence.get('verdict', 'محايد')
+    vix_p   = float(data.get('vix_p', 20) or 20)
+
+    if rsi > 57 and macd > 0:
+        final_dir = "🟢 اتجاه صاعد مسيطر"
+        final_action = f"الشراء التدريجي من {s1:.2f}$ نحو {r1:.2f}$ ثم {r2:.2f}$"
+    elif rsi < 43 and macd < 0:
+        final_dir = "🔴 اتجاه هابط مسيطر"
+        final_action = f"البيع التدريجي من {r1:.2f}$ نحو {s1:.2f}$ ثم {s2:.2f}$"
+    else:
+        final_dir = "⚪ سوق متذبذب بدون اتجاه واضح"
+        final_action = f"الانتظار — نطاق التداول {s1:.2f}$↔{r1:.2f}$"
+
+    from datetime import datetime
+    import pytz
+    now_str = datetime.now(pytz.timezone('Africa/Cairo')).strftime("%d/%m/%Y %H:%M")
+    risk_note = "⚠️ VIX مرتفع — تداول بحجم صغير" if vix_p > 25 else "✅ بيئة مواتية للتداول"
+
+    lines = [
+        "🏆👑 الخلاصة النهائية الشاملة — مجمعة من ٣ تقارير 👑🏆",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"📅 التوقيت: {now_str}",
+        f"💰 السعر: {gold:.2f}$ | ATR: {atr:.2f}$ | Pivot: {pivot:.2f}$",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"🧭 الاتجاه العام الموحد: {final_dir}",
+        f"🎯 الحكم الجماعي للنظام: {verdict}",
+        f"📊 RSI: {rsi:.2f} | MACD: {macd:.4f}",
+        f"📍 R1: {r1:.2f}$ | R2: {r2:.2f}$ | S1: {s1:.2f}$ | S2: {s2:.2f}$",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "📋 ملخص التقارير الثلاثة:",
+        "🔹 تقرير 1 (الكمي الأساسي): تحليل شامل للسعر والمؤشرات والاقتصاد",
+        "🔹 تقرير 2 (المتخصص المتقدم): القوالب المتقدمة والسيولة والمؤسسات",
+        "🔹 تقرير 3 (الفوري الدقيق): التحليل الفني الدقيق والصفقات اللحظية",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"🏆 القرار النهائي الموحد: {final_action}",
+        f"⚠️ تنبيه المخاطر: {risk_note}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "🤖 هذه الخلاصة النهائية مبنية على تحليل اتوماتيكي شامل من جميع القوالب الثلاثة.",
+    ]
+    return "\n".join(lines)
+
 
 def send_summary_to_bot(token, message, chat_id):
     import requests

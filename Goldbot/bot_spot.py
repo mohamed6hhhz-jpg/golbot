@@ -6699,7 +6699,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── خلاصة محورية 1 بعد انتهاء التقرير الأول ──
             try:
                 _summary1_text = _build_group_summary(data, "التقرير الأول (الكمي الأساسي)", flat_chunks)
-                send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary1_text, "@summary1Po_bot")
+                send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary1_text, TARGET_CHATS[0])
                 log.info("✅ [Summary1] تم إرسال خلاصة التقرير الأول.")
             except Exception as _e1:
                 log.error(f"❌ [Summary1] خطأ: {_e1}")
@@ -6729,7 +6729,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── خلاصة محورية 2 بعد انتهاء التقرير الثاني ──
             try:
                 _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", total_2)
-                send_summary_to_bot("8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ", _summary2_text, "@Summary2Hho_bot")
+                send_summary_to_bot("8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ", _summary2_text, TARGET_CHATS[0])
                 log.info("✅ [Summary2] تم إرسال خلاصة التقرير الثاني.")
             except Exception as _e2:
                 log.error(f"❌ [Summary2] خطأ: {_e2}")
@@ -6759,7 +6759,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 # ── خلاصة محورية 3 بعد انتهاء التقرير الثالث ──
                 try:
                     _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", flat_chunks_3)
-                    send_summary_to_bot("8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA", _summary3_text, "@Summary3Lp_bot")
+                    send_summary_to_bot("8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA", _summary3_text, TARGET_CHATS[0])
                     log.info("✅ [Summary3] تم إرسال خلاصة التقرير الثالث.")
                 except Exception as _e3:
                     log.error(f"❌ [Summary3] خطأ: {_e3}")
@@ -6772,7 +6772,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                         locals().get('_summary2_text', ''),
                         locals().get('_summary3_text', '')
                     )
-                    send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary4_text, "@Summary4PEe_bot")
+                    send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary4_text, TARGET_CHATS[0])
                     log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
                 except Exception as _e4:
                     log.error(f"❌ [Summary4] خطأ: {_e4}")
@@ -7200,22 +7200,7 @@ def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_tex
 def send_summary_to_bot(token, message, chat_id):
     import requests
     try:
-        # Fallback dynamic retrieval
-        if str(chat_id).startswith("@"):
-            try:
-                url = f"https://api.telegram.org/bot{token}/getUpdates"
-                resp = requests.get(url, timeout=5).json()
-                if resp.get('ok') and resp.get('result'):
-                    for res in reversed(resp['result']):
-                        if 'message' in res:
-                            chat_id = res['message']['chat']['id']
-                            break
-                        elif 'my_chat_member' in res:
-                            chat_id = res['my_chat_member']['chat']['id']
-                            break
-            except Exception as e:
-                print(f"[Summary] getUpdates Error: {e}")
-                
+        # Secure implementation: No getUpdates. Hardcoded targets only.
         send_url = f"https://api.telegram.org/bot{token}/sendMessage"
         res = requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=10)
         if not res.json().get('ok'):

@@ -28,7 +28,8 @@ logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ي
 log = logging.getLogger(__name__)
 
 import random
-GROQ_KEYS = [
+_env_key = os.environ.get("GROQ_API_KEY")
+GROQ_KEYS = [_env_key] if _env_key else [
     "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",
     "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"
 ]
@@ -7097,7 +7098,7 @@ MACD: {macd}
 لا تكتب مقدمات، فقط الخلاصة القوية المباشرة.
 استخدم الرموز التعبيرية 🟢🔴⚪ للتعبير عن الاتجاه والاحترافية.
 """
-        api_key = random.choice(GROQ_API_KEYS)
+        api_key = random.choice(GROQ_KEYS)
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         payload = {
             "model": "llama-3.3-70b-versatile",
@@ -7179,7 +7180,7 @@ def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_tex
 اكتبها بأسلوب فخم جداً من 5 لـ 6 أسطر.
 لا تكتب مقدمات أو تحيات، ابدأ بالخلاصة مباشرة.
 """
-        api_key = random.choice(GROQ_API_KEYS)
+        api_key = random.choice(GROQ_KEYS)
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         payload = {
             "model": "llama-3.3-70b-versatile",

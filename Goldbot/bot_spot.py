@@ -28,8 +28,8 @@ logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ي
 log = logging.getLogger(__name__)
 
 import random
-_env_key = os.environ.get("GROQ_API_KEY")
-GROQ_KEYS = [_env_key] if _env_key else [
+_env_key = os.environ.get("GROQ_API_KEY", "")
+GROQ_KEYS = [k.strip() for k in _env_key.split(",") if k.strip()] if _env_key else [
     "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",
     "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"
 ]

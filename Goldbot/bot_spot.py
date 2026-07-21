@@ -6730,7 +6730,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── خلاصة محورية 2 بعد انتهاء التقرير الثاني ──
             try:
                 _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", total_2)
-                send_summary_to_bot("8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ", _summary2_text, TARGET_CHATS[0])
+                send_summary_to_bot("8448760638:AAF0PokiiolyPAAztD-BTZGenbjRiUKh6hc", _summary2_text, TARGET_CHATS[0])
                 log.info("✅ [Summary2] تم إرسال خلاصة التقرير الثاني.")
             except Exception as _e2:
                 log.error(f"❌ [Summary2] خطأ: {_e2}")
@@ -6760,7 +6760,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 # ── خلاصة محورية 3 بعد انتهاء التقرير الثالث ──
                 try:
                     _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", flat_chunks_3)
-                    send_summary_to_bot("8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA", _summary3_text, TARGET_CHATS[0])
+                    send_summary_to_bot("8663825687:AAHElJ0PtPoS80QxnXOGBGu9sRzAum-rqx0", _summary3_text, TARGET_CHATS[0])
                     log.info("✅ [Summary3] تم إرسال خلاصة التقرير الثالث.")
                 except Exception as _e3:
                     log.error(f"❌ [Summary3] خطأ: {_e3}")
@@ -6773,7 +6773,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                         locals().get('_summary2_text', ''),
                         locals().get('_summary3_text', '')
                     )
-                    send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary4_text, TARGET_CHATS[0])
+                    send_summary_to_bot("8315216245:AAFoXDISnKYc051VNaOQqE4HjfbpKt2FvyM", _summary4_text, TARGET_CHATS[0])
                     log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
                 except Exception as _e4:
                     log.error(f"❌ [Summary4] خطأ: {_e4}")

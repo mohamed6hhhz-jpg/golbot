@@ -6536,17 +6536,13 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         t0, t1, t2, t3, t4, t5, t7, t8, t9, t10, t11, t13, t6 = results
         
         # Inject the Master Summary & High Lot Sniper into Bot2 (the 13-chunk report)
-        s12_report = _build_spot_s12(data)
+        s12_report = _build_futures_s12(data)
         if s12_report:
-            raw_reports.append(("👑 الخلاصة المحورية لليوم (الفوري - Spot)", s12_report, None))
+            raw_reports.append(("👑 الخلاصة المحورية لليوم (العقود الآجلة - Futures)", s12_report, None))
             
-        s9_report = _build_spot_s9(data)
+        s9_report = _build_futures_s9(data)
         if s9_report:
-            raw_reports.append(("👑 مصفوفة التداول السريعة (الفوري - Spot)", s9_report, None))
-            
-        s6_report = _build_spot_s6(data)
-        if s6_report:
-            raw_reports.append(("👑 قناص اللوت العالي والسكالبينج الشامل (الفوري - Spot)", s6_report, None))
+            raw_reports.append(("👑 مصفوفة التداول السريعة (العقود الآجلة - Futures)", s9_report, None))
 
 
 

@@ -2013,6 +2013,21 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     exp_high = round(gold + d['atr'] * 0.65, 2)
     range_line = f"نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$"
 
+    current_vol = int(d.get('last_vol', 0))
+    rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
+    normal_vol = int(current_vol / rel_vol) if rel_vol > 0.1 else current_vol
+    vol_increase_pct = int((rel_vol - 1) * 100)
+    
+    if vol_increase_pct > 0:
+        liq_desc = f"الحالية: {current_vol:,} عقد | الطبيعي: {normal_vol:,} عقد | زادت بنسبة {vol_increase_pct}% 📈"
+    elif vol_increase_pct < 0:
+        liq_desc = f"الحالية: {current_vol:,} عقد | الطبيعي: {normal_vol:,} عقد | انخفضت بنسبة {abs(vol_increase_pct)}% 📉"
+    else:
+        liq_desc = f"السيولة حالياً في معدلاتها الطبيعية حول {normal_vol:,} عقد ⚖️"
+        
+    trend_impact = "يدعم عمليات الشراء (Buy Dips) ويقوي مستويات الدعم للذهب" if 'صعود' in ent['trend'] else "يدعم عمليات البيع (Sell Rallies) ويضعف مستويات الدعم للذهب" if 'هبوط' in ent['trend'] else "يحفز التذبذب ويدعم صفقات السكالبينج السريعة للذهب"
+    verdict_impact = "يعطي أفضلية واضحة للثيران (المشترين) لدفع سعر الذهب للأعلى" if 'صاعد' in conf['verdict'] or 'شراء' in conf['verdict'] else "يعطي أفضلية واضحة للدببة (البائعين) لدفع سعر الذهب للأسفل" if 'هابط' in conf['verdict'] or 'بيع' in conf['verdict'] else "يفرض حالة من الترقب وتساوي الكفتين مؤقتاً على حركة الذهب"
+
     fixed = f"""👑 📊 التقرير الكمي الشامل للذهب
 🕐 {date_now}
 
@@ -2024,10 +2039,13 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 📊 ملخص السوق
    الزخم        : {ent['momentum']} {'→ تسارع بيع، الذهب عرضة للهبوط' if 'هابط' in ent['momentum'] else '→ تسارع شراء، الذهب في دعم' if 'صاعد' in ent['momentum'] else '→ تجميع سيولة وتذبذب في النطاق'}
    الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ السوق في نطاق عرضي — تداول بين الدعم والمقاومة'}
+   تأثير الاتجاه : {trend_impact}
    السيولة       : {ent['liquidity']} {'→ الحركات موثوقة ✅' if 'مرتفعة' in ent['liquidity'] else '→ انتبه: حركات وهمية محتملة ⚠️'}
+   حجم السيولة   : {liq_desc}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 حكم السوق: {conf['verdict']}
+⚠️ تأثير ذلك على الذهب: {verdict_impact}
 {score_table}
    ∑ {conf['total']:+d}/±{conf['n']}  ▪ 🟢{conf['bullish']} 🔴{conf['bearish']} ⚪{conf['neutral']}
 

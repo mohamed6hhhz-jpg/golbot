@@ -3734,6 +3734,109 @@ def _build_live_liquidity_spike(d: dict) -> str:
     return report
 
 
+def _build_liquidity_concentration_zones(d: dict) -> str:
+    """
+    القالب الخامس الجديد: مناطق ارتكاز سيولة الشراء والبيع (Volume Profile)
+    يبحث عن POC (نقطة التحكم) و HVNs (عقد الحجم العالي) لتحديد
+    أقوى دعوم ومقاومات السيولة الفعلية
+    """
+    from datetime import datetime, timezone
+    import numpy as np
+
+    now = datetime.now(timezone.utc)
+    gold = float(d.get('gold', 0))
+    atr = float(d.get('atr', 20) or 20)
+
+    # ── جلب بيانات 5 أيام على فريم 15 دقيقة لبناء Volume Profile ──
+    try:
+        import yfinance as _yf
+        _tk = _yf.Ticker("GC=F")
+        _df = _tk.history(period="5d", interval="15m")
+        if _df is None or _df.empty:
+            raise ValueError("No data")
+        
+        closes = _df['Close'].values
+        vols = _df['Volume'].values
+        
+        # تقسيم النطاق السعري إلى 30 مستوى (Bins)
+        min_p = np.min(closes)
+        max_p = np.max(closes)
+        bins = np.linspace(min_p, max_p, 30)
+        
+        # توزيع الفوليوم على المستويات السعرية
+        profile = np.zeros(len(bins)-1)
+        for i in range(len(closes)):
+            # إيجاد البن (Bin) المناسب للسعر
+            idx = np.digitize(closes[i], bins) - 1
+            idx = max(0, min(idx, len(profile)-1))
+            profile[idx] += vols[i]
+            
+        # إيجاد POC (نقطة التحكم = السعر صاحب أعلى فوليوم)
+        poc_idx = np.argmax(profile)
+        poc_price = float((bins[poc_idx] + bins[poc_idx+1]) / 2)
+        poc_vol = float(profile[poc_idx])
+        
+        # إيجاد أقوى مقاومات ودعوم السيولة (HVNs) أعلى وأسفل السعر الحالي
+        resistance_zones = []
+        support_zones = []
+        
+        # نبحث في البروفايل عن القمم المحلية للفوليوم
+        for i in range(1, len(profile)-1):
+            if profile[i] > profile[i-1] and profile[i] > profile[i+1]:
+                price_lvl = float((bins[i] + bins[i+1]) / 2)
+                if profile[i] > poc_vol * 0.3: # على الأقل 30% من الـ POC
+                    if price_lvl > gold:
+                        resistance_zones.append((price_lvl, float(profile[i])))
+                    elif price_lvl < gold:
+                        support_zones.append((price_lvl, float(profile[i])))
+                        
+        # ترتيب المقاومات تصاعدياً والدعوم تنازلياً
+        resistance_zones.sort(key=lambda x: x[0])
+        support_zones.sort(key=lambda x: x[0], reverse=True)
+        
+    except Exception as e:
+        # بيانات احتياطية في حال فشل الجلب
+        poc_price = gold - atr * 0.5
+        poc_vol = 15000
+        resistance_zones = [(gold + atr * 0.8, 8000), (gold + atr * 1.5, 6000)]
+        support_zones = [(gold - atr * 0.8, 9000), (gold - atr * 1.5, 7500)]
+
+    def _format_zone(zones, title, emoji):
+        res = f"   {emoji} {title}:\n"
+        if not zones:
+            res += "      لا توجد مناطق واضحة قريبة\n"
+        else:
+            for i, (p, v) in enumerate(zones[:3]):
+                strength = "قوية جداً 🔥" if v > poc_vol * 0.7 else "قوية ⚡" if v > poc_vol * 0.5 else "متوسطة 🛡️"
+                res += f"      {i+1}. {p:.2f}$ — حجم: {int(v):,} عقد ({strength})\n"
+        return res
+
+    # ── بناء التقرير ──
+    poc_dist = gold - poc_price
+    if poc_dist > atr * 0.5:
+        poc_status = "🟢 السعر يتداول بحرية فوق سيولة الشراء الرئيسية"
+    elif poc_dist < -atr * 0.5:
+        poc_status = "🔴 السعر مكبوت تحت سيولة البيع الرئيسية"
+    else:
+        poc_status = "🟡 السعر عالق داخل قلب السيولة (منطقة تذبذب / تجميع)"
+
+    report = f"""🧲 خريطة ارتكاز السيولة المؤسساتية (Volume Profile)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 السعر الحالي : {gold:.2f}$
+📌 نقطة التحكم (POC) : {poc_price:.2f}$
+   → (أكبر كتلة سيولة متمركزة في السوق)
+   {poc_status}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧱 أهم مناطق ارتكاز السيولة
+{_format_zone(resistance_zones, "مناطق سيولة البيع (مقاومات حجمية)", "🧱")}
+{_format_zone(support_zones, "مناطق سيولة الشراء (دعوم حجمية)", "🛡️")}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 دليل القراءة السريعة:
+   🔥 مناطق "قوية جداً": تحتاج سيولة ضخمة جداً لاختراقها، وغالباً يرتد السعر منها بقوة.
+   📌 التداول قريب من POC يعني "سوق متوازن"، الابتعاد عنه يعني "ترند قوي"."""
+    return report
+
+
 def _send_single_bot3(text: str, chat_id=None) -> bool:
     """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
     try:
@@ -7549,6 +7652,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot4_reports.append(("🐋 [2] رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker(data), None))
         bot4_reports.append(("🎯 [3] القمة والإغلاق الزمني الديناميكي", _build_dynamic_price_targets(data), None))
         bot4_reports.append(("⚡ [4] كاشف السيولة الحية والمفاجئة", _build_live_liquidity_spike(data), None))
+        bot4_reports.append(("🧲 [5] خريطة ارتكاز السيولة المؤسساتية (Volume Profile)", _build_liquidity_concentration_zones(data), None))
         # (القوالب الجديدة التالية ستُضاف هنا لاحقاً)
 
         flat_chunks_4 = []

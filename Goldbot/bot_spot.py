@@ -3837,6 +3837,98 @@ def _build_liquidity_concentration_zones(d: dict) -> str:
     return report
 
 
+def _build_global_options_radar(d: dict) -> str:
+    """
+    القالب السادس: رادار عقود الخيارات الشامل
+    يغطي: النفط، الفضة، النحاس، الذهب، البيتكوين، مناجم، معدين، صندوق GLD
+    مع توضيح حالة الجنيه المصري.
+    """
+    from datetime import datetime, timezone
+    
+    now = datetime.now(timezone.utc)
+    
+    # ── قائمة الأصول (Tickers) ──
+    assets = [
+        ("USO",  "🛢️ النفط (USO)"),
+        ("SLV",  "🥈 الفضة (SLV)"),
+        ("CPER", "🥉 النحاس (CPER)"),
+        ("GLD",  "📦 صندوق الذهب (GLD)"),
+        ("IAU",  "🥇 الذهب (IAU)"),
+        ("BITO", "₿ البيتكوين (BITO)"),
+        ("GDX",  "⛏️ سهم المناجم (GDX)"),
+        ("GDXJ", "⚙️ سهم المعدين (GDXJ)"),
+    ]
+    
+    # سنستخدم الدالة الموجودة مسبقاً _fetch_options_institutional
+    # لجمع البيانات لكل أصل
+    
+    report = f"""🌍 رادار عقود الخيارات العالمي (الحيتان والمؤسسات)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🕐 تحديث: {now.strftime('%d %b %Y - %H:%M UTC')}
+
+📊 يوضح هذا التقرير أحجام تداول عقود الخيارات (Options) خلال اليوم والأسبوع الماضي:
+   • Calls (شراء) 🟢: مراهنة على الصعود
+   • Puts (بيع) 🔴: مراهنة على الهبوط أو تحوط
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+    def _format_asset(data: dict) -> str:
+        err = data.get("error")
+        lbl = data.get("label", "")
+        if err:
+            return f"🔹 {lbl}\n   ⚠️ {err}\n"
+            
+        c_vol = data.get("calls_vol", 0)
+        p_vol = data.get("puts_vol", 0)
+        c_wk  = data.get("calls_vol_wk", 0)
+        p_wk  = data.get("puts_vol_wk", 0)
+        pcr   = data.get("pcr_vol", 0)
+        
+        # تصنيف اليوم
+        if pcr is None:
+            bias = "⚪ محايد"
+        elif pcr >= 1.2:
+            bias = "🔴 هبوطي (سيطرة Puts)"
+        elif pcr <= 0.8:
+            bias = "🟢 صعودي (سيطرة Calls)"
+        else:
+            bias = "🟡 توازن نسبي"
+            
+        # شريط بسيط
+        total = c_vol + p_vol
+        if total == 0:
+            bar = "░░░░░░|░░░░░░"
+        else:
+            c_ratio = c_vol / total
+            c_bars = round(c_ratio * 10)
+            p_bars = 10 - c_bars
+            bar = "🟢"*c_bars + "🔴"*p_bars
+            
+        return (
+            f"🔹 {lbl}\n"
+            f"   ├ اليوم  : Calls {c_vol:,} | Puts {p_vol:,}\n"
+            f"   ├ الأسبوع: Calls {c_wk:,} | Puts {p_wk:,}\n"
+            f"   ├ PCR(Vol): {pcr if pcr else '—'} → {bias}\n"
+            f"   └ الاتجاه: [{bar}]\n"
+        )
+
+    # جلب وتنسيق البيانات
+    for ticker, label in assets:
+        data = _fetch_options_institutional(ticker, label)
+        report += _format_asset(data) + "   ─\n"
+
+    # ── ملاحظة الجنيه المصري ──
+    report += f"""🇪🇬 الجنية المصري (EGP)
+   ├ ℹ️ لا توجد عقود خيارات عامة (Public Options) مسعرة للجنيه المصري في الأسواق العالمية (مثل CBOE).
+   └ 💡 تتم تداولات المشتقات (NDFs - العقود الآجلة غير القابلة للتسليم) بشكل أساسي عبر أسواق (OTC) بين البنوك المركزية والمؤسسات.
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 دليل القراءة:
+   - PCR > 1 = ضغط بيعي قوي للمؤسسات.
+   - PCR < 1 = ضغط شرائي قوي للمؤسسات."""
+
+    return report
+
+
 def _send_single_bot3(text: str, chat_id=None) -> bool:
     """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
     try:
@@ -7653,6 +7745,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot4_reports.append(("🎯 [3] القمة والإغلاق الزمني الديناميكي", _build_dynamic_price_targets(data), None))
         bot4_reports.append(("⚡ [4] كاشف السيولة الحية والمفاجئة", _build_live_liquidity_spike(data), None))
         bot4_reports.append(("🧲 [5] خريطة ارتكاز السيولة المؤسساتية (Volume Profile)", _build_liquidity_concentration_zones(data), None))
+        bot4_reports.append(("🌍 [6] رادار عقود الخيارات العالمي", _build_global_options_radar(data), None))
         # (القوالب الجديدة التالية ستُضاف هنا لاحقاً)
 
         flat_chunks_4 = []

@@ -3538,6 +3538,202 @@ def _build_dynamic_price_targets(d: dict) -> str:
     return report
 
 
+def _build_live_liquidity_spike(d: dict) -> str:
+    """
+    القالب الرابع الجديد: كاشف السيولة الحية والمفاجئة
+    يرصد الحجم الحالي ويحدد إذا كان فيه دخول سيولة مفاجئ
+    بالأرقام الدقيقة والمؤشرات الرياضية الحية
+    """
+    import math
+    from datetime import datetime, timezone
+
+    now       = datetime.now(timezone.utc)
+    gold      = d.get('gold', 0)
+    atr       = float(d.get('atr', 20) or 20)
+    rel_vol   = float(d.get('rel_vol', 1.0) or 1.0)
+    obv_val   = float(d.get('obv_val', 0) or 0)
+    obv_trend = d.get('obv_trend', '')
+    vwap      = float(d.get('vwap', gold) or gold)
+    rsi       = float(d.get('rsi', 50) or 50)
+    macd_hist = float(d.get('macd_hist', 0) or 0)
+    bb_upper  = float(d.get('bb_upper', gold + atr) or gold + atr)
+    bb_lower  = float(d.get('bb_lower', gold - atr) or gold - atr)
+    bb_mid    = float(d.get('bb_mid', gold) or gold)
+    adx       = float(d.get('adx', 20) or 20)
+    cci       = float(d.get('cci', 0) or 0)
+    di_plus   = float(d.get('di_plus', 20) or 20)
+    di_minus  = float(d.get('di_minus', 20) or 20)
+
+    # ── جلب بيانات حجم الشمعات الأخيرة من yfinance (5 دقيقة) ──
+    vol_series    = []   # آخر 20 شمعة
+    vol_current   = 0
+    vol_avg_5     = 0    # متوسط 5 شمعات
+    vol_avg_20    = 0    # متوسط 20 شمعة
+    price_series  = []
+    spike_detected = False
+    spike_ratio    = rel_vol
+
+    try:
+        import yfinance as _yf
+        _tk  = _yf.Ticker("GC=F")
+        _df  = _tk.history(period="2d", interval="5m")
+        if _df is not None and not _df.empty:
+            _vols  = _df['Volume'].dropna().values
+            _close = _df['Close'].dropna().values
+            if len(_vols) >= 5:
+                vol_series   = list(_vols[-20:])
+                vol_current  = int(_vols[-1])
+                vol_avg_5    = round(float(sum(_vols[-6:-1]) / 5), 1)
+                vol_avg_20   = round(float(sum(_vols[-21:-1]) / min(20, len(_vols)-1)), 1) if len(_vols) > 1 else vol_avg_5
+                price_series = list(_close[-20:])
+                if vol_avg_5 > 0:
+                    spike_ratio  = round(vol_current / vol_avg_5, 3)
+                    spike_detected = spike_ratio >= 2.5
+    except Exception:
+        vol_current = int(rel_vol * 10000)
+        vol_avg_5   = 10000
+        vol_avg_20  = 10000
+        spike_ratio = rel_vol
+        spike_detected = rel_vol >= 2.5
+
+    # ── نوع السيولة الداخلة (شراء أم بيع) ──
+    vwap_gap    = gold - vwap
+    price_above_vwap = gold > vwap
+    price_above_bb_mid = gold > bb_mid
+
+    # المنطق: إذا السعر فوق VWAP والفوليوم مرتفع → سيولة شرائية
+    if vwap_gap > 0 and spike_ratio >= 1.5:
+        liq_type   = "🟢 سيولة شرائية مفاجئة"
+        liq_action = "LONG — الضغط الشرائي يسيطر"
+    elif vwap_gap < 0 and spike_ratio >= 1.5:
+        liq_type   = "🔴 سيولة بيعية مفاجئة"
+        liq_action = "SHORT — الضغط البيعي يسيطر"
+    elif spike_ratio >= 2.5:
+        liq_type   = "⚡ سيولة ضخمة مجهولة الاتجاه"
+        liq_action = "انتظر إغلاق الشمعة لتحديد الاتجاه"
+    elif spike_ratio >= 1.5:
+        liq_type   = "🟡 سيولة فوق المتوسط"
+        liq_action = "نشاط متزايد — راقب الاتجاه"
+    else:
+        liq_type   = "⚪ سيولة طبيعية"
+        liq_action = "لا يوجد دخول مفاجئ"
+
+    # ── مؤشر ضغط الشراء/البيع (Buy/Sell Pressure Index - BSPI) ──
+    # من -100 (بيع كامل) إلى +100 (شراء كامل)
+    bspi = 0
+    bspi_reasons = []
+
+    # موقع السعر من VWAP
+    vwap_score = math.tanh(vwap_gap / max(atr * 0.3, 1)) * 40
+    bspi += vwap_score
+    bspi_reasons.append(f"VWAP Gap {vwap_gap:+.2f}$ → {round(vwap_score):+d}")
+
+    # RSI
+    rsi_score = (rsi - 50) * 0.8
+    bspi += rsi_score
+    bspi_reasons.append(f"RSI({rsi:.1f}) → {round(rsi_score):+d}")
+
+    # MACD Histogram
+    macd_score = math.tanh(macd_hist / max(atr * 0.2, 0.1)) * 20
+    bspi += macd_score
+    bspi_reasons.append(f"MACD_H → {round(macd_score):+d}")
+
+    # OBV
+    obv_score = 15 if 'صعودي' in obv_trend else (-15 if 'هبوطي' in obv_trend else 0)
+    bspi += obv_score
+    bspi_reasons.append(f"OBV → {obv_score:+d}")
+
+    # تكثيف بالفوليوم
+    if spike_ratio >= 2.0:
+        bspi *= 1.2  # تضخيم الإشارة عند السبايك
+        bspi_reasons.append(f"⚡ تكثيف السبايك ×1.2")
+
+    bspi = max(-100, min(100, int(bspi)))
+
+    # ── مستوى التنبيه ──
+    if spike_ratio >= 3.0:
+        alert_level = "🚨 تنبيه قصوى — سبايك ضخم جداً"
+        alert_emoji = "🚨"
+    elif spike_ratio >= 2.0:
+        alert_level = "⚡ تنبيه عالٍ — دخول مؤسسي محتمل"
+        alert_emoji = "⚡"
+    elif spike_ratio >= 1.5:
+        alert_level = "⚠️ تنبيه متوسط — نشاط غير عادي"
+        alert_emoji = "⚠️"
+    else:
+        alert_level = "✅ طبيعي — لا سبايك"
+        alert_emoji = "✅"
+
+    # ── مؤشر البولينجر باند للضغط ──
+    bb_width     = round(bb_upper - bb_lower, 2)
+    bb_pct       = round((gold - bb_lower) / bb_width * 100, 1) if bb_width > 0 else 50
+    bb_squeeze   = bb_width < atr * 1.5
+    if bb_pct >= 80:
+        bb_pressure = "🔴 السعر عند سقف البولينجر — خطر انعكاس أو اختراق"
+    elif bb_pct <= 20:
+        bb_pressure = "🟢 السعر عند قاع البولينجر — خطر انعكاس أو هبوط"
+    elif bb_pct >= 60:
+        bb_pressure = "🟡 السعر في النصف العلوي — ميل صعودي"
+    else:
+        bb_pressure = "🟡 السعر في النصف السفلي — ميل هبوطي"
+
+    # ── رسم مخطط الحجم النسبي ──
+    def _vol_bar(ratio: float) -> str:
+        bars = min(int(ratio * 4), 20)
+        return "█" * bars + "░" * max(0, 12 - bars)
+
+    # ── بناء التقرير ──
+    report = f"""{alert_emoji} كاشف السيولة الحية والمفاجئة — XAU/USD
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🕐 الوقت     : {now.strftime('%H:%M:%S UTC')} | {now.strftime('%d %b %Y')}
+💰 السعر     : {gold:.2f}$ | VWAP: {vwap:.2f}$ ({vwap_gap:+.2f}$)
+{alert_level}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 تحليل الحجم (Volume Analysis)
+   الحجم الحالي (5د)   : {vol_current:>10,} عقد
+   متوسط 5 شمعات       : {int(vol_avg_5):>10,} عقد
+   متوسط 20 شمعة       : {int(vol_avg_20):>10,} عقد
+   نسبة السبايك        : {spike_ratio:.2f}x  [{_vol_bar(spike_ratio)}]
+   الفوليوم اليومي (rel): {rel_vol:.2f}x المتوسط اليومي
+
+{'🚨 *** سبايك مفاجئ محدد! ***' if spike_detected else '   لا يوجد سبايك حالياً'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💧 نوع السيولة الداخلة
+   {liq_type}
+   → {liq_action}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔋 مؤشر ضغط الشراء/البيع (BSPI) = {bspi:+d}/100
+"""
+    for r in bspi_reasons:
+        report += f"   {r}\n"
+
+    bspi_label = ("🟢 ضغط شرائي قوي" if bspi >= 50 else
+                  "🟡 ميل شرائي" if bspi >= 20 else
+                  "🔴 ضغط بيعي قوي" if bspi <= -50 else
+                  "🟠 ميل بيعي" if bspi <= -20 else "⚪ توازن")
+
+    report += f"""   النتيجة: {bspi_label}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📐 بولينجر باند — ضغط السيولة
+   العرض الحالي: {bb_width:.2f}$ ({'🗜️ Squeeze ضيق' if bb_squeeze else '📊 طبيعي'})
+   موقع السعر  : {bb_pct:.1f}% من النطاق
+   {bb_pressure}
+   BB Upper: {bb_upper:.2f}$ | Mid: {bb_mid:.2f}$ | Lower: {bb_lower:.2f}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📡 مؤشرات تأكيد السيولة
+   OBV : {int(obv_val):,} ({obv_trend}) {'🟢' if 'صعودي' in obv_trend else '🔴'}
+   ADX : {adx:.1f} ({'قوي' if adx>=30 else 'متوسط' if adx>=20 else 'ضعيف'}) | D+{di_plus:.1f} vs D-{di_minus:.1f}
+   CCI : {cci:.1f} ({'تشبع شراء ⚠️' if cci>100 else 'تشبع بيع ⚠️' if cci<-100 else 'طبيعي'})
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 تفسير السبايك:
+   VSI ≥ 3.0x → دخول مؤسسي ضخم/إخبار مفاجئ 🚨
+   VSI ≥ 2.0x → دخول مؤسسي محتمل أو نيوز ⚡
+   VSI ≥ 1.5x → نشاط فوق المعتاد، راقب الاتجاه ⚠️
+   VSI < 1.0x → سوق هادئ، لا توتر حالياً ✅"""
+
+    return report
+
+
 def _send_single_bot3(text: str, chat_id=None) -> bool:
     """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
     try:
@@ -7352,6 +7548,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot4_reports.append(("🔬 [1] كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector(data), None))
         bot4_reports.append(("🐋 [2] رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker(data), None))
         bot4_reports.append(("🎯 [3] القمة والإغلاق الزمني الديناميكي", _build_dynamic_price_targets(data), None))
+        bot4_reports.append(("⚡ [4] كاشف السيولة الحية والمفاجئة", _build_live_liquidity_spike(data), None))
         # (القوالب الجديدة التالية ستُضاف هنا لاحقاً)
 
         flat_chunks_4 = []

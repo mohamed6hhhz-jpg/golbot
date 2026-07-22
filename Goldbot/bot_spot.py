@@ -3929,6 +3929,102 @@ def _build_global_options_radar(d: dict) -> str:
     return report
 
 
+def _build_whale_wallet_monitor(d: dict) -> str:
+    """
+    القالب السابع: مراقب محافظ الحيتان (Whale Wallets & Dark Pools)
+    يرصد الصفقات الكبيرة (Block Trades) وعمليات التجميع/التصريف المخفية
+    (High Volume + Low Price Spread).
+    """
+    from datetime import datetime, timezone
+    import numpy as np
+
+    now = datetime.now(timezone.utc)
+    gold = float(d.get('gold', 0))
+    atr = float(d.get('atr', 20) or 20)
+    
+    report = f"""🐋 مراقب محافظ الحيتان والتجميع المخفي (Dark Pools)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🕐 الوقت: {now.strftime('%H:%M:%S UTC')}
+💰 الأصل: الذهب (XAU/USD) السعر: {gold:.2f}$
+
+يبحث هذا الرادار عن بصمات محافظ الحيتان (Block Trades)
+عبر رصد السيولة الضخمة التي تدخل السوق بدون تحريك ملحوظ للسعر
+(دليل على تجميع أو تصريف مخفي في مناطق Dark Pools).
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+    whale_activity = []
+    
+    try:
+        import yfinance as _yf
+        _tk = _yf.Ticker("GC=F")
+        # سحب بيانات آخر 5 أيام على فريم 5 دقائق
+        _df = _tk.history(period="5d", interval="5m")
+        
+        if _df is not None and not _df.empty:
+            closes = _df['Close'].values
+            opens = _df['Open'].values
+            vols = _df['Volume'].values
+            times = _df.index
+            
+            # حساب متوسط الفوليوم لآخر 100 شمعة
+            avg_vol = np.mean(vols[-100:]) if len(vols) >= 100 else np.mean(vols)
+            if avg_vol == 0: avg_vol = 1
+            
+            # نبحث عن الشمعات التي يتوفر فيها الشرط:
+            for i in range(len(vols) - 40, len(vols)):
+                if i < 0: continue
+                vol_ratio = vols[i] / avg_vol
+                body_size = abs(closes[i] - opens[i])
+                
+                # فوليوم أكثر من 3.5 أضعاف المتوسط (حجم غير طبيعي)
+                if vol_ratio > 3.5:
+                    # إذا كان الجسم صغيراً جداً (أقل من 5% من ATR)، فهذا تجميع/تصريف مخفي
+                    if body_size < (atr * 0.05):
+                        whale_type = "🥷 تجميع/تصريف مخفي (Dark Pool)"
+                        action = "تثبيت السعر لامتصاص الكميات بدون لفت الانتباه."
+                    # إذا كان الإغلاق أعلى من الفتح بوضوح
+                    elif closes[i] > opens[i]:
+                        whale_type = "🐳 بلوك شرائي ضخم (Buy Block Trade)"
+                        action = "دخول حوت ماركت شراء لرفع السعر بقوة."
+                    # إذا كان الإغلاق أقل بوضوح
+                    else:
+                        whale_type = "🦈 بلوك بيعي ضخم (Sell Block Trade)"
+                        action = "تفريغ محفظة حوت ببيع ماركت عنيف."
+                        
+                    whale_activity.append({
+                        "time": times[i].strftime('%d %b %H:%M'),
+                        "price": closes[i],
+                        "vol_ratio": vol_ratio,
+                        "type": whale_type,
+                        "action": action,
+                        "contracts": vols[i]
+                    })
+    except Exception as e:
+        report += f"⚠️ جاري تجهيز بيانات البلوك تريد... الرجاء الانتظار في التحديث القادم.\n"
+
+    # تنسيق النتائج
+    if not whale_activity:
+        report += "🟢 لا توجد بصمات حديثة لمحافظ حيتان في الساعات الماضية.\n   السيولة متوزعة بشكل طبيعي بين المتداولين.\n"
+    else:
+        report += "🚨 تم رصد نشاط محافظ حيتان (Smart Money) مؤخراً:\n\n"
+        # عرض آخر 4 أحداث فقط
+        for act in whale_activity[-4:]:
+            report += f"   {act['type']}\n"
+            report += f"   ├ التوقيت: {act['time']} UTC\n"
+            report += f"   ├ السعر المتمركز عنده: {act['price']:.2f}$\n"
+            report += f"   ├ حجم الصفقة: {int(act['contracts']):,} عقد ({act['vol_ratio']:.1f}x ضعف المتوسط)\n"
+            report += f"   └ التحليل: {act['action']}\n\n"
+
+    # تحليل تجميعي للحالة العامة
+    report += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    report += "💡 دليل القراءة:\n"
+    report += "   - Block Trade: دخول محافظ ضخمة للبيع أو الشراء المفاجئ.\n"
+    report += "   - Dark Pool: ارتفاع الفوليوم بشكل جنوني مع ثبات السعر (يمتص العروض بصمت)."
+    
+    return report
+
+
 def _send_single_bot3(text: str, chat_id=None) -> bool:
     """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
     try:
@@ -7746,6 +7842,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot4_reports.append(("⚡ [4] كاشف السيولة الحية والمفاجئة", _build_live_liquidity_spike(data), None))
         bot4_reports.append(("🧲 [5] خريطة ارتكاز السيولة المؤسساتية (Volume Profile)", _build_liquidity_concentration_zones(data), None))
         bot4_reports.append(("🌍 [6] رادار عقود الخيارات العالمي", _build_global_options_radar(data), None))
+        bot4_reports.append(("🕵️ [7] مراقب محافظ الحيتان (Block Trades & Dark Pools)", _build_whale_wallet_monitor(data), None))
         # (القوالب الجديدة التالية ستُضاف هنا لاحقاً)
 
         flat_chunks_4 = []

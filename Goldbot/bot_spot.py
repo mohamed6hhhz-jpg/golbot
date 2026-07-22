@@ -3088,6 +3088,284 @@ def _build_liquidity_breakout_detector(d: dict) -> str:
     return report
 
 
+def _fetch_options_institutional(ticker_sym: str, label: str) -> dict:
+    """
+    جلب بيانات الأوبشن (Open Interest + Volume) لتيكر معين
+    ويرجع: calls_oi, puts_oi, calls_vol, puts_vol, pcr_oi, pcr_vol
+    لأقرب تاريخ انتهاء (today) والأسبوع الكامل (weekly)
+    """
+    result = {
+        "label": label, "ticker": ticker_sym,
+        "calls_oi": 0, "puts_oi": 0,
+        "calls_vol": 0, "puts_vol": 0,
+        "calls_oi_wk": 0, "puts_oi_wk": 0,
+        "calls_vol_wk": 0, "puts_vol_wk": 0,
+        "pcr_oi": None, "pcr_vol": None,
+        "pcr_oi_wk": None, "net_flow": 0,
+        "error": None
+    }
+    try:
+        import yfinance as _yf
+        tk = _yf.Ticker(ticker_sym)
+        exps = tk.options
+        if not exps:
+            result["error"] = "لا توجد بيانات أوبشن"
+            return result
+
+        # اليوم / أقرب تاريخ
+        chain0 = tk.option_chain(exps[0])
+        c0 = chain0.calls
+        p0 = chain0.puts
+        result["calls_oi"]  = int(c0['openInterest'].sum())
+        result["puts_oi"]   = int(p0['openInterest'].sum())
+        result["calls_vol"] = int(c0['volume'].fillna(0).sum())
+        result["puts_vol"]  = int(p0['volume'].fillna(0).sum())
+        if result["calls_oi"] > 0:
+            result["pcr_oi"]  = round(result["puts_oi"] / result["calls_oi"], 3)
+        if result["calls_vol"] > 0:
+            result["pcr_vol"] = round(result["puts_vol"] / result["calls_vol"], 3)
+
+        # الأسبوع الكامل (نجمع أول 5 تواريخ انتهاء)
+        for exp in exps[:5]:
+            try:
+                ch = tk.option_chain(exp)
+                result["calls_oi_wk"]  += int(ch.calls['openInterest'].sum())
+                result["puts_oi_wk"]   += int(ch.puts['openInterest'].sum())
+                result["calls_vol_wk"] += int(ch.calls['volume'].fillna(0).sum())
+                result["puts_vol_wk"]  += int(ch.puts['volume'].fillna(0).sum())
+            except Exception:
+                pass
+        if result["calls_oi_wk"] > 0:
+            result["pcr_oi_wk"] = round(result["puts_oi_wk"] / result["calls_oi_wk"], 3)
+
+        # صافي التدفق: (calls_vol - puts_vol) × 100 عقد × قيمة الأساس
+        result["net_flow"] = result["calls_vol"] - result["puts_vol"]
+
+    except Exception as e:
+        result["error"] = str(e)[:80]
+    return result
+
+
+def _classify_institution(pcr: float) -> tuple:
+    """يصنف انحياز المؤسسات بناء على PCR"""
+    if pcr is None:
+        return "⚪ محايد", "توازن الشراء والبيع"
+    if pcr >= 1.5:
+        return "🐻 هبوطي قوي جداً", "الحيتان والمؤسسات تراهن بقوة على الهبوط"
+    elif pcr >= 1.2:
+        return "🔴 هبوطي", "المؤسسات تفضل عقود البيع (Puts)"
+    elif pcr >= 0.9:
+        return "⚪ محايد", "توازن نسبي بين الشراء والبيع"
+    elif pcr >= 0.7:
+        return "🟢 صعودي", "المؤسسات تفضل عقود الشراء (Calls)"
+    else:
+        return "🚀 صعودي قوي جداً", "الحيتان تراهن بقوة على الصعود"
+
+
+def _build_whale_bar(calls: int, puts: int, width: int = 12) -> str:
+    """يبني شريط بصري لنسبة Calls vs Puts"""
+    total = calls + puts
+    if total == 0:
+        return "░░░░░░|░░░░░░"
+    call_ratio = calls / total
+    call_bars = round(call_ratio * width)
+    put_bars = width - call_bars
+    return "🟢" * call_bars + "🔴" * put_bars
+
+
+def _build_institutional_whale_tracker(d: dict) -> str:
+    """
+    القالب الثاني الجديد: رادار المؤسسات والحيتان العالمية
+    يتتبع مشتريات ومبيعات الحيتان في أوبشن الذهب والفضة والنفط
+    يومياً وأسبوعياً بأرقام دقيقة من السوق الفعلية
+    """
+    import math
+
+    gold  = d.get('gold', 0)
+    silver= d.get('silver', 0)
+    oil   = d.get('oil', 0)
+    gld_pcr = d.get('gld_pcr', None)
+    pcr_src = d.get('pcr_source', '')
+    vix     = d.get('vix', 20)
+    obv_trend = d.get('obv_trend', '')
+    obv_val   = float(d.get('obv_val', 0) or 0)
+    rel_vol   = float(d.get('rel_vol', 1.0) or 1.0)
+
+    # ── جلب بيانات الأوبشن الحية ──
+    gld_data = _fetch_options_institutional("GLD", "الذهب (GLD ETF)")
+    slv_data = _fetch_options_institutional("SLV", "الفضة (SLV ETF)")
+    uso_data = _fetch_options_institutional("USO", "النفط (USO ETF)")
+
+    # ── مؤشر الخوف (VIX) ──
+    if vix >= 30:
+        vix_inst = "⚠️ خوف عالٍ — المؤسسات تتحوط بقوة (Puts ترتفع)"
+    elif vix >= 20:
+        vix_inst = "🟡 قلق متوسط — تحوط معتدل"
+    else:
+        vix_inst = "🟢 استقرار — المؤسسات واثقة (Calls مهيمنة)"
+
+    # ── حساب الانحياز الكلي للمؤسسات ──
+    def _inst_score(data: dict) -> float:
+        """من -1 (هبوطي كامل) إلى +1 (صعودي كامل)"""
+        pcr = data.get("pcr_oi")
+        if pcr is None:
+            return 0.0
+        # PCR = 1.0 → محايد = 0، PCR > 1 → سلبي، PCR < 1 → إيجابي
+        return max(-1.0, min(1.0, (1.0 - pcr)))
+
+    score_gld = _inst_score(gld_data)
+    score_slv = _inst_score(slv_data)
+    score_uso = _inst_score(uso_data)
+    combined_score = round((score_gld * 0.6) + (score_slv * 0.2) + (score_uso * 0.2), 3)
+    combined_pct   = int(combined_score * 100)
+
+    # ── تصنيف المؤسسات لكل أصل ──
+    gld_bias, gld_bias_desc = _classify_institution(gld_data.get("pcr_oi"))
+    slv_bias, slv_bias_desc = _classify_institution(slv_data.get("pcr_oi"))
+    uso_bias, uso_bias_desc = _classify_institution(uso_data.get("pcr_oi"))
+
+    # ── حساب صافي عقود الشراء/بيع بالدولار تقديرياً ──
+    def _est_usd(calls: int, puts: int, price: float, contract_mult: int = 100) -> tuple:
+        """تقدير القيمة الدولارية للعقود"""
+        buy_usd  = int(calls * price * contract_mult)
+        sell_usd = int(puts  * price * contract_mult)
+        net_usd  = buy_usd - sell_usd
+        return buy_usd, sell_usd, net_usd
+
+    gld_buy_usd, gld_sell_usd, gld_net = _est_usd(
+        gld_data["calls_vol"], gld_data["puts_vol"], gold * 0.1)  # GLD ≈ 10% سعر الذهب
+    slv_buy_usd, slv_sell_usd, slv_net = _est_usd(
+        slv_data["calls_vol"], slv_data["puts_vol"], silver if silver else 30)
+    uso_buy_usd, uso_sell_usd, uso_net = _est_usd(
+        uso_data["calls_vol"], uso_data["puts_vol"], oil if oil else 70, 100)
+
+    total_buy  = gld_buy_usd + slv_buy_usd + uso_buy_usd
+    total_sell = gld_sell_usd + slv_sell_usd + uso_sell_usd
+    total_net  = total_buy - total_sell
+
+    def _fmt_m(val: int) -> str:
+        """تنسيق الأرقام كـ M / B"""
+        if abs(val) >= 1_000_000_000:
+            return f"{val/1_000_000_000:.2f}B$"
+        elif abs(val) >= 1_000_000:
+            return f"{val/1_000_000:.1f}M$"
+        else:
+            return f"{val:,}$"
+
+    def _asset_block(data: dict, price: float, bias: str, bias_desc: str) -> str:
+        """يبني بلوك تقرير لكل أصل"""
+        c_oi  = data["calls_oi"]
+        p_oi  = data["puts_oi"]
+        c_vol = data["calls_vol"]
+        p_vol = data["puts_vol"]
+        pcr   = data.get("pcr_oi")
+        pcr_w = data.get("pcr_oi_wk")
+        c_oi_w = data["calls_oi_wk"]
+        p_oi_w = data["puts_oi_wk"]
+        c_v_w  = data["calls_vol_wk"]
+        p_v_w  = data["puts_vol_wk"]
+        bar    = _build_whale_bar(c_vol, p_vol)
+        err    = data.get("error")
+
+        if err:
+            return f"   ⚠️ {data['label']}: {err}\n"
+
+        return (
+            f"   📊 {data['label']} | السعر: {price:.2f}$\n"
+            f"   ┌── اليوم (أقرب تاريخ انتهاء)\n"
+            f"   │  Calls OI : {c_oi:>12,} عقد (شراء مؤسسي)\n"
+            f"   │  Puts  OI : {p_oi:>12,} عقد (بيع مؤسسي)\n"
+            f"   │  Calls Vol: {c_vol:>12,} عقد (تدفق اليوم)\n"
+            f"   │  Puts  Vol: {p_vol:>12,} عقد (تدفق اليوم)\n"
+            f"   │  PCR (OI) : {pcr if pcr else '—'} | PCR (Vol): {data.get('pcr_vol') if data.get('pcr_vol') else '—'}\n"
+            f"   │  [{bar}]\n"
+            f"   │  {bias} — {bias_desc}\n"
+            f"   ├── الأسبوع (5 تواريخ انتهاء)\n"
+            f"   │  Calls OI : {c_oi_w:>12,} عقد\n"
+            f"   │  Puts  OI : {p_oi_w:>12,} عقد\n"
+            f"   │  Calls Vol: {c_v_w:>12,} عقد\n"
+            f"   │  Puts  Vol: {p_v_w:>12,} عقد\n"
+            f"   └  PCR أسبوعي: {pcr_w if pcr_w else '—'}\n"
+        )
+
+    # ── مؤشر ذكاء Smart Money (SMAI) ──
+    # يدمج PCR + OBV + حجم الفوليوم لتحديد هل المؤسسات تجمع أم تفرغ
+    smai = 0
+    smai_reasons = []
+    if combined_score > 0.15:
+        smai += 35; smai_reasons.append(f"✅ PCR مجمّع: {combined_pct:+d}% صعودي +35")
+    elif combined_score < -0.15:
+        smai -= 35; smai_reasons.append(f"❌ PCR مجمّع: {combined_pct:+d}% هبوطي -35")
+    else:
+        smai_reasons.append(f"⚪ PCR محايد {combined_pct:+d}% ±0")
+
+    if "صعودي" in obv_trend:
+        smai += 30; smai_reasons.append("✅ OBV صعودي — تراكم مؤسسي +30")
+    elif "هبوطي" in obv_trend:
+        smai -= 30; smai_reasons.append("❌ OBV هبوطي — تفريغ مؤسسي -30")
+
+    if rel_vol >= 1.5:
+        smai += 25; smai_reasons.append(f"✅ فوليوم {rel_vol:.1f}x — ضخ مؤسسي +25")
+    elif rel_vol < 0.8:
+        smai -= 15; smai_reasons.append(f"⚠️ فوليوم منخفض {rel_vol:.1f}x -15")
+
+    if vix < 20:
+        smai += 10; smai_reasons.append("✅ VIX منخفض — ثقة مؤسسية +10")
+    elif vix > 28:
+        smai -= 10; smai_reasons.append("⚠️ VIX مرتفع — تحوط مؤسسي -10")
+
+    smai = max(-100, min(100, smai))
+
+    if smai >= 50:
+        smai_verdict = "🟢 مؤسسات تجمع — توقع ارتفاع"
+    elif smai >= 20:
+        smai_verdict = "🟡 ميل مؤسسي للشراء"
+    elif smai <= -50:
+        smai_verdict = "🔴 مؤسسات تفرغ — توقع هبوط"
+    elif smai <= -20:
+        smai_verdict = "🟠 ميل مؤسسي للبيع"
+    else:
+        smai_verdict = "⚪ تعادل مؤسسي"
+
+    # ── بناء التقرير ──
+    report = f"""🐋 رادار الحيتان والمؤسسات العالمية
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏦 أنواع المؤسسات المرصودة:
+   البنوك المركزية | البنوك التجارية | صناديق التحوط
+   صناديق السيادية | شركات التأمين | صناديق التقاعد
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🥇 GOLD — الذهب
+{_asset_block(gld_data, gold, gld_bias, gld_bias_desc)}
+🥈 SILVER — الفضة
+{_asset_block(slv_data, silver if silver else 30, slv_bias, slv_bias_desc)}
+🛢️ OIL — النفط
+{_asset_block(uso_data, oil if oil else 70, uso_bias, uso_bias_desc)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💵 التدفق المالي التقديري (اليوم)
+   إجمالي شراء (Calls): {_fmt_m(total_buy)}
+   إجمالي بيع  (Puts) : {_fmt_m(total_sell)}
+   صافي التدفق        : {_fmt_m(total_net)} {"🟢" if total_net > 0 else "🔴"}
+   ذهب  : شراء {_fmt_m(gld_buy_usd)} | بيع {_fmt_m(gld_sell_usd)} | صافي {_fmt_m(gld_net)} {"🟢" if gld_net>0 else "🔴"}
+   فضة  : شراء {_fmt_m(slv_buy_usd)} | بيع {_fmt_m(slv_sell_usd)} | صافي {_fmt_m(slv_net)} {"🟢" if slv_net>0 else "🔴"}
+   نفط  : شراء {_fmt_m(uso_buy_usd)} | بيع {_fmt_m(uso_sell_usd)} | صافي {_fmt_m(uso_net)} {"🟢" if uso_net>0 else "🔴"}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧠 مؤشر الذكاء المؤسساتي (SMAI) = {smai:+d}/100
+"""
+    for r in smai_reasons:
+        report += f"   {r}\n"
+
+    report += f"""━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 الحكم: {smai_verdict}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VIX: {vix:.1f} → {vix_inst}
+📌 OBV الذهب: {int(obv_val):,} ({obv_trend})
+   الفوليوم الحالي: {rel_vol:.2f}x المتوسط
+📡 مصدر البيانات: Yahoo Finance Options Chain (Real-Time)"""
+
+    return report
+
+
 
 def _send_single_bot3(text: str, chat_id=None) -> bool:
     """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
@@ -6901,6 +7179,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         # ── القوالب الجديدة — البوت الرابع @Boonnii_bot ──
         bot4_reports = []
         bot4_reports.append(("🔬 [1] كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector(data), None))
+        bot4_reports.append(("🐋 [2] رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker(data), None))
         # (القوالب الجديدة التالية ستُضاف هنا لاحقاً)
 
         flat_chunks_4 = []

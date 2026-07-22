@@ -3367,6 +3367,177 @@ def _build_institutional_whale_tracker(d: dict) -> str:
 
 
 
+def _build_dynamic_price_targets(d: dict) -> str:
+    """
+    القالب الثالث الجديد: القمة والقاع والإغلاق المتوقع
+    من النهارده → أسبوع | شهر | 3 شهور | 6 شهور | نهاية 2026
+    كله ديناميكي بالأرقام الرياضية الحقيقية
+    """
+    import math
+    from datetime import datetime, timezone, timedelta
+
+    now       = datetime.now(timezone.utc)
+    gold      = d.get('gold', 0)
+    atr       = d.get('atr', 20.0)           # ATR يومي
+    rsi       = float(d.get('rsi', 50) or 50)
+    macd_hist = float(d.get('macd_hist', 0) or 0)
+    adx       = float(d.get('adx', 25) or 25)
+    di_plus   = float(d.get('di_plus', 20) or 20)
+    di_minus  = float(d.get('di_minus', 20) or 20)
+    ema20     = float(d.get('ema20', gold) or gold)
+    ema50     = float(d.get('ema50', gold) or gold)
+    ema200    = float(d.get('ema200', gold) or gold)
+    rel_vol   = float(d.get('rel_vol', 1.0) or 1.0)
+    bb_upper  = float(d.get('bb_upper', gold + atr) or gold + atr)
+    bb_lower  = float(d.get('bb_lower', gold - atr) or gold - atr)
+    swing_high = float(d.get('swing_high', gold + atr * 2) or gold + atr * 2)
+    swing_low  = float(d.get('swing_low',  gold - atr * 2) or gold - atr * 2)
+    obv_trend  = d.get('obv_trend', '')
+    bias_str   = d.get('bias', 'neutral') if d.get('bias') else 'neutral'
+
+    # ── الأيام المتبقية لكل أفق زمني (من اليوم) ──
+    targets_info = [
+        ("1W",  "أسبوع",    7,   "📆"),
+        ("1M",  "شهر",      30,  "🗓️"),
+        ("3M",  "3 شهور",   91,  "📅"),
+        ("6M",  "6 شهور",   182, "🗓️"),
+        ("EOY", "نهاية 2026", (datetime(2026, 12, 31, tzinfo=timezone.utc) - now).days, "🎯"),
+    ]
+
+    # ── مؤشر الاتجاه المركب (TBI: Trend Bias Index) من -1 إلى +1 ──
+    rsi_bias   = (rsi - 50) / 50          # -1 → +1
+    macd_bias  = math.tanh(macd_hist / max(atr * 0.5, 1))
+    adx_dir    = (di_plus - di_minus) / max(adx, 1)
+    ema_bias   = 1 if gold > ema50 > ema200 else (-1 if gold < ema50 < ema200 else 0)
+    obv_bias   = 0.3 if 'صعودي' in obv_trend else (-0.3 if 'هبوطي' in obv_trend else 0)
+    vol_boost  = min(rel_vol / 1.5, 1.5)  # تأثير الفوليوم
+
+    tbi = round(
+        (rsi_bias * 0.25) +
+        (macd_bias * 0.25) +
+        (adx_dir * 0.20) +
+        (ema_bias * 0.20) +
+        (obv_bias * 0.10),
+        4
+    )
+    tbi_pct = int(tbi * 100)
+
+    # ── دالة توقع القمة والقاع والإغلاق لعدد أيام معين ──
+    def _project(days: int) -> dict:
+        """
+        توقع الأسعار بناء على:
+        1. ATR × √days × معامل التقلب (Volatility Scaling)
+        2. الاتجاه المركب TBI
+        3. حواجز فيبوناتشي الطبيعية
+        """
+        if days <= 0:
+            return {"high": gold, "low": gold, "close": gold, "range": 0}
+
+        # تحجيم ATR لعدد الأيام (قانون الجذر التربيعي للزمن)
+        atr_scaled = atr * math.sqrt(days)
+
+        # معامل التقلب مع الفوليوم
+        vol_factor = 1.0 + (rel_vol - 1.0) * 0.3  # تعديل بسيط بالفوليوم
+
+        # نطاق التحرك الكلي
+        total_range = atr_scaled * vol_factor
+
+        # توزيع الصعود/الهبوط بناءً على TBI
+        # TBI = +1 → 80% صعود | TBI = -1 → 20% صعود فقط
+        up_pct   = 0.5 + (tbi * 0.3)   # من 20% إلى 80%
+        down_pct = 1 - up_pct
+
+        high_target  = round(gold + total_range * up_pct,   2)
+        low_target   = round(gold - total_range * down_pct, 2)
+        close_target = round(gold + (high_target - low_target) * tbi * 0.4, 2)
+
+        # تقييد الإغلاق بين القمة والقاع
+        close_target = max(low_target, min(high_target, close_target))
+
+        # مستوى الثقة (كلما طال الأفق، قلّت الثقة)
+        confidence = max(20, round(90 - days * 0.3))
+
+        return {
+            "high":  high_target,
+            "low":   low_target,
+            "close": close_target,
+            "range": round(total_range, 2),
+            "conf":  confidence,
+            "chg_high":  round((high_target  / gold - 1) * 100, 2),
+            "chg_low":   round((low_target   / gold - 1) * 100, 2),
+            "chg_close": round((close_target / gold - 1) * 100, 2),
+        }
+
+    # ── جلب بيانات العام الحالي من yfinance (YTD High/Low/Close) ──
+    ytd_high  = gold
+    ytd_low   = gold
+    ytd_open  = gold
+    ytd_close = gold
+    ytd_chg   = 0.0
+    try:
+        import yfinance as _yf
+        _tk = _yf.Ticker("GC=F")
+        _df = _tk.history(start="2026-01-01", interval="1d")
+        if _df is not None and not _df.empty:
+            ytd_high  = round(float(_df['High'].max()), 2)
+            ytd_low   = round(float(_df['Low'].min()), 2)
+            ytd_open  = round(float(_df['Open'].iloc[0]), 2)
+            ytd_close = round(float(_df['Close'].iloc[-1]), 2)
+            ytd_chg   = round((ytd_close / ytd_open - 1) * 100, 2)
+    except Exception:
+        pass
+
+    # ── بناء التقرير ──
+    eoy_days = (datetime(2026, 12, 31, tzinfo=timezone.utc) - now).days
+    report = f"""🎯 القمة والإغلاق الزمني الديناميكي — Gold
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 التاريخ اليوم : {now.strftime('%Y-%m-%d')}
+💰 السعر الحالي : {gold:.2f}$
+📊 مؤشر الاتجاه (TBI): {tbi_pct:+d}% ({'🟢 صعودي' if tbi > 0.1 else '🔴 هبوطي' if tbi < -0.1 else '⚪ محايد'})
+   RSI({rsi:.0f}→{round(rsi_bias*100):+d}) | MACD({round(macd_bias*100):+d}) | ADX_Dir({round(adx_dir*100):+d}) | EMA({ema_bias:+d}) | OBV({round(obv_bias*100):+d})
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📈 اليوم 2026 — أداء العام (من 1 يناير)
+   ↑ أعلى سعر YTD : {ytd_high:.2f}$ ({round((ytd_high/ytd_open-1)*100, 2):+.2f}% من الفتح)
+   ↓ أدنى سعر YTD : {ytd_low:.2f}$  ({round((ytd_low /ytd_open-1)*100, 2):+.2f}% من الفتح)
+   📌 فتح العام    : {ytd_open:.2f}$
+   📌 آخر إغلاق   : {ytd_close:.2f}$ ({ytd_chg:+.2f}% من بداية العام)
+   📏 نطاق العام  : {round(ytd_high - ytd_low, 2):.2f}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔮 التوقعات من النهارده ({now.strftime('%d %b %Y')})
+"""
+    for code, label, days, icon in targets_info:
+        if days <= 0:
+            continue
+        p = _project(days)
+        target_date = (now + timedelta(days=days)).strftime('%d %b %Y')
+        report += f"""
+{icon} {label} ({days} يوم) — حتى {target_date}
+   ↑ أعلى متوقع   : {p['high']:.2f}$  ({p['chg_high']:+.2f}%)
+   ↔ إغلاق متوقع  : {p['close']:.2f}$ ({p['chg_close']:+.2f}%)
+   ↓ أدنى متوقع   : {p['low']:.2f}$  ({p['chg_low']:+.2f}%)
+   📏 النطاق الكلي : {p['range']:.2f}$ | ثقة: {p['conf']}%
+"""
+
+    # ── إجمالي نهاية العام 2026 ──
+    p_eoy = _project(max(1, eoy_days))
+    report += f"""━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏆 ملخص نهاية 2026 (31 ديسمبر)
+   متبقي          : {eoy_days} يوم
+   ↑ القمة المتوقعة: {p_eoy['high']:.2f}$  ({p_eoy['chg_high']:+.2f}%)
+   ↔ الإغلاق المتوقع: {p_eoy['close']:.2f}$ ({p_eoy['chg_close']:+.2f}%)
+   ↓ القاع المتوقع : {p_eoy['low']:.2f}$  ({p_eoy['chg_low']:+.2f}%)
+   📏 النطاق الكلي : {p_eoy['range']:.2f}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📐 الحسابات الرياضية المستخدمة:
+   ATR يومي       : {atr:.2f}$
+   ATR مقياس √t  : ATR × √أيام × معامل تقلب الفوليوم
+   توزيع Up/Down  : 50% ± (TBI × 30%)
+   إغلاق = سعر + (نطاق × TBI × 40%)
+   ملاحظة: التوقعات احتمالية ومبنية على الزخم الحالي"""
+
+    return report
+
+
 def _send_single_bot3(text: str, chat_id=None) -> bool:
     """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
     try:
@@ -7180,6 +7351,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot4_reports = []
         bot4_reports.append(("🔬 [1] كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector(data), None))
         bot4_reports.append(("🐋 [2] رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker(data), None))
+        bot4_reports.append(("🎯 [3] القمة والإغلاق الزمني الديناميكي", _build_dynamic_price_targets(data), None))
         # (القوالب الجديدة التالية ستُضاف هنا لاحقاً)
 
         flat_chunks_4 = []

@@ -2875,6 +2875,220 @@ async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
         return False
 
 
+async def _telethon_bot4_send(text: str, chat_id=None) -> bool:
+    """MTProto للبوت الرابع @Boonnii_bot — خاص بالقوالب الجديدة"""
+    try:
+        client = TelegramClient("goldbot_bot4_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN_4)
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        for chat in targets:
+            try:
+                await client.send_message(chat, text)
+            except Exception as inner_e:
+                log.warning(f"[Bot4 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
+        await client.disconnect()
+        return True
+    except Exception as e:
+        log.warning(f"[Bot4 Telethon] {e}")
+        return False
+
+
+def _send_single_bot4(text: str, chat_id=None) -> bool:
+    """الارسال للبوت الرابع @Boonnii_bot عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot4_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot4] تم الارسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot4_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot4] تم الارسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"[Telethon Bot4 loop] {e}")
+    except Exception as e:
+        log.warning(f"[Telethon Bot4] {e}")
+    log.error("[Bot4] فشل الارسال عبر Telethon.")
+    return False
+
+
+def _build_liquidity_breakout_detector(d: dict) -> str:
+    """
+    القالب الأول الجديد: كاشف الاختراق والكسر بالسيولة — رياضيات دقيقة 100%
+    يحدد إذا كان الاختراق/الكسر حقيقي أو وهمي بناءً على الفوليوم والزخم والـ OBV
+    """
+    import math
+
+    gold      = d.get('gold', 0)
+    atr       = d.get('atr', 20)
+    rel_vol   = float(d.get('rel_vol', 1.0) or 1.0)
+    last_vol  = int(d.get('last_vol', 0))
+    obv_val   = float(d.get('obv_val', 0) or 0)
+    obv_trend = d.get('obv_trend', '')
+    rsi       = float(d.get('rsi', 50) or 50)
+    macd_hist = float(d.get('macd_hist', 0) or 0)
+    adx       = float(d.get('adx', 20) or 20)
+    di_plus   = float(d.get('di_plus', 20) or 20)
+    di_minus  = float(d.get('di_minus', 20) or 20)
+    r1 = d.get('r1', gold + atr)
+    r2 = d.get('r2', gold + atr * 2)
+    s1 = d.get('s1', gold - atr)
+    s2 = d.get('s2', gold - atr * 2)
+    vwap = d.get('vwap', gold)
+    swing_high = d.get('swing_high', gold + atr * 1.5)
+    swing_low  = d.get('swing_low',  gold - atr * 1.5)
+    bb_upper = d.get('bb_upper', gold + atr)
+    bb_lower = d.get('bb_lower', gold - atr)
+    daily_high = d.get('daily_high', gold)
+    daily_low  = d.get('daily_low', gold)
+
+    # ══════════════════════════════════════════════
+    # الحسابات الرياضية الأساسية
+    # ══════════════════════════════════════════════
+
+    # 1. مؤشر قوة الفوليوم (Volume Strength Index - VSI)
+    # كلما كان أعلى من 1.5x = ضخ مؤسسي حقيقي
+    normal_vol = int(last_vol / rel_vol) if rel_vol > 0.1 else last_vol
+    vsi = rel_vol
+    vsi_pct = int((vsi - 1) * 100)
+
+    # 2. نسبة الاختراق من ATR (Breakout ATR Ratio)
+    # الاختراق الحقيقي يكون > 0.3 × ATR من مستوى الكسر
+    dist_to_r1 = round(abs(gold - r1), 2)
+    dist_to_s1 = round(abs(gold - s1), 2)
+    breakout_ratio_r1 = round(dist_to_r1 / atr, 3)
+    breakout_ratio_s1 = round(dist_to_s1 / atr, 3)
+    atr_threshold = round(atr * 0.3, 2)  # حد الاختراق الحقيقي
+
+    # 3. مؤشر الزخم المركب (Composite Momentum Score - CMS)
+    # يجمع RSI + MACD Histogram + ADX في رقم واحد من -100 إلى +100
+    rsi_score  = (rsi - 50) * 2          # من -100 إلى +100
+    macd_score = math.tanh(macd_hist / max(atr * 0.1, 0.1)) * 100  # تطبيع MACD
+    adx_dir    = (di_plus - di_minus)    # موجب = اتجاه صعودي، سالب = هبوطي
+    adx_score  = math.tanh(adx_dir / 20) * min(adx, 50) * 2  # قوة الاتجاه
+    cms = round((rsi_score * 0.35) + (macd_score * 0.35) + (adx_score * 0.30), 2)
+    cms_pct = max(-100, min(100, int(cms)))
+
+    # 4. مؤشر صحة الاختراق (Breakout Health Score - BHS)
+    # من 0 إلى 100 — كلما كان أعلى كان الاختراق أكثر موثوقية
+    bhs = 0
+    bhs_details = []
+
+    # شرط 1: الفوليوم (30 نقطة)
+    if vsi >= 2.0:
+        bhs += 30; bhs_details.append(f"✅ الفوليوم قوي جداً ({vsi:.1f}x) +30")
+    elif vsi >= 1.5:
+        bhs += 20; bhs_details.append(f"⚠️ الفوليوم فوق المتوسط ({vsi:.1f}x) +20")
+    elif vsi >= 1.0:
+        bhs += 10; bhs_details.append(f"🟡 الفوليوم طبيعي ({vsi:.1f}x) +10")
+    else:
+        bhs += 0; bhs_details.append(f"❌ الفوليوم ضعيف ({vsi:.1f}x) +0 — خطر وهمي!")
+
+    # شرط 2: OBV (25 نقطة)
+    if 'صعودي' in obv_trend:
+        bhs += 25; bhs_details.append("✅ OBV صعودي — سيولة مؤسسية تتدفق +25")
+    elif 'هبوطي' in obv_trend:
+        bhs += 0;  bhs_details.append("❌ OBV هبوطي — سيولة تنسحب +0")
+    else:
+        bhs += 10; bhs_details.append("⚪ OBV محايد +10")
+
+    # شرط 3: ADX (قوة الاتجاه) (25 نقطة)
+    if adx >= 30:
+        bhs += 25; bhs_details.append(f"✅ ADX={adx:.1f} — اتجاه قوي +25")
+    elif adx >= 20:
+        bhs += 15; bhs_details.append(f"⚠️ ADX={adx:.1f} — اتجاه متوسط +15")
+    else:
+        bhs += 5;  bhs_details.append(f"❌ ADX={adx:.1f} — اتجاه ضعيف، خطر وهمي +5")
+
+    # شرط 4: موقع السعر من VWAP (20 نقطة)
+    vwap_gap = round(gold - vwap, 2)
+    if abs(vwap_gap) < atr * 0.2:
+        bhs += 10; bhs_details.append(f"⚪ السعر قرب VWAP ({vwap:.2f}$) ±{abs(vwap_gap):.2f}$ +10")
+    elif gold > vwap:
+        bhs += 20; bhs_details.append(f"✅ السعر فوق VWAP بـ {vwap_gap:.2f}$ (شراء مهيمن) +20")
+    else:
+        bhs += 5;  bhs_details.append(f"❌ السعر تحت VWAP بـ {abs(vwap_gap):.2f}$ (بيع مهيمن) +5")
+
+    bhs = min(100, bhs)
+
+    # 5. حكم الاختراق
+    if bhs >= 75:
+        breakout_verdict = "🟢 اختراق/كسر حقيقي قوي — ادخل بثقة عالية"
+        verdict_color = "✅"
+    elif bhs >= 50:
+        breakout_verdict = "🟡 اختراق/كسر محتمل — انتظر إغلاق شمعة للتأكيد"
+        verdict_color = "⚠️"
+    elif bhs >= 30:
+        breakout_verdict = "🟠 اختراق مشكوك فيه — خطر وهمي متوسط"
+        verdict_color = "⚠️"
+    else:
+        breakout_verdict = "🔴 اختراق وهمي مرجح — لا تدخل، انتظر"
+        verdict_color = "❌"
+
+    # 6. اكتشاف أقرب مستوى حرج
+    levels = {
+        f"R1 ({r1}$)": dist_to_r1,
+        f"R2 ({r2}$)": abs(gold - r2),
+        f"S1 ({s1}$)": dist_to_s1,
+        f"S2 ({s2}$)": abs(gold - s2),
+        f"Daily High ({daily_high}$)": abs(gold - daily_high),
+        f"Daily Low ({daily_low}$)": abs(gold - daily_low),
+    }
+    nearest_level = min(levels, key=levels.get)
+    nearest_dist  = round(min(levels.values()), 2)
+
+    # 7. حساب حجم السيولة المطلوب للكسر الحقيقي
+    min_vol_for_real_breakout = int(normal_vol * 1.5)
+    vol_gap = last_vol - min_vol_for_real_breakout
+    vol_status = "✅ يكفي للكسر الحقيقي" if vol_gap >= 0 else f"❌ ينقص {abs(vol_gap):,} عقد للكسر الحقيقي"
+
+    # ══════════════════════════════════════════════
+    # بناء التقرير
+    # ══════════════════════════════════════════════
+    report = f"""🔬 كاشف الاختراق الرياضي — السيولة والزخم
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 السعر الحالي: {gold:.2f}$ | VWAP: {vwap:.2f}$
+📍 أقرب مستوى حرج: {nearest_level} (يبعد {nearest_dist:.2f}$)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 مؤشر قوة الفوليوم (VSI)
+   الحجم الحالي    : {last_vol:,} عقد
+   المتوسط الطبيعي : {normal_vol:,} عقد
+   الفوليوم المطلوب للكسر : {min_vol_for_real_breakout:,} عقد
+   الفارق          : {vol_gap:+,} عقد → {vol_status}
+   نسبة الفوليوم   : {vsi:.2f}x ({"🔥 مؤسسي" if vsi >= 2 else "⬆️ نشط" if vsi >= 1.5 else "🟡 طبيعي" if vsi >= 1 else "⬇️ خامل"})
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ مؤشر الزخم المركب (CMS) = {cms_pct:+d}/100
+   RSI({rsi:.1f})→{round(rsi_score, 1):+.1f} | MACD_H→{round(macd_score, 1):+.1f} | ADX_Dir→{round(adx_score, 1):+.1f}
+   {'🟢 زخم صعودي قوي' if cms_pct > 50 else '🔴 زخم هبوطي قوي' if cms_pct < -50 else '🟡 زخم صعودي ضعيف' if cms_pct > 0 else '🟠 زخم هبوطي ضعيف'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧮 نسبة ATR للاختراق
+   ATR الكلي    : {atr:.2f}$
+   حد الاختراق  : {atr_threshold:.2f}$ (0.3 × ATR)
+   بُعد عن R1   : {dist_to_r1:.2f}$ ({int(breakout_ratio_r1*100)}% من ATR)
+   بُعد عن S1   : {dist_to_s1:.2f}$ ({int(breakout_ratio_s1*100)}% من ATR)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏆 مؤشر صحة الاختراق (BHS) = {bhs}/100
+"""
+    for detail in bhs_details:
+        report += f"   {detail}\n"
+
+    report += f"""━━━━━━━━━━━━━━━━━━━━━━━━━━
+{verdict_color} الحكم النهائي: {breakout_verdict}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 قاعدة الاختراق الذكي:
+   اختراق حقيقي = VSI ≥ 1.5x + BHS ≥ 60 + إغلاق فوق/تحت المستوى
+   اختراق وهمي  = VSI < 1.0x أو ADX < 20 أو OBV عكس الاتجاه
+📌 OBV الحالي: {int(obv_val):,} ({obv_trend}) — {"سيولة تتراكم 🟢" if "صعودي" in obv_trend else "سيولة تنسحب 🔴"}"""
+
+    return report
+
+
+
 def _send_single_bot3(text: str, chat_id=None) -> bool:
     """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
     try:
@@ -6684,6 +6898,18 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     flat_chunks_2.append((title, chunk, chat_id))
         total_2 = len(flat_chunks_2)
 
+        # ── القوالب الجديدة — البوت الرابع @Boonnii_bot ──
+        bot4_reports = []
+        bot4_reports.append(("🔬 [1] كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector(data), None))
+        # (القوالب الجديدة التالية ستُضاف هنا لاحقاً)
+
+        flat_chunks_4 = []
+        for title4, txt4, cid4 in bot4_reports:
+            if txt4:
+                for chunk4 in _split_message(txt4):
+                    flat_chunks_4.append((title4, chunk4, cid4))
+        total_4 = len(flat_chunks_4)
+
         global LAST_PUBLIC_REPORT_TIME, LAST_4H_REPORT_TIME
         now = time.time()
         is_public = False
@@ -6796,6 +7022,20 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
                 except Exception as _e4:
                     log.error(f"❌ [Summary4] خطأ: {_e4}")
+
+            # ── البوت الرابع: القوالب الجديدة (@Boonnii_bot) ──
+            if flat_chunks_4:
+                log.info(f"📤 [Bot4] إرسال {total_4} قالب جديد عبر @Boonnii_bot...")
+                for i4, (title4, chunk4, cid4) in enumerate(flat_chunks_4, 1):
+                    final_text4 = (
+                        f"🆕 [{i4}/{total_4}] قوالب الذهب المتقدمة (XAU/USD)\n"
+                        f"{title4}\n\n{chunk4}"
+                    )
+                    ok4 = _send_single_bot4(final_text4, cid4)
+                    if send_to_4h_channel and not cid4:
+                        _send_single_bot4(final_text4, "@Maaregsovereinefund")
+                    log.info(f"{'✅' if ok4 else '❌'} [Bot4] {i4}/{total_4}")
+                    time.sleep(2)
 
             log.info("🔓 [Spot] تم الارسال، تحرير القفل لانتظار الخلاصة...")
 

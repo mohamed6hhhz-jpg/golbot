@@ -2923,11 +2923,36 @@ def _build_liquidity_breakout_detector(d: dict) -> str:
     يحدد إذا كان الاختراق/الكسر حقيقي أو وهمي بناءً على الفوليوم والزخم والـ OBV
     """
     import math
+    import numpy as np
 
     gold      = d.get('gold', 0)
     atr       = d.get('atr', 20)
     rel_vol   = float(d.get('rel_vol', 1.0) or 1.0)
-    last_vol  = int(d.get('last_vol', 0))
+    
+    # محاولة سحب الفوليوم الحقيقي
+    last_vol = 0
+    vol_avg = 1
+    try:
+        import yfinance as _yf
+        _tk = _yf.Ticker("GC=F")
+        _df = _tk.history(period="1d", interval="5m")
+        if _df is not None and not _df.empty:
+            vols = _df['Volume'].values
+            last_vol = int(vols[-1]) if len(vols) > 0 else 0
+            if last_vol == 0 and len(vols) > 1:
+                last_vol = int(vols[-2])
+            vol_avg = int(np.mean(vols[-20:])) if len(vols) >= 20 else int(np.mean(vols))
+            if vol_avg == 0: vol_avg = 1
+            if last_vol > 0:
+                rel_vol = last_vol / vol_avg
+    except Exception:
+        pass
+        
+    if last_vol == 0:
+        # Fallback heuristic if yfinance fails
+        last_vol = int(atr * rel_vol * 100)
+        if last_vol == 0: last_vol = 1000
+
     obv_val   = float(d.get('obv_val', 0) or 0)
     obv_trend = d.get('obv_trend', '')
     rsi       = float(d.get('rsi', 50) or 50)
@@ -2953,7 +2978,8 @@ def _build_liquidity_breakout_detector(d: dict) -> str:
 
     # 1. مؤشر قوة الفوليوم (Volume Strength Index - VSI)
     # كلما كان أعلى من 1.5x = ضخ مؤسسي حقيقي
-    normal_vol = int(last_vol / rel_vol) if rel_vol > 0.1 else last_vol
+    normal_vol = vol_avg if 'vol_avg' in locals() and vol_avg > 1 else int(last_vol / rel_vol) if rel_vol > 0.1 else last_vol
+    if normal_vol == 0: normal_vol = 1
     vsi = rel_vol
     vsi_pct = int((vsi - 1) * 100)
 

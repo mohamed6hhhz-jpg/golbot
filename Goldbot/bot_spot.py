@@ -4252,6 +4252,90 @@ def _build_ultimate_quant_score(d: dict) -> str:
 """
     return report
 
+def _build_timeframe_impact_matrix(d: dict) -> str:
+    """
+    القالب الحادي عشر: تأثير البيانات على الفترات الزمنية
+    """
+    import math
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    gold = float(d.get('gold', 0))
+    rsi = float(d.get('rsi', 50) or 50)
+    macd_hist = float(d.get('macd_hist', 0) or 0)
+    rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
+    obv_val = float(d.get('obv_val', 0) or 0)
+    dxy = float(d.get('dxy', 104.0) or 104.0)
+    us10y = float(d.get('us10y', 4.0) or 4.0)
+    ema50 = float(d.get('ema50', gold) or gold)
+    ema200 = float(d.get('ema200', gold) or gold)
+    vwap = float(d.get('vwap', gold) or gold)
+
+    # 1. المدى اليومي (Intraday) - يعتمد على VWAP, RSI, والسيولة اللحظية
+    if gold > vwap and rsi > 50 and rel_vol > 1.0:
+        intraday_impact = "🟢 إيجابي (زخم شرائي مستمر خلال الجلسة، استهداف مقاومات عليا)."
+    elif gold < vwap and rsi < 50 and rel_vol > 1.0:
+        intraday_impact = "🔴 سلبي (ضغط بيعي قوي، استهداف دعوم سفلية)."
+    elif rsi >= 70:
+        intraday_impact = "⚠️ تشبع شرائي (احتمالية تصحيح لحظي قبل استكمال المسار)."
+    elif rsi <= 30:
+        intraday_impact = "⚠️ تشبع بيعي (فرصة ارتداد لحظي للمضاربين)."
+    else:
+        intraday_impact = "🟡 متذبذب (يتحرك في نطاق عرضي حول مناطق الـ VWAP)."
+
+    # 2. المدى القريب (Short-Term: أيام لأسابيع) - يعتمد على MACD وميل الـ EMA50
+    if macd_hist > 0 and gold > ema50:
+        shortterm_impact = "🟢 صعود مستقر (قوة الاتجاه تدعم استمرار الإغلاقات الأسبوعية الإيجابية)."
+    elif macd_hist < 0 and gold < ema50:
+        shortterm_impact = "🔴 هبوط حاد (ضعف في الهيكل الفني يرجح كسر قيعان أسبوعية جديدة)."
+    elif macd_hist > 0 and gold < ema50:
+        shortterm_impact = "↗️ تعافي بطيء (تجميع تدريجي لمحاولة اختراق المقاومات الأسبوعية)."
+    else:
+        shortterm_impact = "↘️ ضغط تصحيحي (إشارات ضعف قد تتحول لهبوط إن لم يتماسك السعر)."
+
+    # 3. المدى المتوسط (Medium-Term: أسابيع لأشهر) - يعتمد على الـ OBV و Smart Money
+    whale_power = math.tanh(obv_val / 100000)
+    if whale_power > 0.2:
+        midterm_impact = "🟢 ارتكاز مؤسساتي قوي (الحيتان يقومون بتجميع استراتيجي يستهدف قمم شهرية)."
+    elif whale_power < -0.2:
+        midterm_impact = "🔴 تصريف مؤسساتي (تسييل محافظ ضخمة مما يضعف الثقة الاستثمارية)."
+    else:
+        midterm_impact = "⚪ حيرة استثمارية (استقرار نسبي بانتظار محفزات أساسية أو سيولة جديدة)."
+
+    # 4. المدى البعيد (Long-Term: 6 شهور فما فوق) - يعتمد على DXY و US10Y و EMA200
+    macro_env = -math.tanh((dxy - 104.0)/2.0) - math.tanh((us10y - 4.0)/0.5)
+    if gold > ema200 and macro_env > 0:
+        longterm_impact = "🟢 بيئة استثمارية مثالية (الدولار والعوائد يدعمان رالي استثماري ضخم للذهب)."
+    elif gold > ema200 and macro_env < 0:
+        longterm_impact = "🟡 صعود حذر (السعر إيجابي فنياً، لكن قوة الدولار/السندات تشكل مقاومة خفية)."
+    elif gold < ema200 and macro_env < 0:
+        longterm_impact = "🔴 دورة هبوطية (الذهب تحت ضغط كلي من السياسات النقدية وقوة الدولار)."
+    else:
+        longterm_impact = "⚖️ مفترق طرق (تعارض بين المؤشرات الفنية الكبرى وظروف الاقتصاد الكلي)."
+
+    report = f"""⏳ [11] مصفوفة التأثير الزمني الشامل (Timeframe Impact)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🕐 التوقيت: {now.strftime('%H:%M:%S UTC')}
+💰 السعر : {gold:.2f}$
+
+بناءً على نتائج الإحصائيات والأرقام (للقوالب الـ 29 السابقة)، 
+إليك الانعكاس المباشر والتأثير المتوقع على كافة الآجال الزمنية:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+1️⃣ المدى اليومي اللحظي (Intraday)
+   └ التأثير: {intraday_impact}
+
+2️⃣ المدى القريب (أيام - أسابيع)
+   └ التأثير: {shortterm_impact}
+
+3️⃣ المدى المتوسط (أسابيع - أشهر)
+   └ التأثير: {midterm_impact}
+
+4️⃣ المدى البعيد والاستثماري (أشهر - نهاية العام)
+   └ التأثير: {longterm_impact}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 خلاصة التوقيت: مواءمة الصفقات مع المدى الزمني المناسب هي مفتاح النجاة في هذا السوق.
+"""
+    return report
+
 def _send_single_bot3(text: str, chat_id=None) -> bool:
     """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
     try:
@@ -8070,7 +8154,10 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot4_reports.append(("🧲 [5] خريطة ارتكاز السيولة المؤسساتية (Volume Profile)", _build_liquidity_concentration_zones(data), None))
         bot4_reports.append(("🌍 [6] رادار عقود الخيارات العالمي", _build_global_options_radar(data), None))
         bot4_reports.append(("🕵️ [7] مراقب محافظ الحيتان (Block Trades & Dark Pools)", _build_whale_wallet_monitor(data), None))
-        # (القوالب الجديدة التالية ستُضاف هنا لاحقاً)
+        bot4_reports.append(("🧮 [8] خزانة السيولة الكلية وتدفق العقود", _build_total_liquidity_flow_matrix(data), None))
+        bot4_reports.append(("⚖️ [9] ميزان قوى الحيتان مقابل القطيع", _build_smart_money_vs_retail(data), None))
+        bot4_reports.append(("🧠 [10] محرك القرار الخوارزمي النهائي", _build_ultimate_quant_score(data), None))
+        bot4_reports.append(("⏳ [11] مصفوفة التأثير الزمني الشامل", _build_timeframe_impact_matrix(data), None))
 
         flat_chunks_4 = []
         for title4, txt4, cid4 in bot4_reports:

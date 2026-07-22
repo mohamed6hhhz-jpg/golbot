@@ -3168,7 +3168,11 @@ def _fetch_options_institutional(ticker_sym: str, label: str) -> dict:
         result["net_flow"] = result["calls_vol"] - result["puts_vol"]
 
     except Exception as e:
-        result["error"] = str(e)[:80]
+        err_str = str(e)
+        if "Too Many Requests" in err_str or "Rate limit" in err_str:
+            result["error"] = "البيانات غير متاحة مؤقتاً (تحديث الخوادم أو السوق مغلق)"
+        else:
+            result["error"] = err_str[:80]
     return result
 
 
@@ -3462,8 +3466,8 @@ def _build_dynamic_price_targets(d: dict) -> str:
         # تحجيم ATR لعدد الأيام (قانون الجذر التربيعي للزمن)
         atr_scaled = atr * math.sqrt(days)
 
-        # معامل التقلب مع الفوليوم
-        vol_factor = 1.0 + (rel_vol - 1.0) * 0.3  # تعديل بسيط بالفوليوم
+        # معامل التقلب مع الفوليوم (مقيّد لتجنب القيم الشاذة)
+        vol_factor = min(2.5, max(0.5, 1.0 + (rel_vol - 1.0) * 0.15))
 
         # نطاق التحرك الكلي
         total_range = atr_scaled * vol_factor
@@ -3474,7 +3478,7 @@ def _build_dynamic_price_targets(d: dict) -> str:
         down_pct = 1 - up_pct
 
         high_target  = round(gold + total_range * up_pct,   2)
-        low_target   = round(gold - total_range * down_pct, 2)
+        low_target   = max(gold * 0.2, round(gold - total_range * down_pct, 2))
         close_target = round(gold + (high_target - low_target) * tbi * 0.4, 2)
 
         # تقييد الإغلاق بين القمة والقاع

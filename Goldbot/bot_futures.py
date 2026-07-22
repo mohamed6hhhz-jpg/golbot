@@ -6683,7 +6683,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(data), None))
         t13_src = t13 if t13 and 'تعذر' not in str(t13) else _build_template_13(data)
         if not t13_src:
-            t13_src = "━━━━━━━━━━━━━━━━━━━━━━━━━━" + "━━━━━━━━━━━━━━━━━━━━━━━━━━".join(_build_template_13.__code__.co_consts) # Fallback if everything fails
+            t13_src = "━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + "\n".join([str(c) for c in _build_template_13.__code__.co_consts if isinstance(c, str) and len(c) > 5])
         
         import re
         t13_clean = re.sub(r'\[.*?\]', '', t13_src, flags=re.DOTALL)

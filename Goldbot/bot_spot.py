@@ -8062,7 +8062,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(data), None))
         t13_src = t13 if t13 and 'تعذر' not in str(t13) else _build_template_13(data)
         if not t13_src:
-            t13_src = "━━━━━━━━━━━━━━━━━━━━━━━━━━" + "━━━━━━━━━━━━━━━━━━━━━━━━━━".join(_build_template_13.__code__.co_consts) # Fallback if everything fails
+            t13_src = "━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + "\n".join([str(c) for c in _build_template_13.__code__.co_consts if isinstance(c, str) and len(c) > 5])
         
         import re
         t13_clean = re.sub(r'\[.*?\]', '', t13_src, flags=re.DOTALL)
@@ -8230,7 +8230,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
             # ── خلاصة محورية 2 بعد انتهاء التقرير الثاني ──
             try:
-                _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", total_2)
+                _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", flat_chunks_2)
                 send_summary_to_bot("8448760638:AAF0PokiiolyPAAztD-BTZGenbjRiUKh6hc", _summary2_text, TARGET_CHATS[0])
                 log.info("✅ [Summary2] تم إرسال خلاصة التقرير الثاني.")
             except Exception as _e2:

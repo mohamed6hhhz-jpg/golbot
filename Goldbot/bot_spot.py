@@ -8505,12 +8505,11 @@ def run_bot():
         market_closed_notified = False
 
         for mode in ['spot']:
-            try:
-                data = get_full_market_data(mode=mode)
-                if data and data["gold"]:
-                    consec_failures[mode] = 0
-                    all_models_notified = False
-                    current_gold = data["gold"]
+            data = get_full_market_data(mode=mode)
+            if data and data["gold"]:
+                consec_failures[mode] = 0
+                all_models_notified = False
+                current_gold = data["gold"]
 
                 if last_gold_price[mode] is None and last_report_date != today:
                     log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
@@ -8566,20 +8565,15 @@ def run_bot():
                             send_reports(data, report)
                             last_gold_price[mode] = current_gold
                             minutes_counter[mode] = 0
-                else:
-                    consec_failures[mode] += 1
-                    log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
-                    if consec_failures[mode] >= 3 and not all_models_notified:
-                        send_to_telegram(
-                            f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
-                            "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
-                        )
-                        all_models_notified = True
-
-            except Exception as loop_e:
-                import traceback
-                log.error(f"❌ خطأ غير متوقع في حلقة البوت: {loop_e}\n{traceback.format_exc()}")
-                time.sleep(10)
+            else:
+                consec_failures[mode] += 1
+                log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
+                if consec_failures[mode] >= 3 and not all_models_notified:
+                    send_to_telegram(
+                        f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
+                        "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
+                    )
+                    all_models_notified = True
 
             minutes_counter[mode] += 1
             

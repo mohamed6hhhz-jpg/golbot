@@ -4700,11 +4700,12 @@ def run_bot():
         market_closed_notified = False
 
         for mode in ['futures']:
-            data = get_full_market_data(mode=mode)
-            if data and data["gold"]:
-                consec_failures[mode] = 0
-                all_models_notified = False
-                current_gold = data["gold"]
+            try:
+                data = get_full_market_data(mode=mode)
+                if data and data["gold"]:
+                    consec_failures[mode] = 0
+                    all_models_notified = False
+                    current_gold = data["gold"]
 
                 if last_gold_price[mode] is None and last_report_date != today:
                     log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
@@ -4769,6 +4770,11 @@ def run_bot():
                         "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
                     )
                     all_models_notified = True
+
+            except Exception as loop_e:
+                import traceback
+                log.error(f"❌ خطأ غير متوقع في حلقة البوت: {loop_e}\n{traceback.format_exc()}")
+                time.sleep(10)
 
             minutes_counter[mode] += 1
             
@@ -6692,26 +6698,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
         # القوالب الفورية S1-S12 — البوت الثالث @Dsssoppp78_bot
         bot3_reports = []
-        try:
-            bot3_reports.append(("[فوري] 1/12 الاسعار والفيبوناتشي",       _build_spot_s1(data),  None))
-            bot3_reports.append(("[فوري] 2/12 الاطارات الزمنية",            _build_spot_s2(data),  None))
-            bot3_reports.append(("[فوري] 3/12 زيرو انعكاس",                 _build_spot_s3(data),  None))
-            bot3_reports.append(("[فوري] 4/12 السكالبينج",                   _build_spot_s4(data),  None))
-            bot3_reports.append(("[فوري] 5/12 السوينج",                      _build_spot_s5(data),  None))
-            bot3_reports.append(("[فوري] 6/12 اللوت العالي",                 _build_spot_s6(data),  None))
-            bot3_reports.append(("[فوري] 7/12 التحليل الفني والزخم",         _build_spot_s7(data),  None))
-            bot3_reports.append(("[فوري] 8/12 الاقتصاد الكلي",              _build_spot_s8(data),  None))
-            bot3_reports.append(("[فوري] 9/12 شهية المخاطرة",               _build_spot_s9(data),  None))
-            bot3_reports.append(("[فوري] 10/12 عوائد السندات",              _build_spot_s10(data), None))
-            bot3_reports.append(("[فوري] 11/12 قوة العملات DXY",             _build_spot_s11(data), None))
-            bot3_reports.append(("[فوري] 12/12 الخلاصة المحورية",            _build_spot_s12(data), None))
-            bot3_reports.append(("[فوري] 13/13 المستهدف الأسبوعي", _build_friday_target(data, False), None))
-            bot3_reports.append(("[فوري] 14/14 مسار القمة والقاع", _build_spot_s14(data), None))
-            bot3_reports.append(("[فوري] 15/15 الرادار المؤسساتي والسيولة", _build_spot_s15(data), None))
-            bot3_reports.append(("[فوري] 16/16 استراتيجية اللوت الكامل", _build_spot_s16(data), None))
-            log.info(f"[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي")
-        except Exception as _se:
-            log.warning(f"[S1-S12] خطا في توليد القوالب الفورية: {_se}")
+        # (Spot reports S1-S12 are handled by bot_spot.py)
 
         bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7 or _build_template_7(data), None))
         bot2_reports.append(("🐋 تاثير الاسواق والمؤسسات (الفوري)", t8 or _build_template_8(data), None))
@@ -6720,15 +6707,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         _t6_text = t6 if t6 and 'تعذر' not in str(t6) else f"الخلاصة: اتجاه {data.get('confluence', {}).get('verdict', 'محايد')} — السعر {data.get('gold', 0):.2f}$"
         bot2_reports.append(("الخلاصة المحورية", _t6_text, None))
         
-        s12_report = _build_spot_s12(data)
-        bot2_reports.append(("👑 الخلاصة المحورية والدقيقة (الجيل الخامس - Spot)", s12_report or f"الخلاصة المحورية: السعر {data.get('gold',0):.2f}$", None))
-            
-        s9_report = _build_spot_s9(data)
-        bot2_reports.append(("👑 مصفوفة التداول السريعة والاسكالبينج الاحترافي (Spot)", s9_report or f"مصفوفة التداول: السعر {data.get('gold',0):.2f}$", None))
+        # (Spot reports are handled by bot_spot.py)
         bot2_reports.append(("[16/16] المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
-        bot2_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
-        bot2_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
-        bot2_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
         bot2_reports.append(("⏰ تنبيه مبكر — انعكاس مرتقب", _build_early_warning_alert(data), None))
         bot2_reports.append(("🚨 رادار الأخبار العاجلة (Breaking News)", _build_sudden_news_alert(data), None))
         bot2_reports.append(("🏦 رادار السيولة المؤسساتية (Smart Money)", _build_institutional_liquidity_map(data), None))
@@ -6741,9 +6721,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──
 
         # ── تسطيح وإرسال ──
-        raw_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
-        raw_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
-        raw_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
+        # (Spot reports are handled by bot_spot.py)
         raw_reports.append(("⏰ تنبيه مبكر — انعكاس مرتقب", _build_early_warning_alert(data), None))
         raw_reports.append(("🚨 رادار الأخبار العاجلة (Breaking News)", _build_sudden_news_alert(data), None))
         raw_reports.append(("🏦 رادار السيولة المؤسساتية (Smart Money)", _build_institutional_liquidity_map(data), None))

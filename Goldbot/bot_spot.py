@@ -4313,6 +4313,8 @@ def _build_timeframe_impact_matrix(d: dict) -> str:
     rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
     obv_val = float(d.get('obv_val', 0) or 0)
     dxy = float(d.get('dxy', 104.0) or 104.0)
+    atr = float(d.get('atr', 20.0) or 20.0)
+    obv_trend = d.get('obv_trend', '')
     us10y = float(d.get('us10y', 4.0) or 4.0)
     ema50 = float(d.get('ema50', gold) or gold)
     ema200 = float(d.get('ema200', gold) or gold)
@@ -8503,11 +8505,12 @@ def run_bot():
         market_closed_notified = False
 
         for mode in ['spot']:
-            data = get_full_market_data(mode=mode)
-            if data and data["gold"]:
-                consec_failures[mode] = 0
-                all_models_notified = False
-                current_gold = data["gold"]
+            try:
+                data = get_full_market_data(mode=mode)
+                if data and data["gold"]:
+                    consec_failures[mode] = 0
+                    all_models_notified = False
+                    current_gold = data["gold"]
 
                 if last_gold_price[mode] is None and last_report_date != today:
                     log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
@@ -8572,6 +8575,11 @@ def run_bot():
                         "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
                     )
                     all_models_notified = True
+
+            except Exception as loop_e:
+                import traceback
+                log.error(f"❌ خطأ غير متوقع في حلقة البوت: {loop_e}\n{traceback.format_exc()}")
+                time.sleep(10)
 
             minutes_counter[mode] += 1
             

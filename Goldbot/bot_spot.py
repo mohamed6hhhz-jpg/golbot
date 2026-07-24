@@ -3089,27 +3089,39 @@ def _build_liquidity_breakout_detector(d: dict) -> str:
    نسبة الفوليوم   : {vsi:.2f}x ({"🔥 مؤسسي" if vsi >= 2 else "⬆️ نشط" if vsi >= 1.5 else "🟡 طبيعي" if vsi >= 1 else "⬇️ خامل"})
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ مؤشر الزخم المركب (CMS) = {cms_pct:+d}/100
-   RSI({rsi:.1f})→{round(rsi_score, 1):+.1f} | MACD_H→{round(macd_score, 1):+.1f} | ADX_Dir→{round(adx_score, 1):+.1f}
+   RSI({rsi:.0f}) → نقاط: {round(rsi_score, 0):+.0f} | (50=محايد، >50=صعودي)
+   MACD_H → نقاط: {round(macd_score, 0):+.0f} | (موجب=شراء، سالب=بيع)
+   ADX_Dir → نقاط: {round(adx_score, 0):+.0f} | (DI+{di_plus:.0f} vs DI-{di_minus:.0f})
    {'🟢 زخم صعودي قوي' if cms_pct > 50 else '🔴 زخم هبوطي قوي' if cms_pct < -50 else '🟡 زخم صعودي ضعيف' if cms_pct > 0 else '🟠 زخم هبوطي ضعيف'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧮 نسبة ATR للاختراق
-   ATR الكلي    : {atr:.2f}$
-   حد الاختراق  : {atr_threshold:.2f}$ (0.3 × ATR)
-   بُعد عن R1   : {dist_to_r1:.2f}$ ({int(breakout_ratio_r1*100)}% من ATR)
-   بُعد عن S1   : {dist_to_s1:.2f}$ ({int(breakout_ratio_s1*100)}% من ATR)
+   ATR الكلي    : {atr:.2f}$ (متوسط التحرك اليومي)
+   حد الاختراق  : {atr_threshold:.2f}$ (30% من ATR — الحد الأدنى للكسر الحقيقي)
+   بُعد عن R1   : {dist_to_r1:.2f}$ ({int(breakout_ratio_r1*100)}% من ATR) {'✅ قريب' if breakout_ratio_r1 < 0.5 else '🟡 متوسط' if breakout_ratio_r1 < 1.0 else '🔴 بعيد'}
+   بُعد عن S1   : {dist_to_s1:.2f}$ ({int(breakout_ratio_s1*100)}% من ATR) {'✅ قريب' if breakout_ratio_s1 < 0.5 else '🟡 متوسط' if breakout_ratio_s1 < 1.0 else '🔴 بعيد'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🏆 مؤشر صحة الاختراق (BHS) = {bhs}/100
+   (0-30: خطر وهمي | 30-60: مشكوك فيه | 60-80: محتمل | 80-100: قوي)
 """
     for detail in bhs_details:
         report += f"   {detail}\n"
 
+    # توصية التداول بناءً على BHS وVSI
+    if bhs >= 60 and vsi >= 1.5:
+        trade_action = (f"🟢 توصية: ابحث عن دخول بعد إغلاق شمعة {'15 دقيقة' if nearest_dist < atr*0.5 else 'ساعة'} فوق {nearest_level.split('(')[1].rstrip('$)')}$" if gold > vwap else f"🔴 توصية: ابحث عن دخول بيع بعد كسر {nearest_level.split('(')[1].rstrip('$)')}$ وإغلاق تحته")
+    elif bhs >= 30:
+        trade_action = "⚠️ توصية: انتظر تأكيداً إضافياً — الظروف غير مثالية بعد"
+    else:
+        trade_action = "❌ توصية: لا تدخل — احتمال عالٍ أن الكسر وهمي"
+
     report += f"""━━━━━━━━━━━━━━━━━━━━━━━━━━
 {verdict_color} الحكم النهائي: {breakout_verdict}
+{trade_action}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 💡 قاعدة الاختراق الذكي:
    اختراق حقيقي = VSI ≥ 1.5x + BHS ≥ 60 + إغلاق فوق/تحت المستوى
    اختراق وهمي  = VSI < 1.0x أو ADX < 20 أو OBV عكس الاتجاه
-📌 OBV الحالي: {int(obv_val):,} ({obv_trend}) — {"سيولة تتراكم 🟢" if "صعودي" in obv_trend else "سيولة تنسحب 🔴"}"""
+📌 OBV: {int(obv_val):,} ({obv_trend}) — {"سيولة تتراكم 🟢" if "صعودي" in obv_trend else "سيولة تنسحب 🔴"}"""
 
     return report
 
@@ -3673,10 +3685,9 @@ def _build_live_liquidity_spike(d: dict) -> str:
     bspi += obv_score
     bspi_reasons.append(f"OBV → {obv_score:+d}")
 
-    # تكثيف بالفوليوم
+    # تكثيف الإشارة عند وجود سبايك (لا يُضاف كسبب منفصل)
     if spike_ratio >= 2.0:
-        bspi *= 1.2  # تضخيم الإشارة عند السبايك
-        bspi_reasons.append(f"⚡ تكثيف السبايك ×1.2")
+        bspi *= 1.2  # تضخيم الإشارة — السبايك يُعزز القراءة الحالية
 
     bspi = max(-100, min(100, int(bspi)))
 
@@ -3862,8 +3873,17 @@ def _build_liquidity_concentration_zones(d: dict) -> str:
 {_format_zone(support_zones, "مناطق سيولة الشراء (دعوم حجمية)", "🛡️")}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 💡 دليل القراءة السريعة:
-   🔥 مناطق "قوية جداً": تحتاج سيولة ضخمة جداً لاختراقها، وغالباً يرتد السعر منها بقوة.
-   📌 التداول قريب من POC يعني "سوق متوازن"، الابتعاد عنه يعني "ترند قوي"."""
+   🔥 مناطق "قوية جداً": تحتاج سيولة ضخمة لاختراقها — السعر يرتد منها غالباً بقوة.
+   📌 التداول قريب من POC = "سوق متوازن" | الابتعاد عنه = "ترند قوي".
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📰 بُعد السعر عن نقطة التحكم (POC)
+   السعر الحالي : {gold:.2f}$
+   نقطة التحكم  : {poc_price:.2f}$
+   الفارق       : {gold - poc_price:+.2f}$ ({abs(round((gold / poc_price - 1) * 100, 2)):.2f}%)
+   {'🟢 السعر فوق POC — زخم صعودي قائم' if gold > poc_price + atr * 0.3 else '🔴 السعر تحت POC — ضغط بيعي قائم' if gold < poc_price - atr * 0.3 else '🟡 السعر قريب من POC — منطقة تذبذب / تجميع'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 التوصية بناءً على الموقع:
+   {'↗️ انتظر كسر أقرب مقاومة حجمية لتأكيد الصعود المستمر' if gold > poc_price + atr * 0.3 else '↘️ انتظر اختبار أقرب دعم حجمي — الارتداد عنه فرصة دخول' if gold < poc_price - atr * 0.3 else '⚖️ ترقب الكسر فوق أو تحت POC لتحديد الاتجاه التالي'}"""
     return report
 
 
@@ -4084,25 +4104,29 @@ def _build_total_liquidity_flow_matrix(d: dict) -> str:
     # التدفق المالي التقديري (بالمليون)
     money_flow = (net_flow * 100) / 1_000_000  # تقدير رمزي لقيمة العقد بـ 100 ألف
     
-    report = f"""🧮 [8] خزانة السيولة الكلية وتدفق العقود (Quant Matrix)
+    report = f"""🧮 [8] مؤشر ميزان قوى السيولة (Liquidity Pressure Index)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🕐 الوقت: {now.strftime('%H:%M:%S UTC')}
-💰 الأصل: الذهب (XAU/USD) | السعر: {gold:.2f}$
+💰 السعر: {gold:.2f}$ | الفوليوم: {rel_vol:.2f}x المتوسط
 
-يعمل هذا القالب كعصارة رياضية لكل بيانات الفوليوم والسيولة
-في السوق حالياً ويحولها لأرقام وعقود صافية.
+يقيس هذا المؤشر توازن الضغط الشرائي مقابل البيعي
+بناءً على OBV وRSI والفوليوم النسبي.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚖️ إجمالي العقود النشطة الآن (Spot & Options)
-   🟢 عقود الشراء (Longs) : {buy_contracts:,} عقد ({buy_ratio*100:.1f}%)
-   🔴 عقود البيع (Shorts) : {sell_contracts:,} عقد ({sell_ratio*100:.1f}%)
+⚖️ نسبة الضغط الشرائي مقابل البيعي
+   🟢 ضغط الشراء  : {buy_ratio*100:.1f}% (مبني على OBV + RSI)
+   🔴 ضغط البيع   : {sell_ratio*100:.1f}%
+   الميزان        : {'🟢 شرائي' if buy_ratio > 0.55 else '🔴 بيعي' if buy_ratio < 0.45 else '🟡 متوازن'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-💵 صافي التدفق المالي (Net Flow)
-   الفارق الصافي : {'+' if net_flow > 0 else ''}{net_flow:,} عقد
-   القيمة التقديرية : {'+' if money_flow > 0 else ''}{money_flow:.2f}M$ (مليون دولار)
-   
-   النتيجة: {'🟢 سيولة شرائية تكتسح السوق' if net_flow > 2000 else '🔴 سيولة بيعية تضغط على السعر' if net_flow < -2000 else '🟡 سيولة متوازنة (صراع قوى)'}
+📊 مكونات الحساب:
+   OBV Bias  : {'+' if obv_val > 0 else ''}{obv_val:.0f} → {obv_bias:.2f} نسبة
+   RSI Bias  : {rsi:.1f} → {rsi_bias:+.2f} نسبة
+   Rel Vol   : {rel_vol:.2f}x المتوسط
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 اختصار رقمي: كلما زاد الفارق الإيجابي، زادت فرص الانفجار السعري لأعلى."""
+⚠️ ملاحظة: هذه أرقام إحصائية تقديرية مشتقة من المؤشرات — ليست بيانات Order Book مباشرة.
+
+{'🟢 التوقع: ضغط شرائي يدعم الصعود' if buy_ratio > 0.55 else '🔴 التوقع: ضغط بيعي يهدد بالتراجع' if buy_ratio < 0.45 else '🟡 التوقع: تعادل في القوى — انتظر كسراً'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 كلما ارتفعت نسبة الضغط الشرائي فوق 60%، زادت فرص الارتداد الصاعد."""
     return report
 
 def _build_smart_money_vs_retail(d: dict) -> str:
@@ -4117,32 +4141,39 @@ def _build_smart_money_vs_retail(d: dict) -> str:
     rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
     obv_trend = d.get('obv_trend', '')
     
-    # مؤشر الحيتان (يعتمد على الفوليوم الاستثنائي والـ OBV)
-    smart_money_power = 50 + (math.tanh(rel_vol - 1.2) * 30)
-    if 'صعودي' in obv_trend:
+    # مؤشر الحيتان (Smart Money) — مبني على الفوليوم غير الطبيعي + OBV
+    # الفوليوم العالي (> 1.5x) مع OBV صعودي = تجميع مؤسسي
+    vol_raw  = math.tanh((rel_vol - 1.0) / 0.8) * 40  # من -40 إلى +40
+    obv_raw  = 30 if 'صعودي' in obv_trend else (-30 if 'هبوطي' in obv_trend else 0)
+    smart_money_power = max(10, min(90, 50 + vol_raw + obv_raw))
+
+    if smart_money_power > 60:
         smart_money_bias = "🟢 شراء تجميعي"
-        smart_money_power += 15
-    elif 'هبوطي' in obv_trend:
+    elif smart_money_power < 40:
         smart_money_bias = "🔴 بيع وتصريف"
-        smart_money_power -= 15
     else:
         smart_money_bias = "⚪ محايد/تحوط"
-        
-    smart_money_power = max(10, min(90, smart_money_power))
-    
-    # مؤشر القطيع (الأفراد) يعتمد على ה RSI والتحرك البسيط
-    retail_power = rsi
+
+    # مؤشر القطيع (Retail) — مبني على RSI كمؤشر للشعور الجماهيري
+    # RSI > 65 = شراء جماعي مفرط، RSI < 35 = بيع جماعي مفرط
+    retail_sentiment = (rsi - 50) / 50  # من -1 إلى +1
+    retail_power = max(10, min(90, 50 + retail_sentiment * 40))
+
     if rsi > 65:
-        retail_bias = "🟢 شراء مفرط (FOMO)"
+        retail_bias = "🟢 شراء جماعي (FOMO)"
     elif rsi < 35:
-        retail_bias = "🔴 بيع مفرط (Panic)"
+        retail_bias = "🔴 بيع جماعي (Panic)"
+    elif rsi > 52:
+        retail_bias = "🟡 ميل شرائي خفيف"
+    elif rsi < 48:
+        retail_bias = "🟠 ميل بيعي خفيف"
     else:
-        retail_bias = "🟡 تداول عشوائي"
-        
-    # نسبة الهيمنة
-    total_power = smart_money_power + (100 - abs(50 - retail_power))
-    sm_dom = (smart_money_power / total_power) * 100 if total_power > 0 else 50
-    ret_dom = 100 - sm_dom
+        retail_bias = "⚪ تداول عشوائي"
+
+    # نسبة الهيمنة بناءً على قوة كل طرف
+    total = smart_money_power + retail_power
+    sm_dom  = round((smart_money_power / total) * 100, 1) if total > 0 else 50
+    ret_dom = round(100 - sm_dom, 1)
 
     report = f"""⚖️ [9] ميزان القوى: الحيتان (Smart Money) 🆚 القطيع (Retail)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -4213,10 +4244,10 @@ def _build_ultimate_quant_score(d: dict) -> str:
     short_score = min(100, max(0, 50 - total_score))
     
     if long_score >= 70:
-        verdict = "🟢 صعود حتمي (إشارة شراء قوية جداً)"
+        verdict = "🟢 صعود مرجح (ضغط شرائي قوي جداً)"
         bar = "██████████░░"
     elif short_score >= 70:
-        verdict = "🔴 هبوط حتمي (إشارة بيع قوية جداً)"
+        verdict = "🔴 هبوط مرجح (ضغط بيعي قوي جداً)"
         bar = "🔴🔴🔴🔴🔴🔴🔴🔴⚪⚪"
     elif long_score >= 55:
         verdict = "↗️ ميل للصعود (بحث عن فرص شراء)"
@@ -4230,29 +4261,42 @@ def _build_ultimate_quant_score(d: dict) -> str:
         
     prob_reversal = 100 - max(long_score, short_score) if adx < 20 else max(10, 100 - max(long_score, short_score) - 10)
 
+    # تحديد لون شريط القوة بشكل موحد
+    filled = round(max(long_score, short_score) / 10)
+    empty  = 10 - filled
+    if long_score >= short_score:
+        bar_display = "█" * filled + "░" * empty
+        bar_color   = "🟢"
+    else:
+        bar_display = "█" * filled + "░" * empty
+        bar_color   = "🔴"
+
     report = f"""🧠 [10] محرك القرار الخوارزمي النهائي (Ultimate Quant Score)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🕐 التوقيت: {now.strftime('%H:%M:%S UTC')}
 💰 السعر : {gold:.2f}$
 
-هذا القالب هو المحصلة الرياضية النهائية לـ 29 قالب وتقييم سابق.
-يتم دمج وموازنة (السيولة 35%، الحيتان 25%، الزخم الفني 20%، والماكرو 20%).
+هذا القالب هو المحصلة الرياضية النهائية لـ 10 قوالب تحليلية سابقة.
+يتم دمج وموازنة: السيولة(35%) + الحيتان(25%) + الزخم الفني(20%) + الماكرو(20%).
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🏆 التقييم الخوارزمي النهائي للاتجاه:
    📈 قوة الشراء (Long) : {long_score:.1f}/100
    📉 قوة البيع (Short) : {short_score:.1f}/100
 
    القرار النهائي: {verdict}
-   مؤشر القوة: [{bar}]
+   مؤشر القوة: {bar_color} [{bar_display}]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧩 تفاصيل الأوزان الرياضية (شفافية الخوارزمية):
-   1. وزن السيولة وعقود الخيارات (35%): {'+' if vol_score>0 else ''}{vol_score:.1f}
-   2. وزن بصمات الحيتان (25%)       : {'+' if whale_score>0 else ''}{whale_score:.1f}
-   3. وزن الزخم الفني (20%)         : {'+' if tech_score>0 else ''}{tech_score:.1f}
-   4. وزن الماكرو (الدولار/العوائد) (20%) : {'+' if macro_score>0 else ''}{macro_score:.1f}
+   1. السيولة والفوليوم (35%)         : {vol_score:+.1f} {'📈' if vol_score>0 else '📉'}
+   2. بصمات الحيتان / OBV (25%)      : {whale_score:+.1f} {'📈' if whale_score>0 else '📉'}
+   3. الزخم الفني RSI+MACD+ADX (20%) : {tech_score:+.1f} {'📈' if tech_score>0 else '📉'}
+   4. الماكرو DXY+US10Y (20%)        : {macro_score:+.1f} {'📈' if macro_score>0 else '📉'}
+   ─────────────────────────────
+   المجموع                           : {total_score:+.1f}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ احتمالية الانعكاس السعري (Reversal Risk): {prob_reversal:.1f}%
-💡 هذا هو القرار المبني على دمج كافة الأبعاد الكمية للسوق!
+⚠️ احتمالية الانعكاس (Reversal Risk): {prob_reversal:.0f}%
+   {'⚡ اتجاه ضعيف — احذر من انعكاس مفاجئ' if prob_reversal > 40 else '✅ اتجاه واضح — مخاطرة معقولة'}
+💡 القرار مبني على دمج كافة الأبعاد الكمية — تأكد دائماً بالإغلاق الشمعي.
 """
     return report
 

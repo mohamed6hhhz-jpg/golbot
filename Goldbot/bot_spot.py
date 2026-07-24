@@ -4360,27 +4360,45 @@ def _build_timeframe_impact_matrix(d: dict) -> str:
     else:
         longterm_impact = "⚖️ مفترق طرق (تعارض بين المؤشرات الفنية الكبرى وظروف الاقتصاد الكلي)."
 
+    # حسابات رقمية لكل مدى زمني
+    import math as _math11
+    _id_s  = max(-100, min(100, int(round((gold - vwap) / max(atr * 0.1, 0.1) * 10 + (rsi - 50) * 0.5, 0))))
+    _st_s  = max(-100, min(100, int(round((1 if macd_hist > 0 else -1) * 40 + (1 if gold > ema50 else -1) * 30 + (rsi - 50) * 0.6, 0))))
+    _mt_s  = max(-100, min(100, int(round(_math11.tanh(obv_val / 50000) * 70, 0))))
+    _lt_s  = max(-100, min(100, int(round(macro_env * 50 + (1 if gold > ema200 else -1) * 30, 0))))
+
+    def _sb11(s):
+        f = min(10, int(abs(s) / 10))
+        return ("█" * f + "░" * (10 - f)) if s >= 0 else ("░" * (10 - f) + "█" * f)
+
     report = f"""⏳ [11] مصفوفة التأثير الزمني الشامل (Timeframe Impact)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🕐 التوقيت: {now.strftime('%H:%M:%S UTC')}
-💰 السعر : {gold:.2f}$
+💰 السعر: {gold:.2f}$ | EMA50: {ema50:.2f}$ | EMA200: {ema200:.2f}$
 
-بناءً على نتائج الإحصائيات والأرقام (للقوالب الـ 29 السابقة)، 
-إليك الانعكاس المباشر والتأثير المتوقع على كافة الآجال الزمنية:
+تقييم رقمي لتأثير الظروف الحالية على كل مدى زمني:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-1️⃣ المدى اليومي اللحظي (Intraday)
-   └ التأثير: {intraday_impact}
+1️⃣ اليومي / اللحظي (Intraday)
+   الدرجة: {_id_s:+d}/100 [{_sb11(_id_s)}]
+   المحركات: VWAP{'+' if gold > vwap else '-'}{abs(gold - vwap):.0f}$ | RSI={rsi:.0f} | Vol={rel_vol:.1f}x
+   └ {intraday_impact}
 
-2️⃣ المدى القريب (أيام - أسابيع)
-   └ التأثير: {shortterm_impact}
+2️⃣ القريب (أيام — أسابيع)
+   الدرجة: {_st_s:+d}/100 [{_sb11(_st_s)}]
+   المحركات: MACD {'موجب' if macd_hist > 0 else 'سالب'} | السعر {'فوق' if gold > ema50 else 'تحت'} EMA50
+   └ {shortterm_impact}
 
-3️⃣ المدى المتوسط (أسابيع - أشهر)
-   └ التأثير: {midterm_impact}
+3️⃣ المتوسط (أسابيع — أشهر)
+   الدرجة: {_mt_s:+d}/100 [{_sb11(_mt_s)}]
+   المحركات: OBV = {int(obv_val):+,} ({obv_trend})
+   └ {midterm_impact}
 
-4️⃣ المدى البعيد والاستثماري (أشهر - نهاية العام)
-   └ التأثير: {longterm_impact}
+4️⃣ البعيد / الاستثماري (أشهر — نهاية العام)
+   الدرجة: {_lt_s:+d}/100 [{_sb11(_lt_s)}]
+   المحركات: DXY={dxy:.1f} | US10Y={us10y:.2f}% | السعر {'فوق' if gold > ema200 else 'تحت'} EMA200
+   └ {longterm_impact}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 خلاصة التوقيت: مواءمة الصفقات مع المدى الزمني المناسب هي مفتاح النجاة في هذا السوق.
+💡 درجة موجبة = زخم صعودي | سالبة = ضغط هبوطي | الأفضل التداول في نفس اتجاه الأعلى درجة.
 """
     return report
 

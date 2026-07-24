@@ -8566,15 +8566,15 @@ def run_bot():
                             send_reports(data, report)
                             last_gold_price[mode] = current_gold
                             minutes_counter[mode] = 0
-            else:
-                consec_failures[mode] += 1
-                log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
-                if consec_failures[mode] >= 3 and not all_models_notified:
-                    send_to_telegram(
-                        f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
-                        "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
-                    )
-                    all_models_notified = True
+                else:
+                    consec_failures[mode] += 1
+                    log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
+                    if consec_failures[mode] >= 3 and not all_models_notified:
+                        send_to_telegram(
+                            f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
+                            "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
+                        )
+                        all_models_notified = True
 
             except Exception as loop_e:
                 import traceback

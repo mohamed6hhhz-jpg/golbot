@@ -8136,20 +8136,22 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         raw_reports.append(("📊 صناديق الذهب العالمية (ETF Flows)", _build_etf_flows_report(data), None))
         raw_reports.append(("📅 مصفوفة السكالبينج الشاملة (يومي/أسبوعي/شهري)", _build_scalping_weekly_monthly(data), None))
 
+        # ── تسطيح القوالب مع حفظ رقم القالب لضمان ثبات العدد ──
+        total_templates = len(raw_reports)  # عدد القوالب الثابت (مش الشانكس)
         flat_chunks = []
-        for title, txt, chat_id in raw_reports:
+        for tmpl_idx, (title, txt, chat_id) in enumerate(raw_reports, 1):
             for chunk in _split_message(txt):
-                flat_chunks.append((title, chunk, chat_id))
-        total = len(flat_chunks)
+                flat_chunks.append((tmpl_idx, title, chunk, chat_id))
 
+        total_templates_2 = len(bot2_reports) if 'bot2_reports' in locals() else 0
         flat_chunks_2 = []
         if 'bot2_reports' in locals():
-            for title, txt, chat_id in bot2_reports:
+            for tmpl_idx2, (title, txt, chat_id) in enumerate(bot2_reports, 1):
                 for chunk in _split_message(txt):
-                    flat_chunks_2.append((title, chunk, chat_id))
-        total_2 = len(flat_chunks_2)
+                    flat_chunks_2.append((tmpl_idx2, title, chunk, chat_id))
 
         # ── القوالب الجديدة — البوت الرابع @Boonnii_bot ──
+        BOT4_TOTAL = 11  # عدد ثابت دائماً
         bot4_reports = []
         bot4_reports.append(("🔬 [1] كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector(data), None))
         bot4_reports.append(("🐋 [2] رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker(data), None))
@@ -8164,11 +8166,10 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot4_reports.append(("⏳ [11] مصفوفة التأثير الزمني الشامل", _build_timeframe_impact_matrix(data), None))
 
         flat_chunks_4 = []
-        for title4, txt4, cid4 in bot4_reports:
+        for tmpl_idx4, (title4, txt4, cid4) in enumerate(bot4_reports, 1):
             if txt4:
                 for chunk4 in _split_message(txt4):
-                    flat_chunks_4.append((title4, chunk4, cid4))
-        total_4 = len(flat_chunks_4)
+                    flat_chunks_4.append((tmpl_idx4, title4, chunk4, cid4))
 
         global LAST_PUBLIC_REPORT_TIME, LAST_4H_REPORT_TIME
         now = time.time()
@@ -8185,12 +8186,12 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         log.info("⏳ [Spot] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
         with SEND_LOCK:
             log.info("🔒 [Spot] حصل على القفل — بدء إرسال الرسائل...")
-            log.info(f"📤 [Spot] إرسال {total} رسالة متسلسلة...")
+            log.info(f"📤 [Spot] إرسال {total_templates} قالب ({len(flat_chunks)} رسالة) للبوت الأول...")
 
-            for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
+            for tmpl_idx, title, chunk, chat_id in flat_chunks:
                 subtitle = _get_subtitle(chunk, title)
                 final_text = (
-                    f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
+                    f"{prefix}[{tmpl_idx}/{total_templates}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
                     f"{subtitle}\n\n{chunk}"
                 )
                 ok = _send_single(final_text, is_public, chat_id)
@@ -8199,7 +8200,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 if send_to_4h_channel and not chat_id:
                     _send_single(final_text, is_public, "@Maaregsovereinefund")
                     
-                log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
+                log.info(f"✅ قالب {tmpl_idx}/{total_templates} وصل." if ok else f"❌ فشل قالب {tmpl_idx}/{total_templates}.")
                 time.sleep(2)
 
             # ── خلاصة محورية 1 بعد انتهاء التقرير الأول ──
@@ -8212,24 +8213,20 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
             # ── إرسال للبوت الجديد (القسم الثاني) ──
             if flat_chunks_2:
-                log.info(f"📤 إرسال {total_2} رسالة متسلسلة للبوت المستقل (الجزء الثاني)...")
-                import os
-                # استدعاء توكن البوت الجديد (مؤقتاً نستخدم نفس الإرسال المخصص إذا لم يتوفر التوكن، لكن يمكن للعميل تغييره)
-                bot2_token = os.environ.get('TELEGRAM_BOT_TOKEN_2', TELEGRAM_BOT_TOKEN) 
+                log.info(f"📤 إرسال {total_templates_2} قالب ({len(flat_chunks_2)} رسالة) للبوت الثاني...")
                 
-                for i2, (title2, chunk2, chat_id2) in enumerate(flat_chunks_2, 1):
+                for tmpl_idx2, title2, chunk2, chat_id2 in flat_chunks_2:
                     subtitle2 = _get_subtitle(chunk2, title2)
                     final_text2 = (
-                        f"{prefix}[{i2}/{total_2}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
+                        f"{prefix}[{tmpl_idx2}/{total_templates_2}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
                         f"{subtitle2}\n\n{chunk2}"
                     )
-                    # For bot 2, we will send to TARGET_CHATS unless specified
                     ok2 = _send_single_bot2(final_text2, is_public, chat_id2)
                     
                     if send_to_4h_channel and not chat_id2:
                         _send_single_bot2(final_text2, is_public, "@Maaregsovereinefund")
                         
-                    log.info(f"✅ رسالة البوت الثاني {i2}/{total_2} وصلت." if ok2 else f"❌ فشل رسالة البوت الثاني {i2}/{total_2}.")
+                    log.info(f"✅ قالب البوت الثاني {tmpl_idx2}/{total_templates_2} وصل." if ok2 else f"❌ فشل قالب البوت الثاني {tmpl_idx2}/{total_templates_2}.")
                     time.sleep(2)
 
             # ── خلاصة محورية 2 بعد انتهاء التقرير الثاني ──
@@ -8243,15 +8240,15 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── البوت الثالث: القوالب الفورية S1-S12 (@Dsssoppp78_bot) ──
             if 'bot3_reports' in locals() and bot3_reports:
                 flat_chunks_3 = []
-                for title3, txt3, cid3 in bot3_reports:
+                for tmpl_idx3, (title3, txt3, cid3) in enumerate(bot3_reports, 1):
                     if txt3:
                         for chunk3 in _split_message(txt3):
-                            flat_chunks_3.append((title3, chunk3, cid3))
-                total_3 = len(flat_chunks_3)
-                log.info(f"📤 [Bot3] ارسال {total_3} قالب فوري عبر @Dsssoppp78_bot...")
-                for i3, (title3, chunk3, cid3) in enumerate(flat_chunks_3, 1):
+                            flat_chunks_3.append((tmpl_idx3, title3, chunk3, cid3))
+                total_templates_3 = len(bot3_reports)  # عدد ثابت دائماً 16
+                log.info(f"📤 [Bot3] ارسال {total_templates_3} قالب فوري عبر @Dsssoppp78_bot...")
+                for tmpl_idx3, title3, chunk3, cid3 in flat_chunks_3:
                     final_text3 = (
-                        f"📊 [{i3}/{total_3}] تقارير سوق الفوري (XAU/USD Spot)\n"
+                        f"📊 [{tmpl_idx3}/{total_templates_3}] تقارير سوق الفوري (XAU/USD Spot)\n"
                         f"{title3}\n\n{chunk3}"
                     )
                     ok3 = _send_single_bot3(final_text3, cid3)
@@ -8259,7 +8256,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     if send_to_4h_channel and not cid3:
                         _send_single_bot3(final_text3, "@Maaregsovereinefund")
                         
-                    log.info(f"{'✅' if ok3 else '❌'} [Bot3] {i3}/{total_3}")
+                    log.info(f"{'✅' if ok3 else '❌'} [Bot3] {tmpl_idx3}/{total_templates_3}")
                     time.sleep(2)
 
                 # ── خلاصة محورية 3 بعد انتهاء التقرير الثالث ──
@@ -8285,16 +8282,16 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
             # ── البوت الرابع: القوالب الجديدة (@Boonnii_bot) ──
             if flat_chunks_4:
-                log.info(f"📤 [Bot4] إرسال {total_4} قالب جديد عبر @Boonnii_bot...")
-                for i4, (title4, chunk4, cid4) in enumerate(flat_chunks_4, 1):
+                log.info(f"📤 [Bot4] إرسال {BOT4_TOTAL} قالب جديد عبر @Boonnii_bot...")
+                for tmpl_idx4, title4, chunk4, cid4 in flat_chunks_4:
                     final_text4 = (
-                        f"🆕 [{i4}/{total_4}] قوالب الذهب المتقدمة (XAU/USD)\n"
+                        f"🆕 [{tmpl_idx4}/{BOT4_TOTAL}] قوالب الذهب المتقدمة (XAU/USD)\n"
                         f"{title4}\n\n{chunk4}"
                     )
                     ok4 = _send_single_bot4(final_text4, cid4)
                     if send_to_4h_channel and not cid4:
                         _send_single_bot4(final_text4, "@Maaregsovereinefund")
-                    log.info(f"{'✅' if ok4 else '❌'} [Bot4] {i4}/{total_4}")
+                    log.info(f"{'✅' if ok4 else '❌'} [Bot4] {tmpl_idx4}/{BOT4_TOTAL}")
                     time.sleep(2)
 
             log.info("🔓 [Spot] تم الارسال، تحرير القفل لانتظار الخلاصة...")

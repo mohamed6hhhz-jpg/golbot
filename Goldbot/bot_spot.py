@@ -8376,19 +8376,6 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 except Exception as _e3:
                     log.error(f"❌ [Summary3] خطأ: {_e3}")
 
-                # ── الخلاصة النهائية المجمعة من الثلاثة ──
-                try:
-                    _summary4_text = _build_final_combined_summary(
-                        data,
-                        locals().get('_summary1_text', ''),
-                        locals().get('_summary2_text', ''),
-                        locals().get('_summary3_text', '')
-                    )
-                    send_summary_to_bot("8315216245:AAFoXDISnKYc051VNaOQqE4HjfbpKt2FvyM", _summary4_text, BOT4_CHATS[0])
-                    log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
-                except Exception as _e4:
-                    log.error(f"❌ [Summary4] خطأ: {_e4}")
-
             # ── البوت الرابع: القوالب الجديدة (@Boonnii_bot) ──
             if flat_chunks_4:
                 log.info(f"📤 [Bot4] إرسال {BOT4_TOTAL} قالب جديد عبر @Boonnii_bot...")
@@ -8402,6 +8389,19 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                         _send_single_bot4(final_text4, "@Maaregsovereinefund")
                     log.info(f"{'✅' if ok4 else '❌'} [Bot4] {tmpl_idx4}/{BOT4_TOTAL}")
                     time.sleep(2)
+
+            # ── الخلاصة النهائية المجمعة من الثلاثة ──
+            try:
+                _summary4_text = _build_final_combined_summary(
+                    data,
+                    locals().get('_summary1_text', ''),
+                    locals().get('_summary2_text', ''),
+                    locals().get('_summary3_text', '')
+                )
+                send_summary_to_bot("8315216245:AAFoXDISnKYc051VNaOQqE4HjfbpKt2FvyM", _summary4_text, BOT4_CHATS[0])
+                log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
+            except Exception as _e4:
+                log.error(f"❌ [Summary4] خطأ: {_e4}")
 
             log.info("🔓 [Spot] تم الارسال، تحرير القفل لانتظار الخلاصة...")
 

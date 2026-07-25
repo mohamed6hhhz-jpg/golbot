@@ -39,7 +39,11 @@ TELEGRAM_BOT_TOKEN_2 = "8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ"
 TELEGRAM_BOT_TOKEN_3 = "8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA"  # @Dsssoppp78_bot — القوالب الفورية S1-S12
 TELEGRAM_BOT_TOKEN_4 = "8930341910:AAHzqUUrPgMYf0vkkORWX25HGVgo_BDLRDI"  # @Boonnii_bot — للقوالب الجديدة
 
-TARGET_CHATS = [-1003935552363]
+TARGET_CHATS = [-1003935552363]  # Fallback
+BOT1_CHATS = [-1003935552363]
+BOT2_CHATS = [-5443493882]
+BOT3_CHATS = [-5474006900]
+BOT4_CHATS = [-5123473624]
 LAST_PUBLIC_REPORT_TIME = 0
 LAST_4H_REPORT_TIME = 0
 
@@ -2801,7 +2805,7 @@ def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
     success = True
-    targets = [chat_id] if chat_id else TARGET_CHATS
+    targets = [chat_id] if chat_id else BOT1_CHATS
     for chat in targets:
         payload = {"chat_id": str(chat), "text": text}
         chat_success = False
@@ -2826,7 +2830,7 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
         client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN)
         
-        targets = [chat_id] if chat_id else TARGET_CHATS
+        targets = [chat_id] if chat_id else BOT1_CHATS
         for chat in targets:
             try:
                 await client.send_message(chat, text)
@@ -2845,7 +2849,7 @@ async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
     try:
         client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
-        targets = [chat_id] if chat_id else TARGET_CHATS
+        targets = [chat_id] if chat_id else BOT2_CHATS
         for chat in targets:
             try:
                 await client.send_message(chat, text)
@@ -2887,7 +2891,7 @@ async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
     try:
         client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
-        targets = [chat_id] if chat_id else TARGET_CHATS
+        targets = [chat_id] if chat_id else BOT3_CHATS
         for chat in targets:
             try:
                 await client.send_message(chat, text)
@@ -2905,7 +2909,7 @@ async def _telethon_bot4_send(text: str, chat_id=None) -> bool:
     try:
         client = TelegramClient("goldbot_bot4_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_4)
-        targets = [chat_id] if chat_id else TARGET_CHATS
+        targets = [chat_id] if chat_id else BOT4_CHATS
         for chat in targets:
             try:
                 await client.send_message(chat, text)
@@ -8311,7 +8315,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── خلاصة محورية 1 بعد انتهاء التقرير الأول ──
             try:
                 _summary1_text = _build_group_summary(data, "التقرير الأول (الكمي الأساسي)", flat_chunks)
-                send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary1_text, TARGET_CHATS[0])
+                send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary1_text, BOT1_CHATS[0])
                 log.info("✅ [Summary1] تم إرسال خلاصة التقرير الأول.")
             except Exception as _e1:
                 log.error(f"❌ [Summary1] خطأ: {_e1}")
@@ -8337,7 +8341,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── خلاصة محورية 2 بعد انتهاء التقرير الثاني ──
             try:
                 _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", flat_chunks_2)
-                send_summary_to_bot("8448760638:AAF0PokiiolyPAAztD-BTZGenbjRiUKh6hc", _summary2_text, TARGET_CHATS[0])
+                send_summary_to_bot("8448760638:AAF0PokiiolyPAAztD-BTZGenbjRiUKh6hc", _summary2_text, BOT2_CHATS[0])
                 log.info("✅ [Summary2] تم إرسال خلاصة التقرير الثاني.")
             except Exception as _e2:
                 log.error(f"❌ [Summary2] خطأ: {_e2}")
@@ -8367,7 +8371,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 # ── خلاصة محورية 3 بعد انتهاء التقرير الثالث ──
                 try:
                     _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", flat_chunks_3)
-                    send_summary_to_bot("8663825687:AAHElJ0PtPoS80QxnXOGBGu9sRzAum-rqx0", _summary3_text, TARGET_CHATS[0])
+                    send_summary_to_bot("8663825687:AAHElJ0PtPoS80QxnXOGBGu9sRzAum-rqx0", _summary3_text, BOT3_CHATS[0])
                     log.info("✅ [Summary3] تم إرسال خلاصة التقرير الثالث.")
                 except Exception as _e3:
                     log.error(f"❌ [Summary3] خطأ: {_e3}")
@@ -8380,7 +8384,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                         locals().get('_summary2_text', ''),
                         locals().get('_summary3_text', '')
                     )
-                    send_summary_to_bot("8315216245:AAFoXDISnKYc051VNaOQqE4HjfbpKt2FvyM", _summary4_text, TARGET_CHATS[0])
+                    send_summary_to_bot("8315216245:AAFoXDISnKYc051VNaOQqE4HjfbpKt2FvyM", _summary4_text, BOT4_CHATS[0])
                     log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
                 except Exception as _e4:
                     log.error(f"❌ [Summary4] خطأ: {_e4}")

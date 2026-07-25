@@ -1987,6 +1987,8 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     range_line = f"نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$"
 
     current_vol = int(d.get('last_vol', 0))
+    if current_vol == 0:
+        current_vol = int(d.get('atr', 20) * float(d.get('rel_vol', 1.0) or 1.0) * 1000)
     rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
     normal_vol = int(current_vol / rel_vol) if rel_vol > 0.1 else current_vol
     vol_increase_pct = int((rel_vol - 1) * 100)
@@ -2011,7 +2013,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 ملخص السوق
    الزخم        : {ent['momentum']} {'→ تسارع بيع، الذهب عرضة للهبوط' if 'هابط' in ent['momentum'] else '→ تسارع شراء، الذهب في دعم' if 'صاعد' in ent['momentum'] else '→ تجميع سيولة وتذبذب في النطاق'}
-   الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ مسار عرضي تجميعي (Range Bound)'}
+   الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ مسار عرضي تجميعي (Range Bound)'} | الحكم النهائي: {conf['verdict']}
    تأثير الاتجاه : {trend_impact}
    السيولة       : {ent['liquidity']} {'→ الحركات موثوقة ✅' if 'مرتفعة' in ent['liquidity'] else '→ انتبه: حركات وهمية محتملة ⚠️'}
    حجم السيولة   : {liq_desc}
@@ -2256,7 +2258,6 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    📉 هبوط (Y%): كسر {refs['below']}$ → الهدف [رقم]$ — فوري (Spot)
    ⚡ تذبذب (Z%): النطاق [رقم]$-[رقم]$ — فوري (Spot)"""
 
-    fixed += "\n\n" + _build_friday_target(d, False)
     return fixed, ai_instructions
 
 
@@ -2671,32 +2672,56 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
 
     fixed_block, ai_instructions = _build_fixed_template(d, header)
 
+    friday_tgt = _build_friday_target(d, False)
+    
+    ai_instructions_general = ai_instructions.replace(
+        "🤖 التحليل الكمي", "🤖 التحليل الكمي (النظرة العامة الشاملة)"
+    ).replace(
+        "فوري (Spot)", "للسوق المفتوح"
+    ).replace(
+        "اكتب هذه الأقسام فقط بالترتيب:",
+        "اكتب هذه الأقسام بناءً على النظرة الكلية للذهب بشكل عام لكامل التقرير:"
+    )
+
     for model_name in GROQ_MODELS:
         try:
-            log.info(f"🤖 جاري الاتصال بـ Groq — {model_name}")
-            resp = client.chat.completions.create(
+            log.info(f"🤖 جاري الاتصال بـ Groq — {model_name} (General & Custom)")
+            resp_gen = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل ذهب كمي. اكتب فقط ما طُلب منك بالعربية الفصحى. لا تكتب أي شيء خارج الأقسام المطلوبة."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل ذهب كمي. اكتب فقط ما طُلب منك بالعربية الفصحى."},
+                    {"role": "user",   "content": ai_instructions_general},
+                ],
+                model=model_name,
+                temperature=0.1,
+                max_tokens=700,
+            )
+            ai_analysis_general = resp_gen.choices[0].message.content
+            
+            resp_cust = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل ذهب كمي مخصص. اكتب فقط ما طُلب منك بالعربية الفصحى."},
                     {"role": "user",   "content": ai_instructions},
                 ],
                 model=model_name,
                 temperature=0.07,
                 max_tokens=700,
             )
-            ai_analysis = resp.choices[0].message.content
-            log.info(f"✅ نجح الاتصال: {model_name}")
-            return fixed_block + "\n\n" + ai_analysis
+            ai_analysis_custom = resp_cust.choices[0].message.content
+            
+            log.info(f"✅ نجح الاتصال المزدوج: {model_name}")
+            return fixed_block + "\n\n" + ai_analysis_general + "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" + friday_tgt + "\n\n" + ai_analysis_custom
         except Exception as e:
             err_str = str(e)
             if "429" in err_str or "rate_limit" in err_str.lower():
                 log.warning(f"⚠️ [{model_name}] 429 — الانتقال للتالي...")
+                import time
                 time.sleep(10)
                 continue
             log.error(f"❌ [{model_name}] {e}")
             break
 
     log.error("❌ جميع الموديلات فشلت — إرسال الجزء الثابت فقط.")
-    return fixed_block
+    return fixed_block + "\n\n" + friday_tgt
 
 
 # ══════════════════════════════════════════════
@@ -5361,7 +5386,9 @@ def _build_template_7(d: dict) -> str:
         ('30 دقيقة', 'tf_30m', 0.25),
         ('1 ساعة', 'tf_hourly', 0.4),
         ('4 ساعات', 'tf_4h', 0.7),
-        ('يومي', 'tf_daily', 1.2)
+        ('يومي', 'tf_daily', 1.2),
+        ('أسبوعي', 'tf_weekly', 2.5),
+        ('شهري', 'tf_monthly', 4.5)
     ]
     
     for label, key, atr_mult in tfs:
@@ -8030,6 +8057,14 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         raw_reports.append(("📈 تقرير عوائد السندات (الفوري)", t4 if t4 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
         raw_reports.append(("💱 تقرير قوة العملات (الفوري)", t5 if t5 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
         
+        # القوالب الإضافية للبوت الأول (للوصول إلى 29 قالب شامل)
+        raw_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7 if t7 else _build_template_7(data), None))
+        raw_reports.append(("🐋 تاثير الاسواق والمؤسسات (الفوري)", t8 if t8 else _build_template_8(data), None))
+        raw_reports.append(("[29/29] المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
+        raw_reports.append(("📊 تقرير اتجاه الذهب اليومي (الفوري)", t9 if t9 else _build_template_9(data), None))
+        raw_reports.append(("📆 التقرير الاسبوعي الشامل (الفوري)", t10 if t10 else _build_template_10(data), None))
+        raw_reports.append(("📰 تقرير CFTC (الفوري)", t11 if t11 else _build_template_11(data), None))
+        
         # ── 4. قالب سيولة اليومي ──
         from datetime import datetime
         import pytz
@@ -8126,6 +8161,12 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         
         # القالب الجديد للمستويات
         bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
+        # القوالب الذكية T0-T4 (نفس البوت الأول)
+        bot2_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس", t0 if t0 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        bot2_reports.append(("📊 التقرير الفني المتقدم", t1 if t1 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        bot2_reports.append(("🌍 تقرير الاقتصاد الكلي", t2 if t2 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        bot2_reports.append(("⚠️ تقرير شهية المخاطرة", t3 if t3 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        bot2_reports.append(("📈 تقرير عوائد السندات", t4 if t4 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
         # القالب الذكي الجديد CFTC (t11)
         bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(data), None))
         t13_src = t13 if t13 and 'تعذر' not in str(t13) else _build_template_13(data)

@@ -41,9 +41,9 @@ TELEGRAM_BOT_TOKEN_4 = "8930341910:AAHzqUUrPgMYf0vkkORWX25HGVgo_BDLRDI"  # @Boon
 
 TARGET_CHATS = [-1003935552363]  # Fallback
 BOT1_CHATS = [-1003935552363]
-BOT2_CHATS = [-5443493882]
-BOT3_CHATS = [-5474006900]
-BOT4_CHATS = [-5123473624]
+BOT2_CHATS = [-1004464751054]
+BOT3_CHATS = [-1004311302624]
+BOT4_CHATS = [-1004412766977]
 LAST_PUBLIC_REPORT_TIME = 0
 LAST_4H_REPORT_TIME = 0
 
@@ -8828,7 +8828,7 @@ def send_summary_to_bot(token, message, chat_id):
     try:
         # Secure implementation: No getUpdates. Hardcoded targets only.
         send_url = f"https://api.telegram.org/bot{token}/sendMessage"
-        res = requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=10)
+        res = requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=30)
         if not res.json().get('ok'):
             print(f"[Summary Error] Telegram API Failed: {res.text}")
     except Exception as e:

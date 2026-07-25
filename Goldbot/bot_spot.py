@@ -2823,6 +2823,33 @@ def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     return success
 
 
+
+def _http_fallback_send(text: str, token: str, default_chats: list, chat_id=None) -> bool:
+    import requests
+    import time
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    headers = {
+        "Connection": "close",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    success = True
+    targets = [chat_id] if chat_id else default_chats
+    for chat in targets:
+        payload = {"chat_id": str(chat), "text": text}
+        chat_success = False
+        for attempt in range(4):
+            try:
+                r = requests.post(url, json=payload, headers=headers, timeout=45)
+                r.raise_for_status()
+                chat_success = True
+                break
+            except Exception as e:
+                wait = 2 ** attempt
+                log.warning(f"⚠️ [HTTP Fallback] {attempt+1}/4 — {e} — انتظار {wait}s")
+                time.sleep(wait)
+        if not chat_success: success = False
+    return success
+
 async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     """MTProto باستخدام توكن البوت — يتجاوز حجب HTTP نهائياً ولا يتعارض مع جلسات المستخدم"""
     try:
@@ -2831,14 +2858,19 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
         await client.start(bot_token=TELEGRAM_BOT_TOKEN)
         
         targets = [chat_id] if chat_id else BOT1_CHATS
+        success = False
         for chat in targets:
             try:
                 await client.send_message(chat, text)
+                success = True
             except Exception as inner_e:
                 log.warning(f"⚠️ [Telethon Bot (Spot)] فشل الإرسال للجروب {chat}: {inner_e}")
+                log.info(f"جاري المحاولة عبر HTTP للجروب {chat}...")
+                if _http_fallback_send(text, TELEGRAM_BOT_TOKEN, [], chat):
+                    success = True
                 
         await client.disconnect()
-        return True
+        return success
     except Exception as e:
         log.warning(f"⚠️ [Telethon Bot (Spot)] {e}")
         return False
@@ -2850,13 +2882,18 @@ async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
         client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
         targets = [chat_id] if chat_id else BOT2_CHATS
+        success = False
         for chat in targets:
             try:
                 await client.send_message(chat, text)
+                success = True
             except Exception as inner_e:
                 log.warning(f"[Bot2 Telethon] فشل الإرسال للجروب {chat}: {inner_e}")
+                log.info(f"جاري المحاولة عبر HTTP للجروب {chat}...")
+                if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_2, [], chat):
+                    success = True
         await client.disconnect()
-        return True
+        return success
     except Exception as e:
         log.warning(f"[Bot2 Telethon] {e}")
         return False
@@ -2882,7 +2919,13 @@ def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -
             log.warning(f"[Telethon Bot2 loop] {e}")
     except Exception as e:
         log.warning(f"[Telethon Bot2] {e}")
-    log.error("[Bot2] فشل الإرسال عبر Telethon.")
+    
+    log.warning("[Bot2] فشل الإرسال عبر Telethon — جاري المحاولة عبر HTTP...")
+    if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_2, BOT2_CHATS, chat_id):
+        log.info("✅ [Bot2 HTTP] تم الإرسال بنجاح.")
+        return True
+    
+    log.error("[Bot2] فشل الإرسال عبر جميع الوسائل.")
     return False
 
 
@@ -2892,13 +2935,18 @@ async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
         client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
         targets = [chat_id] if chat_id else BOT3_CHATS
+        success = False
         for chat in targets:
             try:
                 await client.send_message(chat, text)
+                success = True
             except Exception as inner_e:
                 log.warning(f"[Bot3 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
+                log.info(f"جاري المحاولة عبر HTTP للجروب {chat}...")
+                if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_3, [], chat):
+                    success = True
         await client.disconnect()
-        return True
+        return success
     except Exception as e:
         log.warning(f"[Bot3 Telethon] {e}")
         return False
@@ -2910,13 +2958,18 @@ async def _telethon_bot4_send(text: str, chat_id=None) -> bool:
         client = TelegramClient("goldbot_bot4_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_4)
         targets = [chat_id] if chat_id else BOT4_CHATS
+        success = False
         for chat in targets:
             try:
                 await client.send_message(chat, text)
+                success = True
             except Exception as inner_e:
                 log.warning(f"[Bot4 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
+                log.info(f"جاري المحاولة عبر HTTP للجروب {chat}...")
+                if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_4, [], chat):
+                    success = True
         await client.disconnect()
-        return True
+        return success
     except Exception as e:
         log.warning(f"[Bot4 Telethon] {e}")
         return False
@@ -2942,7 +2995,13 @@ def _send_single_bot4(text: str, chat_id=None) -> bool:
             log.warning(f"[Telethon Bot4 loop] {e}")
     except Exception as e:
         log.warning(f"[Telethon Bot4] {e}")
-    log.error("[Bot4] فشل الارسال عبر Telethon.")
+        
+    log.warning("[Bot4] فشل الإرسال عبر Telethon — جاري المحاولة عبر HTTP...")
+    if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_4, BOT4_CHATS, chat_id):
+        log.info("✅ [Bot4 HTTP] تم الإرسال بنجاح.")
+        return True
+        
+    log.error("[Bot4] فشل الارسال عبر جميع الوسائل.")
     return False
 
 
@@ -4453,7 +4512,13 @@ def _send_single_bot3(text: str, chat_id=None) -> bool:
             log.warning(f"[Telethon Bot3 loop] {e}")
     except Exception as e:
         log.warning(f"[Telethon Bot3] {e}")
-    log.error("[Bot3] فشل الارسال عبر Telethon.")
+        
+    log.warning("[Bot3] فشل الإرسال عبر Telethon — جاري المحاولة عبر HTTP...")
+    if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_3, BOT3_CHATS, chat_id):
+        log.info("✅ [Bot3 HTTP] تم الإرسال بنجاح.")
+        return True
+        
+    log.error("[Bot3] فشل الارسال عبر جميع الوسائل.")
     return False
 
 
@@ -8307,7 +8372,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 
                 # Send to SovereignMaaregFund if 4 hours have passed
                 if send_to_4h_channel and not chat_id:
-                    _send_single(final_text, is_public, "@Maaregsovereinefund")
+                    # _send_single(final_text, is_public, "@Maaregsovereinefund")
                     
                 log.info(f"✅ قالب {tmpl_idx}/{total_templates} وصل." if ok else f"❌ فشل قالب {tmpl_idx}/{total_templates}.")
                 time.sleep(2)
@@ -8333,7 +8398,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     ok2 = _send_single_bot2(final_text2, is_public, chat_id2)
                     
                     if send_to_4h_channel and not chat_id2:
-                        _send_single_bot2(final_text2, is_public, "@Maaregsovereinefund")
+                        # _send_single_bot2(final_text2, is_public, "@Maaregsovereinefund")
                         
                     log.info(f"✅ قالب البوت الثاني {tmpl_idx2}/{total_templates_2} وصل." if ok2 else f"❌ فشل قالب البوت الثاني {tmpl_idx2}/{total_templates_2}.")
                     time.sleep(2)
@@ -8363,7 +8428,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     ok3 = _send_single_bot3(final_text3, cid3)
                     
                     if send_to_4h_channel and not cid3:
-                        _send_single_bot3(final_text3, "@Maaregsovereinefund")
+                        # _send_single_bot3(final_text3, "@Maaregsovereinefund")
                         
                     log.info(f"{'✅' if ok3 else '❌'} [Bot3] {tmpl_idx3}/{total_templates_3}")
                     time.sleep(2)
@@ -8386,7 +8451,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     )
                     ok4 = _send_single_bot4(final_text4, cid4)
                     if send_to_4h_channel and not cid4:
-                        _send_single_bot4(final_text4, "@Maaregsovereinefund")
+                        # _send_single_bot4(final_text4, "@Maaregsovereinefund")
                     log.info(f"{'✅' if ok4 else '❌'} [Bot4] {tmpl_idx4}/{BOT4_TOTAL}")
                     time.sleep(2)
 

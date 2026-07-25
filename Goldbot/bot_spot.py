@@ -8886,16 +8886,28 @@ def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_tex
 اكتبها بأسلوب فخم جداً من 5 لـ 6 أسطر.
 لا تكتب مقدمات أو تحيات، ابدأ بالخلاصة مباشرة.
 """
+        import random, requests
         api_key = random.choice(GROQ_KEYS)
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        payload = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.3,
-            "max_tokens": 600
-        }
-        resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
-        resp.raise_for_status()
+        
+        try:
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "max_tokens": 600
+            }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if resp.status_code == 429:
+                log.warning(f"⚠️ [llama-3.3-70b-versatile] Rate limit hit for final summary, falling back to llama-3.1-8b-instant")
+                payload["model"] = "llama-3.1-8b-instant"
+                resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
+                resp.raise_for_status()
+            else:
+                raise e
+                
         ai_master_summary = resp.json()["choices"][0]["message"]["content"].strip()
         
         return f"🏆👑 الخلاصة النهائية الشاملة للمسار بأكمله 👑🏆\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📅 التوقيت: {now_str}\n💰 السعر: {gold:.2f}$ | ATR: {atr:.2f}$ | Pivot: {pivot:.2f}$\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n{ai_master_summary}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🤖 تم توليد هذه الخلاصة الذهبية بالذكاء الاصطناعي لدمج جميع التقارير معاً."
@@ -8905,31 +8917,42 @@ def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_tex
 
 
 def send_summary_to_bot(token, message, chat_id):
-    import requests
-    import time
-    send_url = f"https://api.telegram.org/bot{token}/sendMessage"
-    headers = {
-        "Connection": "close",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
+    import asyncio
+    from telethon import TelegramClient
     
-    chunks = []
-    while len(message) > 4000:
-        split_idx = message.rfind('\n', 0, 4000)
-        if split_idx == -1: split_idx = 4000
-        chunks.append(message[:split_idx])
-        message = message[split_idx:]
-    if message:
-        chunks.append(message)
+    async def _send_via_telethon():
+        session_name = f"summary_bot_{token[:10]}"
+        client = TelegramClient(session_name, API_ID, API_HASH)
         
-    for chunk in chunks:
-        for attempt in range(4):
-            try:
-                res = requests.post(send_url, headers=headers, json={'chat_id': str(chat_id), 'text': chunk}, timeout=45)
-                if not res.json().get('ok'):
-                    print(f"[Summary Error] Telegram API Failed: {res.text}")
-                break # Move to next chunk on successful request or API rejection
-            except Exception as e:
-                wait = 2 ** attempt
-                print(f"⚠️ [Summary HTTP Fallback] {attempt+1}/4 — Failed to send summary: {e} — waiting {wait}s")
-                time.sleep(wait)
+        chunks = []
+        msg = message
+        while len(msg) > 4000:
+            split_idx = msg.rfind('\n', 0, 4000)
+            if split_idx == -1: split_idx = 4000
+            chunks.append(msg[:split_idx])
+            msg = msg[split_idx:]
+        if msg:
+            chunks.append(msg)
+            
+        try:
+            await client.start(bot_token=token)
+            for chunk in chunks:
+                for attempt in range(4):
+                    try:
+                        target_chat = int(chat_id) if str(chat_id).lstrip('-').isdigit() else chat_id
+                        await client.send_message(target_chat, chunk)
+                        log.info(f"✅ [Summary Telethon] Sent summary chunk to {target_chat}")
+                        break
+                    except Exception as e:
+                        wait = 2 ** attempt
+                        log.warning(f"⚠️ [Summary Telethon Fallback] {attempt+1}/4 — Failed to send summary: {e} — waiting {wait}s")
+                        await asyncio.sleep(wait)
+        finally:
+            await client.disconnect()
+
+    try:
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(_send_via_telethon())
+        loop.close()
+    except Exception as e:
+        log.error(f"[Summary Error] Failed to start telethon loop: {e}")

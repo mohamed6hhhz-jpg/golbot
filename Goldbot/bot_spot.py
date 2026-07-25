@@ -8380,7 +8380,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── خلاصة محورية 1 بعد انتهاء التقرير الأول ──
             try:
                 _summary1_text = _build_group_summary(data, "التقرير الأول (الكمي الأساسي)", flat_chunks)
-                send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary1_text, BOT1_CHATS[0])
+                for c in BOT1_CHATS:
+                    send_summary_to_bot("8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4", _summary1_text, c)
                 log.info("✅ [Summary1] تم إرسال خلاصة التقرير الأول.")
             except Exception as _e1:
                 log.error(f"❌ [Summary1] خطأ: {_e1}")
@@ -8406,7 +8407,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── خلاصة محورية 2 بعد انتهاء التقرير الثاني ──
             try:
                 _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", flat_chunks_2)
-                send_summary_to_bot("8448760638:AAF0PokiiolyPAAztD-BTZGenbjRiUKh6hc", _summary2_text, BOT2_CHATS[0])
+                for c in BOT2_CHATS:
+                    send_summary_to_bot("8448760638:AAF0PokiiolyPAAztD-BTZGenbjRiUKh6hc", _summary2_text, c)
                 log.info("✅ [Summary2] تم إرسال خلاصة التقرير الثاني.")
             except Exception as _e2:
                 log.error(f"❌ [Summary2] خطأ: {_e2}")
@@ -8436,7 +8438,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 # ── خلاصة محورية 3 بعد انتهاء التقرير الثالث ──
                 try:
                     _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", flat_chunks_3)
-                    send_summary_to_bot("8663825687:AAHElJ0PtPoS80QxnXOGBGu9sRzAum-rqx0", _summary3_text, BOT3_CHATS[0])
+                    for c in BOT3_CHATS:
+                        send_summary_to_bot("8663825687:AAHElJ0PtPoS80QxnXOGBGu9sRzAum-rqx0", _summary3_text, c)
                     log.info("✅ [Summary3] تم إرسال خلاصة التقرير الثالث.")
                 except Exception as _e3:
                     log.error(f"❌ [Summary3] خطأ: {_e3}")
@@ -8463,7 +8466,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     locals().get('_summary2_text', ''),
                     locals().get('_summary3_text', '')
                 )
-                send_summary_to_bot("8315216245:AAFoXDISnKYc051VNaOQqE4HjfbpKt2FvyM", _summary4_text, BOT4_CHATS[0])
+                for c in BOT4_CHATS:
+                    send_summary_to_bot("8315216245:AAFoXDISnKYc051VNaOQqE4HjfbpKt2FvyM", _summary4_text, c)
                 log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
             except Exception as _e4:
                 log.error(f"❌ [Summary4] خطأ: {_e4}")
@@ -8788,16 +8792,28 @@ MACD: {macd}
 لا تكتب مقدمات، فقط الخلاصة القوية المباشرة.
 استخدم الرموز التعبيرية 🟢🔴⚪ للتعبير عن الاتجاه والاحترافية.
 """
+        import random, requests
         api_key = random.choice(GROQ_KEYS)
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        payload = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.3,
-            "max_tokens": 600
-        }
-        resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
-        resp.raise_for_status()
+        
+        try:
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "max_tokens": 600
+            }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if resp.status_code == 429:
+                log.warning(f"⚠️ [llama-3.3-70b-versatile] Rate limit hit for {group_name} summary, falling back to llama-3.1-8b-instant")
+                payload["model"] = "llama-3.1-8b-instant"
+                resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
+                resp.raise_for_status()
+            else:
+                raise e
+
         ai_summary = resp.json()["choices"][0]["message"]["content"].strip()
         
         return f"👑 الخلاصة المحورية — {group_name}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📅 التوقيت: {now_str} | القوالب: {len(titles)}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n{ai_summary}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🤖 تم توليد هذه الخلاصة بالذكاء الاصطناعي بناءً على القوالب والبيانات الحية."
@@ -8890,11 +8906,30 @@ def _build_final_combined_summary(data: dict, s1_text: str, s2_text: str, s3_tex
 
 def send_summary_to_bot(token, message, chat_id):
     import requests
-    try:
-        # Secure implementation: No getUpdates. Hardcoded targets only.
-        send_url = f"https://api.telegram.org/bot{token}/sendMessage"
-        res = requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=30)
-        if not res.json().get('ok'):
-            print(f"[Summary Error] Telegram API Failed: {res.text}")
-    except Exception as e:
-        print(f"Failed to send summary: {e}")
+    import time
+    send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    headers = {
+        "Connection": "close",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    
+    chunks = []
+    while len(message) > 4000:
+        split_idx = message.rfind('\n', 0, 4000)
+        if split_idx == -1: split_idx = 4000
+        chunks.append(message[:split_idx])
+        message = message[split_idx:]
+    if message:
+        chunks.append(message)
+        
+    for chunk in chunks:
+        for attempt in range(4):
+            try:
+                res = requests.post(send_url, headers=headers, json={'chat_id': str(chat_id), 'text': chunk}, timeout=45)
+                if not res.json().get('ok'):
+                    print(f"[Summary Error] Telegram API Failed: {res.text}")
+                break # Move to next chunk on successful request or API rejection
+            except Exception as e:
+                wait = 2 ** attempt
+                print(f"⚠️ [Summary HTTP Fallback] {attempt+1}/4 — Failed to send summary: {e} — waiting {wait}s")
+                time.sleep(wait)

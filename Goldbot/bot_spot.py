@@ -8372,7 +8372,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 
                 # Send to SovereignMaaregFund if 4 hours have passed
                 if send_to_4h_channel and not chat_id:
-                    # _send_single(final_text, is_public, "@Maaregsovereinefund")
+                    pass # _send_single(final_text, is_public, "@Maaregsovereinefund")
                     
                 log.info(f"✅ قالب {tmpl_idx}/{total_templates} وصل." if ok else f"❌ فشل قالب {tmpl_idx}/{total_templates}.")
                 time.sleep(2)
@@ -8398,7 +8398,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     ok2 = _send_single_bot2(final_text2, is_public, chat_id2)
                     
                     if send_to_4h_channel and not chat_id2:
-                        # _send_single_bot2(final_text2, is_public, "@Maaregsovereinefund")
+                        pass # _send_single_bot2(final_text2, is_public, "@Maaregsovereinefund")
                         
                     log.info(f"✅ قالب البوت الثاني {tmpl_idx2}/{total_templates_2} وصل." if ok2 else f"❌ فشل قالب البوت الثاني {tmpl_idx2}/{total_templates_2}.")
                     time.sleep(2)
@@ -8428,7 +8428,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     ok3 = _send_single_bot3(final_text3, cid3)
                     
                     if send_to_4h_channel and not cid3:
-                        # _send_single_bot3(final_text3, "@Maaregsovereinefund")
+                        pass # _send_single_bot3(final_text3, "@Maaregsovereinefund")
                         
                     log.info(f"{'✅' if ok3 else '❌'} [Bot3] {tmpl_idx3}/{total_templates_3}")
                     time.sleep(2)
@@ -8451,7 +8451,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     )
                     ok4 = _send_single_bot4(final_text4, cid4)
                     if send_to_4h_channel and not cid4:
-                        # _send_single_bot4(final_text4, "@Maaregsovereinefund")
+                        pass # _send_single_bot4(final_text4, "@Maaregsovereinefund")
                     log.info(f"{'✅' if ok4 else '❌'} [Bot4] {tmpl_idx4}/{BOT4_TOTAL}")
                     time.sleep(2)
 

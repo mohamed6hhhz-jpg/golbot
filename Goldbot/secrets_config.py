@@ -1,0 +1,18 @@
+"""
+secrets_config.py — ملف الإعدادات والمفاتيح الخارجية لإبعاد المفاتيح الحساسة عن الأكواد البرمجية الأساسية.
+"""
+import os
+
+GROQ_KEYS_FALLBACK = [
+    "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",
+    "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"
+]
+
+TWELVEDATA_API_KEY_FALLBACK = "a40631d26cb64ba99916a3162880aff3"
+
+TELEGRAM_TOKENS = {
+    "bot1": "8135586080:AAFS1ZI2XcsPrnjtTvAPlXxlTMrSO_Lu3Qc",
+    "bot2": "8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ",
+    "bot3": "8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA",  # @Dsssoppp78_bot — القوالب الفورية S1-S12
+    "bot4": "8930341910:AAHzqUUrPgMYf0vkkORWX25HGVgo_BDLRDI",  # @Boonnii_bot — للقوالب الجديدة
+}

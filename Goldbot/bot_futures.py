@@ -50,11 +50,34 @@ except ImportError:
 
 GROQ_KEYS = get_api_keys() or GROQ_KEYS_FALLBACK
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", TWELVEDATA_API_KEY_FALLBACK)
-TELEGRAM_BOT_TOKEN   = os.environ.get("TELEGRAM_BOT_TOKEN", TELEGRAM_TOKENS.get("bot1", ""))
-TELEGRAM_BOT_TOKEN_2 = os.environ.get("TELEGRAM_BOT_TOKEN_2", TELEGRAM_TOKENS.get("bot2", ""))
-TELEGRAM_BOT_TOKEN_3 = os.environ.get("TELEGRAM_BOT_TOKEN_3", TELEGRAM_TOKENS.get("bot3", ""))  # @Dsssoppp78_bot
-TELEGRAM_BOT_TOKEN_4 = os.environ.get("TELEGRAM_BOT_TOKEN_4", TELEGRAM_TOKENS.get("bot4", ""))  # @Boonnii_bot
+TELEGRAM_BOT_TOKEN   = TELEGRAM_TOKENS.get("bot1", "") or os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_TOKEN_2 = TELEGRAM_TOKENS.get("bot2", "") or os.environ.get("TELEGRAM_BOT_TOKEN_2", "")
+TELEGRAM_BOT_TOKEN_3 = TELEGRAM_TOKENS.get("bot3", "") or os.environ.get("TELEGRAM_BOT_TOKEN_3", "")  # @Dsssoppp78_bot
+TELEGRAM_BOT_TOKEN_4 = TELEGRAM_TOKENS.get("bot4", "") or os.environ.get("TELEGRAM_BOT_TOKEN_4", "")  # @Boonnii_bot
 TARGET_CHATS = ["@GooldFut"]
+
+from telethon.tl.types import InputPeerChannel
+_PEER_CHATS_MAP = {
+    -1003935552363: InputPeerChannel(3935552363, 8825754294104567316),
+    -1004464751054: InputPeerChannel(4464751054, -3802222172989073173),
+    -1004311302624: InputPeerChannel(4311302624, 5665851860967928824),
+    -1004412766977: InputPeerChannel(4412766977, 1260066506694203273),
+    3935552363: InputPeerChannel(3935552363, 8825754294104567316),
+    4464751054: InputPeerChannel(4464751054, -3802222172989073173),
+    4311302624: InputPeerChannel(4311302624, 5665851860967928824),
+    4412766977: InputPeerChannel(4412766977, 1260066506694203273),
+}
+def _resolve_peer(chat):
+    if isinstance(chat, int) and chat in _PEER_CHATS_MAP:
+        return _PEER_CHATS_MAP[chat]
+    try:
+        if isinstance(chat, str) and chat.lstrip("-").isdigit():
+            val = int(chat)
+            if val in _PEER_CHATS_MAP:
+                return _PEER_CHATS_MAP[val]
+    except Exception:
+        pass
+    return chat
 LAST_PUBLIC_REPORT_TIME = 0
 LAST_4H_REPORT_TIME = 0
 
@@ -2791,7 +2814,7 @@ async def _telethon_send(text: str) -> bool:
         client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
         await client.start()   # جلسة موجودة — بدون ImportBotAuthorizationRequest
         for chat in TARGET_CHATS:
-            await client.send_message(chat, text)
+            await client.send_message(_resolve_peer(chat), text)
         await client.disconnect()
         return True
     except Exception as e:
@@ -2836,7 +2859,7 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
         success = False
         for chat in targets:
             try:
-                await client.send_message(chat, text)
+                await client.send_message(_resolve_peer(chat), text)
                 success = True
             except Exception as inner_e:
                 log.warning(f"⚠️ [Telethon Bot (Futures)] فشل الإرسال للجروب {chat}: {inner_e}")
@@ -2857,7 +2880,7 @@ async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
         success = False
         for chat in targets:
             try:
-                await client.send_message(chat, text)
+                await client.send_message(_resolve_peer(chat), text)
                 success = True
             except Exception as inner_e:
                 log.warning(f"[Bot2 Telethon] فشل الإرسال للجروب {chat}: {inner_e}")
@@ -2919,7 +2942,7 @@ async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
         success = False
         for chat in targets:
             try:
-                await client.send_message(chat, text)
+                await client.send_message(_resolve_peer(chat), text)
                 success = True
             except Exception as inner_e:
                 log.warning(f"[Bot3 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
@@ -4902,7 +4925,7 @@ def send_summary_to_bot(token, message, chat_id):
             for chunk in chunks:
                 for attempt in range(4):
                     try:
-                        target_chat = int(chat_id) if str(chat_id).lstrip('-').isdigit() else chat_id
+                        target_chat = _resolve_peer(int(chat_id) if str(chat_id).lstrip('-').isdigit() else chat_id)
                         await client.send_message(target_chat, chunk)
                         log.info(f"✅ [Summary Telethon Fut] Sent summary chunk to {target_chat}")
                         break
@@ -7172,7 +7195,7 @@ def send_summary_to_bot(token, message, chat_id):
             for chunk in chunks:
                 for attempt in range(4):
                     try:
-                        target_chat = int(chat_id) if str(chat_id).lstrip('-').isdigit() else chat_id
+                        target_chat = _resolve_peer(int(chat_id) if str(chat_id).lstrip('-').isdigit() else chat_id)
                         await client.send_message(target_chat, chunk)
                         log.info(f"✅ [Summary Telethon Fut] Sent summary chunk to {target_chat}")
                         break

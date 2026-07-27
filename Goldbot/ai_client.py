@@ -12,23 +12,31 @@ log = logging.getLogger(__name__)
 DEFAULT_KEYS = []
 
 def get_api_keys():
+    try:
+        from Goldbot.secrets_config import GROQ_KEYS_FALLBACK
+    except ImportError:
+        try:
+            from secrets_config import GROQ_KEYS_FALLBACK
+        except ImportError:
+            GROQ_KEYS_FALLBACK = []
+
     env_keys = (
         os.environ.get("OPENAI_API_KEY", "") or 
         os.environ.get("GROQ_API_KEY", "") or 
         os.environ.get("GROQ_KEYS", "") or
         os.environ.get("AI_API_KEY", "")
     )
+    keys = []
     if env_keys:
         keys = [k.strip() for k in env_keys.split(",") if k.strip()]
-        if keys:
-            seen = set()
-            combined = []
-            for k in (keys + DEFAULT_KEYS):
-                if k not in seen:
-                    seen.add(k)
-                    combined.append(k)
-            return combined
-    return DEFAULT_KEYS
+        
+    combined = []
+    seen = set()
+    for k in (GROQ_KEYS_FALLBACK + keys + DEFAULT_KEYS):
+        if k and k not in seen:
+            seen.add(k)
+            combined.append(k)
+    return combined
 
 
 class SimpleOpenAIClient:
@@ -101,10 +109,29 @@ class UniversalAIClient:
         def create(self, messages, model=None, temperature=0.1, max_tokens=700, **kwargs):
             if self.parent.is_openai:
                 model = "gpt-4o-mini"
-            return self.parent._client.chat.completions.create(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                **kwargs
-            )
+            try:
+                return self.parent._client.chat.completions.create(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs
+                )
+            except Exception as e:
+                err_str = str(e).lower()
+                if "401" in err_str or "auth" in err_str or "unauthorized" in err_str or "invalid_api_key" in err_str:
+                    log.warning(f"⚠️ [UniversalAIClient] Key {self.parent.api_key[:12]}... failed ({e}). Trying another key...")
+                    all_keys = [k for k in get_api_keys() if k != self.parent.api_key]
+                    if all_keys:
+                        new_key = random.choice(all_keys)
+                        self.parent.__init__(api_key=new_key)
+                        if self.parent.is_openai:
+                            model = "gpt-4o-mini"
+                        return self.parent._client.chat.completions.create(
+                            messages=messages,
+                            model=model,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            **kwargs
+                        )
+                raise

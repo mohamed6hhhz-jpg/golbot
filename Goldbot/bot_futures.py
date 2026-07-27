@@ -31,12 +31,19 @@ logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ي
 log = logging.getLogger(__name__)
 
 import random
-GROQ_KEYS = get_api_keys()
-TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
-TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
-TELEGRAM_BOT_TOKEN_2 = "8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ"
-TELEGRAM_BOT_TOKEN_3 = "8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA"  # @Dsssoppp78_bot
-TELEGRAM_BOT_TOKEN_4 = "8930341910:AAHzqUUrPgMYf0vkkORWX25HGVgo_BDLRDI"  # @Boonnii_bot — للقوالب الجديدة
+try:
+    from secrets_config import GROQ_KEYS_FALLBACK, TWELVEDATA_API_KEY_FALLBACK, TELEGRAM_TOKENS
+except ImportError:
+    GROQ_KEYS_FALLBACK = []
+    TWELVEDATA_API_KEY_FALLBACK = ""
+    TELEGRAM_TOKENS = {}
+
+GROQ_KEYS = get_api_keys() or GROQ_KEYS_FALLBACK
+TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", TWELVEDATA_API_KEY_FALLBACK)
+TELEGRAM_BOT_TOKEN   = os.environ.get("TELEGRAM_BOT_TOKEN", TELEGRAM_TOKENS.get("bot1", ""))
+TELEGRAM_BOT_TOKEN_2 = os.environ.get("TELEGRAM_BOT_TOKEN_2", TELEGRAM_TOKENS.get("bot2", ""))
+TELEGRAM_BOT_TOKEN_3 = os.environ.get("TELEGRAM_BOT_TOKEN_3", TELEGRAM_TOKENS.get("bot3", ""))  # @Dsssoppp78_bot
+TELEGRAM_BOT_TOKEN_4 = os.environ.get("TELEGRAM_BOT_TOKEN_4", TELEGRAM_TOKENS.get("bot4", ""))  # @Boonnii_bot
 TARGET_CHATS = ["@GooldFut"]
 LAST_PUBLIC_REPORT_TIME = 0
 LAST_4H_REPORT_TIME = 0
@@ -4686,7 +4693,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
                         f.write(t6)
 
-                    send_summary_to_bot('8448760638:AAF0PokiiolyPAAztD-BTZGenbjRiUKh6hc', t6, '@spotGol')
+                    send_summary_to_bot(TELEGRAM_BOT_TOKEN_2, t6, '@spotGol')
 
                     
 
@@ -4694,7 +4701,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
                         f.write(t6)
 
-                    send_summary_to_bot('8663825687:AAHElJ0PtPoS80QxnXOGBGu9sRzAum-rqx0', t6, '@GooldFut')
+                    send_summary_to_bot(TELEGRAM_BOT_TOKEN_3, t6, '@GooldFut')
 
                     
 
@@ -6967,7 +6974,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     f.write(t6)
  
 
-                send_summary_to_bot('8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4', t6, '@spotGol')
+                send_summary_to_bot(TELEGRAM_BOT_TOKEN, t6, '@spotGol')
  
 
         except Exception as e:

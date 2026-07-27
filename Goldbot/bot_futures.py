@@ -1,5 +1,8 @@
 import yfinance as yf
-from groq import Groq
+try:
+    from Goldbot.ai_client import UniversalAIClient as Groq, get_api_keys
+except ImportError:
+    from ai_client import UniversalAIClient as Groq, get_api_keys
 import requests
 from datetime import datetime, timezone, timedelta
 import time
@@ -28,13 +31,7 @@ logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ي
 log = logging.getLogger(__name__)
 
 import random
-_env_key = os.environ.get("GROQ_API_KEY", "")
-GROQ_KEYS = [k.strip() for k in _env_key.split(",") if k.strip()] if _env_key else [
-    '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',
-    "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",
-    "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",
-    "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"
-]
+GROQ_KEYS = get_api_keys()
 TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
 TELEGRAM_BOT_TOKEN  = "8783502825:AAEEgxaxzgiAxwl4oBp4zl73jmqwBtKCalc"
 TELEGRAM_BOT_TOKEN_2 = "8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ"
@@ -3024,7 +3021,6 @@ def _build_template_5(d: dict) -> str:
 
 def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: str, t4: str, t5: str) -> str:
     """بناء القالب السادس والأخير (الخلاصة الذكية) عبر الذكاء الاصطناعي"""
-    from groq import Groq
     import random
     import re
     

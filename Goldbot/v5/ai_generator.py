@@ -1,6 +1,9 @@
 import logging
 import time
-from groq import Groq
+try:
+    from Goldbot.ai_client import UniversalAIClient as Groq
+except ImportError:
+    from ai_client import UniversalAIClient as Groq
 from Goldbot.v5.config import GROQ_API_KEY, GROQ_MODELS
 from Goldbot.v5.prompts import get_system_prompt, get_template
 

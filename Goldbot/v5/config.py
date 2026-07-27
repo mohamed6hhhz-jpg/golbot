@@ -7,7 +7,12 @@ GROQ_MODELS = [
     "mixtral-8x7b-32768"
 ]
 
-GROQ_API_KEY = "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"
+try:
+    from Goldbot.ai_client import get_api_keys
+except ImportError:
+    from ai_client import get_api_keys
+
+GROQ_API_KEY = get_api_keys()[0]
 
 # Hard minimum limits according to rule 8
 MIN_CONFIDENCE = 65

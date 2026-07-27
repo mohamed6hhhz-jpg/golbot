@@ -1,5 +1,8 @@
 import logging
-from groq import Groq
+try:
+    from Goldbot.ai_client import UniversalAIClient as Groq
+except ImportError:
+    from ai_client import UniversalAIClient as Groq
 import time
 
 log = logging.getLogger(__name__)

@@ -8,10 +8,8 @@ import logging
 
 log = logging.getLogger(__name__)
 
-# Primary keys list - starts with working OpenAI key
-DEFAULT_KEYS = [
-    "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",
-]
+# Primary keys list - loaded safely from environment variables (Hugging Face Secrets)
+DEFAULT_KEYS = []
 
 def get_api_keys():
     env_keys = (

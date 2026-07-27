@@ -47,8 +47,8 @@ TELEGRAM_BOT_TOKEN_2 = os.environ.get("TELEGRAM_BOT_TOKEN_2", TELEGRAM_TOKENS.ge
 TELEGRAM_BOT_TOKEN_3 = os.environ.get("TELEGRAM_BOT_TOKEN_3", TELEGRAM_TOKENS.get("bot3", ""))  # @Dsssoppp78_bot
 TELEGRAM_BOT_TOKEN_4 = os.environ.get("TELEGRAM_BOT_TOKEN_4", TELEGRAM_TOKENS.get("bot4", ""))  # @Boonnii_bot
 
-TARGET_CHATS = [-1003935552363]  # Fallback
-BOT1_CHATS = [-1003935552363]
+TARGET_CHATS = ["@spotGol"]  # Fallback
+BOT1_CHATS = ["@spotGol"]
 BOT2_CHATS = [-1004464751054]
 BOT3_CHATS = [-1004311302624]
 BOT4_CHATS = [-1004412766977]
@@ -2813,60 +2813,74 @@ async def _telethon_send(text: str) -> bool:
 
 
 def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
-    """الإرسال عبر HTTP Bot API — الوسيلة الأساسية."""
-    url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    """الإرسال عبر HTTP Bot API باستخدام httpx و requests كاحتياطي مزدوج مع timeout طويل."""
+    import httpx
+    import requests
+    import time
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     headers = {
-        "Connection": "keep-alive",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     success = True
     targets = [chat_id] if chat_id else BOT1_CHATS
-    with requests.Session() as s:
-        s.headers.update(headers)
-        for chat in targets:
-            payload = {"chat_id": str(chat), "text": text}
-            chat_success = False
-            for attempt in range(3):
-                try:
-                    r = s.post(url, json=payload, timeout=15)
+    for chat in targets:
+        payload = {"chat_id": str(chat), "text": text}
+        chat_success = False
+        for attempt in range(3):
+            try:
+                with httpx.Client(timeout=35.0, headers=headers) as client:
+                    r = client.post(url, json=payload)
                     r.raise_for_status()
                     chat_success = True
                     break
-                except Exception as e:
+            except Exception as e:
+                log.warning(f"⚠️ [HTTP httpx] {attempt+1}/3 — {e} — تجربة requests...")
+                try:
+                    r = requests.post(url, json=payload, headers=headers, timeout=35.0)
+                    r.raise_for_status()
+                    chat_success = True
+                    break
+                except Exception as e2:
                     wait = 2 ** attempt
-                    log.warning(f"⚠️ [HTTP] {attempt+1}/3 — {e} — انتظار {wait}s")
+                    log.warning(f"⚠️ [HTTP requests] {attempt+1}/3 — {e2} — انتظار {wait}s")
                     time.sleep(wait)
-            if not chat_success: success = False
+        if not chat_success: success = False
     return success
 
 
 
 def _http_fallback_send(text: str, token: str, default_chats: list, chat_id=None) -> bool:
+    import httpx
     import requests
     import time
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     headers = {
-        "Connection": "keep-alive",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     success = True
     targets = [chat_id] if chat_id else default_chats
-    with requests.Session() as s:
-        s.headers.update(headers)
-        for chat in targets:
-            payload = {"chat_id": str(chat), "text": text}
-            chat_success = False
-            for attempt in range(3):
-                try:
-                    r = s.post(url, json=payload, timeout=15)
+    for chat in targets:
+        payload = {"chat_id": str(chat), "text": text}
+        chat_success = False
+        for attempt in range(3):
+            try:
+                with httpx.Client(timeout=35.0, headers=headers) as client:
+                    r = client.post(url, json=payload)
                     r.raise_for_status()
                     chat_success = True
                     break
-                except Exception as e:
+            except Exception as e:
+                log.warning(f"⚠️ [HTTP Fallback httpx] {attempt+1}/3 — {e} — تجربة requests...")
+                try:
+                    r = requests.post(url, json=payload, headers=headers, timeout=35.0)
+                    r.raise_for_status()
+                    chat_success = True
+                    break
+                except Exception as e2:
                     wait = 2 ** attempt
-                    log.warning(f"⚠️ [HTTP Fallback] {attempt+1}/3 — {e} — انتظار {wait}s")
+                    log.warning(f"⚠️ [HTTP Fallback requests] {attempt+1}/3 — {e2} — انتظار {wait}s")
                     time.sleep(wait)
-            if not chat_success: success = False
+        if not chat_success: success = False
     return success
 
 async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
@@ -2875,10 +2889,6 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
         # استخدام ملف جلسة محلي بدلاً من الذاكرة لتجنب تسجيل الدخول بالتوكن في كل رسالة (يمنع الـ FloodWait)
         client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN)
-        try:
-            await client.get_dialogs()
-        except Exception as _de:
-            log.warning(f"⚠️ [Telethon Bot1] get_dialogs: {_de}")
         
         targets = [chat_id] if chat_id else BOT1_CHATS
         success = False
@@ -2904,10 +2914,6 @@ async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
     try:
         client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
-        try:
-            await client.get_dialogs()
-        except Exception as _de:
-            log.warning(f"⚠️ [Telethon Bot2] get_dialogs: {_de}")
         targets = [chat_id] if chat_id else BOT2_CHATS
         success = False
         for chat in targets:
@@ -2961,10 +2967,6 @@ async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
     try:
         client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
-        try:
-            await client.get_dialogs()
-        except Exception as _de:
-            log.warning(f"⚠️ [Telethon Bot3] get_dialogs: {_de}")
         targets = [chat_id] if chat_id else BOT3_CHATS
         success = False
         for chat in targets:
@@ -2988,10 +2990,6 @@ async def _telethon_bot4_send(text: str, chat_id=None) -> bool:
     try:
         client = TelegramClient("goldbot_bot4_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_4)
-        try:
-            await client.get_dialogs()
-        except Exception as _de:
-            log.warning(f"⚠️ [Telethon Bot4] get_dialogs: {_de}")
         targets = [chat_id] if chat_id else BOT4_CHATS
         success = False
         for chat in targets:
@@ -9155,10 +9153,6 @@ def send_summary_to_bot(token, message, chat_id):
         success = True
         try:
             await client.start(bot_token=token)
-            try:
-                await client.get_dialogs()
-            except Exception as _de:
-                log.warning(f"⚠️ [Summary Telethon] get_dialogs: {_de}")
             for chunk in chunks:
                 chunk_ok = False
                 for attempt in range(3):

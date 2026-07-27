@@ -11,6 +11,7 @@ python-dotenv==1.0.1
 # Goldbot Dependencies
 yfinance
 groq
+openai
 requests
 numpy
 

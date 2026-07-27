@@ -2570,10 +2570,10 @@ def _build_today_ohlc_section(d: dict) -> str:
         "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
         f"   \u2502 \U0001f4cf \u0646\u0637\u0627\u0642 ATR \u0627\u0644\u064a\u0648\u0645\u064a: {exp_low:,.2f}$ \u2194 {exp_high:,.2f}$",
         f"   \u2502 \U0001f4c5 Pivot \u0627\u0644\u064a\u0648\u0645: {pivot:,.2f}$",
-        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
-        f"   \u2502 \U0001f4c8 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0635\u0639\u0648\u062f \u0646\u062d\u0648 \u0627\u0644\u0642\u0645\u0629: {bull_prob}%",
-        f"   \u2502 \U0001f4c9 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0647\u0628\u0648\u0637 \u0646\u062d\u0648 \u0627\u0644\u0642\u0627\u0639:  {bear_prob}%",
-        f"   \u2502 \u26a1 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0627\u0644\u062a\u0630\u0628\u0630\u0628 \u0641\u064a \u0627\u0644\u0646\u0637\u0627\u0642: {100 - bull_prob - bear_prob}%",
+        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
+        f"   \u2502 \U0001f4c8 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0635\u0639\u0648\u062f \u0646\u062d\u0648 \u0627\u0644\u0642\u0645\u0629 ({pred_high:,.2f}$): {bull_prob}% \u2014 \u0628\u0627\u0633\u062a\u0647\u062f\u0627\u0641 \u0627\u062e\u062a\u0631\u0627\u0642 \u0627\u0644\u0645\u0642\u0627\u0648\u0645\u0629 {r1}$",
+        f"   \u2502 \U0001f4c9 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0647\u0628\u0648\u0637 \u0646\u062d\u0648 \u0627\u0644\u0642\u0627\u0639 ({pred_low:,.2f}$): {bear_prob}% \u2014 \u0628\u0627\u0633\u062a\u0647\u062f\u0627\u0641 \u0627\u062e\u062a\u0631\u0627\u0642 \u0627\u0644\u062f\u0639\u0645 {s1}$",
+        f"   \u2502 \u26a1 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0627\u0644\u062a\u0630\u0628\u0630\u0628 \u0641\u064a \u0627\u0644\u0646\u0637\u0627\u0642 ({pred_low:,.2f}$ \u2194 {pred_high:,.2f}$): {100 - bull_prob - bear_prob}% \u2014 \u062d\u0631\u0643\u0629 \u0639\u0631\u0636\u064a\u0629 \u0628\u064a\u0646 \u0627\u0644\u062f\u0639\u0645 \u0648\u0627\u0644\u0645\u0642\u0627\u0648\u0645\u0629",
         "   \u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f",
         "",
         "   \u2139\ufe0f \u0647\u0630\u0627 \u0627\u0644\u062a\u0648\u0642\u0639 \u0645\u0628\u0646\u064a \u0639\u0644\u0649: ATR + ADX(\u0642\u0648\u0629 \u0627\u0644\u062a\u0631\u0646\u062f) + \u062a\u0648\u0627\u0641\u0642 \u0627\u0644\u0625\u0637\u0627\u0631\u0627\u062a + \u0641\u064a\u0628\u0648\u0646\u0627\u062a\u0634\u064a",
@@ -7589,68 +7589,187 @@ def _build_early_warning_alert(data: dict) -> str:
 
 
 def _fetch_breaking_news() -> str:
-    """جلب آخر الأخبار العاجلة من ForexLive"""
-    try:
-        import requests
-        import xml.etree.ElementTree as ET
-        import re
-        r = requests.get('https://www.forexlive.com/feed/news', timeout=5, headers={'User-Agent': 'Mozilla/5.0'})
-        if r.status_code == 200:
-            root = ET.fromstring(r.content)
+    """
+    جلب آخر الأخبار العاجلة — يجرب 4 مصادر RSS بالتسلسل حتى ينجح أحدها.
+    مصادر: ForexLive → Investing.com → MarketWatch → Reuters (Gold)
+    """
+    import requests
+    import xml.etree.ElementTree as ET
+    import re
+
+    RSS_SOURCES = [
+        {
+            'url': 'https://www.forexlive.com/feed/news',
+            'title_tag': 'title',
+            'desc_tag': 'description',
+            'name': 'ForexLive'
+        },
+        {
+            'url': 'https://www.investing.com/rss/news_25.rss',
+            'title_tag': 'title',
+            'desc_tag': 'description',
+            'name': 'Investing.com'
+        },
+        {
+            'url': 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines',
+            'title_tag': 'title',
+            'desc_tag': 'description',
+            'name': 'MarketWatch'
+        },
+        {
+            'url': 'https://feeds.reuters.com/reuters/businessNews',
+            'title_tag': 'title',
+            'desc_tag': 'description',
+            'name': 'Reuters'
+        },
+    ]
+
+    HEADERS = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+
+    for src in RSS_SOURCES:
+        try:
+            r = requests.get(src['url'], timeout=7, headers=HEADERS)
+            if r.status_code != 200:
+                log.warning(f"[News] {src['name']} => HTTP {r.status_code}")
+                continue
+
+            try:
+                root = ET.fromstring(r.content)
+            except ET.ParseError:
+                content_clean = r.content.lstrip(b'\xef\xbb\xbf')
+                root = ET.fromstring(content_clean)
+
             items = root.findall('.//item')
+            if not items:
+                log.warning(f"[News] {src['name']} => 0 items found")
+                continue
+
             news_list = []
-            for item in items[:5]:
-                title = item.find('title').text if item.find('title') is not None else ""
-                desc = item.find('description').text if item.find('description') is not None else ""
+            for item in items[:6]:
+                title_el = item.find(src['title_tag'])
+                desc_el  = item.find(src['desc_tag'])
+                title = (title_el.text or '').strip() if title_el is not None else ''
+                desc  = (desc_el.text  or '').strip() if desc_el  is not None else ''
                 desc = re.sub(r'<[^>]+>', '', desc).strip()
-                news_list.append(f"Title: {title}\nDetails: {desc}")
-            return "\n\n".join(news_list)
-    except Exception as e:
-        log.warning(f"⚠️ فشل جلب الأخبار العاجلة: {e}")
+                desc = re.sub(r'\s+', ' ', desc)
+                if title and len(title) > 5:
+                    news_list.append(f"Title: {title}\nDetails: {desc[:300]}" if desc else f"Title: {title}")
+
+            if news_list:
+                log.info(f"[News] ✅ Got {len(news_list)} items from {src['name']}")
+                return "\n\n".join(news_list)
+            else:
+                log.warning(f"[News] {src['name']} => items parsed but all empty")
+
+        except requests.exceptions.Timeout:
+            log.warning(f"[News] {src['name']} => timeout")
+        except Exception as e:
+            log.warning(f"[News] {src['name']} => error: {e}")
+
+    log.warning("[News] ❌ All RSS sources failed — returning empty")
     return ""
 
 def _build_sudden_news_alert(data: dict) -> str:
-    """القالب الجديد: رادار الأخبار العاجلة باستخدام الذكاء الاصطناعي"""
+    """رادار الأخبار العاجلة — يستخدم الأخبار الحقيقية أو تحليل السوق عند تعذّر الجلب"""
+    import random
+    try:
+        from groq import Groq
+    except:
+        pass
+
+    HEADER = "🚨 **رادار الأخبار العاجلة (Breaking News)** 🚨\n━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
     news_text = _fetch_breaking_news()
-    if not news_text or len(news_text) < 10:
-        return "🚨 **رادار الأخبار العاجلة (Breaking News)** 🚨\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nلا توجد تحديثات إخبارية حالياً. السوق يتحرك بناءً على السيولة التقنية."
-    
-    prompt = f"""أنت خبير اقتصادي مختص في الذهب.
-إليك آخر 5 أخبار عاجلة من السوق:
+    has_news  = bool(news_text and len(news_text.strip()) > 15)
+
+    # ── المسار 1: أخبار متاحة → Groq يحلل ويترجم ──
+    if has_news:
+        prompt = f"""أنت خبير اقتصادي مختص في الذهب.
+إليك آخر أخبار عاجلة من السوق:
 {news_text}
 
 المطلوب:
-1. اختر أهم خبر من هذه الأخبار الخمسة مهما كان تأثيره (حتى لو كان متوسطاً أو ضعيفاً).
-2. إياك أن تقول 'لا توجد أحداث مؤثرة'، بل صغ أهم ما جاء في الأخبار.
-3. قم بصياغة الخبر بدقة باللغة العربية داخل هذا القالب بالضبط ولا تضف أي ديباجة:
+1. اختر أهم خبر أو حدث مهما كان تأثيره (حتى لو كان متوسطاً).
+2. لا تقل أبداً 'لا توجد أحداث مؤثرة' — دائماً اختر الأهم مما ورد.
+3. ترجم وصغ بالعربية داخل هذا القالب فقط دون أي ديباجة:
 
-🚨 **رادار الأخبار العاجلة (Breaking News)** 🚨
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📰 **الخبر البارز:** 
+{HEADER}
+📰 **الخبر البارز:**
 [عنوان الخبر وتفاصيله المترجمة بدقة واحترافية]
 
 🔥 **درجة التأثير:** [عالية جداً / متوسطة / ضعيفة]
 📈 **التوجه المتوقع للذهب بناءً على الخبر:** [صعودي 🟢 / هبوطي 🔴 / تذبذب 🟡]
 """
-    try:
-        from groq import Groq
-        import random
-    except:
-        pass
-    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
-    if client:
-        try:
-            resp = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=random.choice(GROQ_MODELS),
-                temperature=0.3,
-                max_tokens=600
-            )
-            ans = resp.choices[0].message.content.strip()
-            return ans
-        except Exception as e:
-            pass
-    return "🚨 **رادار الأخبار العاجلة (Breaking News)** 🚨\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nلا توجد تحديثات إخبارية حالياً. السوق يتحرك بناءً على السيولة التقنية."
+        client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+        if client:
+            for attempt in range(2):
+                try:
+                    resp = client.chat.completions.create(
+                        messages=[{"role": "user", "content": prompt}],
+                        model=random.choice(GROQ_MODELS),
+                        temperature=0.3,
+                        max_tokens=600
+                    )
+                    ans = resp.choices[0].message.content.strip()
+                    if ans and len(ans) > 30:
+                        return ans
+                except Exception as e:
+                    log.warning(f"[NewsAlert] Groq attempt {attempt+1} failed: {e}")
+
+        # Groq فشل لكن الأخبار موجودة — نعرضها مباشرة بتنسيق جيد
+        first_item = news_text.split('\n\n')[0]
+        lines = first_item.split('\n')
+        title   = lines[0].replace('Title:', '').strip()
+        details = lines[1].replace('Details:', '').strip() if len(lines) > 1 else ''
+        return (
+            f"{HEADER}\n"
+            f"📰 **الخبر البارز:**\n{title}\n"
+            + (f"📄 {details}\n" if details else '')
+            + f"\n🔥 **درجة التأثير:** متوسطة"
+            f"\n📈 **التوجه المتوقع للذهب:** تذبذب 🟡"
+        )
+
+    # ── المسار 2: لا أخبار خارجية → تحليل سوق حقيقي من البيانات ──
+    gold  = data.get('gold', 0.0)
+    atr   = data.get('atr', 20.0)
+    rsi   = float(data.get('rsi', 50))
+    bias  = data.get('confluence', {}).get('bias', 'neutral')
+    r1    = data.get('r1', round(gold + atr, 2))
+    s1    = data.get('s1', round(gold - atr, 2))
+    adx   = float(data.get('adx', 20))
+
+    if bias == 'bull':
+        bias_ar    = "صعودي 🟢"
+        sentiment  = f"الزخم الداخلي إيجابي — السعر {gold:.2f}$ يستهدف المقاومة {r1:.2f}$"
+        impact_lvl = "متوسطة" if adx < 25 else "عالية"
+    elif bias == 'bear':
+        bias_ar    = "هبوطي 🔴"
+        sentiment  = f"ضغط بيع سائد — السعر {gold:.2f}$ يستهدف الدعم {s1:.2f}$"
+        impact_lvl = "متوسطة" if adx < 25 else "عالية"
+    else:
+        bias_ar    = "تذبذب 🟡"
+        sentiment  = f"السوق في نطاق عرضي بين {s1:.2f}$ و{r1:.2f}$ — انتظار محفّز لكسر النطاق"
+        impact_lvl = "ضعيفة"
+
+    rsi_note = (
+        f"RSI={rsi:.1f} → تشبع شرائي ⚠️" if rsi > 68 else
+        f"RSI={rsi:.1f} → تشبع بيعي 🔻" if rsi < 32 else
+        f"RSI={rsi:.1f} → محايد ↔️"
+    )
+
+    return (
+        f"{HEADER}\n"
+        f"📰 **الوضع الراهن للسوق:**\n"
+        f"{sentiment}\n"
+        f"📊 {rsi_note} | ATR اليومي: {atr:.2f}$ | ADX: {adx:.1f}\n"
+        f"🎯 نطاق التداول: {s1:.2f}$ ↔ {r1:.2f}$\n\n"
+        f"🔥 **درجة الحركة المتوقعة:** {impact_lvl}\n"
+        f"📈 **التوجه المتوقع للذهب:** {bias_ar}"
+    )
 
 def _build_institutional_liquidity_map(data: dict) -> str:
     """القالب الجديد: خريطة السيولة المؤسساتية (Smart Money Concepts)"""

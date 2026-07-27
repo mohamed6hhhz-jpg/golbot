@@ -2588,10 +2588,10 @@ def _build_today_ohlc_section(d: dict) -> str:
         "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
         f"   \u2502 \U0001f4cf \u0646\u0637\u0627\u0642 ATR \u0627\u0644\u064a\u0648\u0645\u064a: {exp_low:,.2f}$ \u2194 {exp_high:,.2f}$",
         f"   \u2502 \U0001f4c5 Pivot \u0627\u0644\u064a\u0648\u0645: {pivot:,.2f}$",
-        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
-        f"   \u2502 \U0001f4c8 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0635\u0639\u0648\u062f \u0646\u062d\u0648 \u0627\u0644\u0642\u0645\u0629: {bull_prob}%",
-        f"   \u2502 \U0001f4c9 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0647\u0628\u0648\u0637 \u0646\u062d\u0648 \u0627\u0644\u0642\u0627\u0639:  {bear_prob}%",
-        f"   \u2502 \u26a1 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0627\u0644\u062a\u0630\u0628\u0630\u0628 \u0641\u064a \u0627\u0644\u0646\u0637\u0627\u0642: {100 - bull_prob - bear_prob}%",
+        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
+        f"   \u2502 \U0001f4c8 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0635\u0639\u0648\u062f \u0646\u062d\u0648 \u0627\u0644\u0642\u0645\u0629 ({pred_high:,.2f}$): {bull_prob}% \u2014 \u0628\u0627\u0633\u062a\u0647\u062f\u0627\u0641 \u0627\u062e\u062a\u0631\u0627\u0642 \u0627\u0644\u0645\u0642\u0627\u0648\u0645\u0629 {r1}$",
+        f"   \u2502 \U0001f4c9 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0647\u0628\u0648\u0637 \u0646\u062d\u0648 \u0627\u0644\u0642\u0627\u0639 ({pred_low:,.2f}$): {bear_prob}% \u2014 \u0628\u0627\u0633\u062a\u0647\u062f\u0627\u0641 \u0627\u062e\u062a\u0631\u0627\u0642 \u0627\u0644\u062f\u0639\u0645 {s1}$",
+        f"   \u2502 \u26a1 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0627\u0644\u062a\u0630\u0628\u0630\u0628 \u0641\u064a \u0627\u0644\u0646\u0637\u0627\u0642 ({pred_low:,.2f}$ \u2194 {pred_high:,.2f}$): {100 - bull_prob - bear_prob}% \u2014 \u062d\u0631\u0643\u0629 \u0639\u0631\u0636\u064a\u0629 \u0628\u064a\u0646 \u0627\u0644\u062f\u0639\u0645 \u0648\u0627\u0644\u0645\u0642\u0627\u0648\u0645\u0629",
         "   \u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f",
         "",
         "   \u2139\ufe0f \u0647\u0630\u0627 \u0627\u0644\u062a\u0648\u0642\u0639 \u0645\u0628\u0646\u064a \u0639\u0644\u0649: ATR + ADX(\u0642\u0648\u0629 \u0627\u0644\u062a\u0631\u0646\u062f) + \u062a\u0648\u0627\u0641\u0642 \u0627\u0644\u0625\u0637\u0627\u0631\u0627\u062a + \u0641\u064a\u0628\u0648\u0646\u0627\u062a\u0634\u064a",
@@ -5943,29 +5943,6 @@ def _fetch_breaking_news() -> str:
             log.warning(f"[News] {src['name']} => error: {e}")
 
     log.warning("[News] ❌ All RSS sources failed — returning empty")
-    return ""
-
-
-
-def _fetch_breaking_news() -> str:
-    """جلب آخر الأخبار العاجلة من ForexLive"""
-    try:
-        import requests
-        import xml.etree.ElementTree as ET
-        import re
-        r = requests.get('https://www.forexlive.com/feed/news', timeout=5, headers={'User-Agent': 'Mozilla/5.0'})
-        if r.status_code == 200:
-            root = ET.fromstring(r.content)
-            items = root.findall('.//item')
-            news_list = []
-            for item in items[:5]:
-                title = item.find('title').text if item.find('title') is not None else ""
-                desc = item.find('description').text if item.find('description') is not None else ""
-                desc = re.sub(r'<[^>]+>', '', desc).strip()
-                news_list.append(f"Title: {title}\nDetails: {desc}")
-            return "\n\n".join(news_list)
-    except Exception as e:
-        log.warning(f"⚠️ فشل جلب الأخبار العاجلة: {e}")
     return ""
 
 

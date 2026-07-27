@@ -2816,14 +2816,16 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
         await client.start(bot_token=TELEGRAM_BOT_TOKEN)
         
         targets = [chat_id] if chat_id else TARGET_CHATS
+        success = False
         for chat in targets:
             try:
                 await client.send_message(chat, text)
+                success = True
             except Exception as inner_e:
                 log.warning(f"⚠️ [Telethon Bot (Futures)] فشل الإرسال للجروب {chat}: {inner_e}")
                 
         await client.disconnect()
-        return True
+        return success
     except Exception as e:
         log.warning(f"⚠️ [Telethon Bot (Futures)] {e}")
         return False
@@ -2835,13 +2837,15 @@ async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
         client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
         await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
         targets = [chat_id] if chat_id else TARGET_CHATS
+        success = False
         for chat in targets:
             try:
                 await client.send_message(chat, text)
+                success = True
             except Exception as inner_e:
                 log.warning(f"[Bot2 Telethon] فشل الإرسال للجروب {chat}: {inner_e}")
         await client.disconnect()
-        return True
+        return success
     except Exception as e:
         log.warning(f"[Bot2 Telethon] {e}")
         return False
@@ -2867,8 +2871,88 @@ def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -
             log.warning(f"[Telethon Bot2 loop] {e}")
     except Exception as e:
         log.warning(f"[Telethon Bot2] {e}")
-    log.error("[Bot2] فشل الإرسال عبر Telethon.")
-    return False
+    
+    # محاولة الإرسال عبر HTTP الخاص بالبوت الثاني
+    try:
+        import os
+        token_2 = os.environ.get('TELEGRAM_BOT_TOKEN_2', TELEGRAM_BOT_TOKEN)
+        url = f"https://api.telegram.org/bot{token_2}/sendMessage"
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        http_ok = True
+        for chat in targets:
+            r = requests.post(url, json={"chat_id": str(chat), "text": text}, timeout=15)
+            if not r.ok: http_ok = False
+        if http_ok:
+            log.info("[HTTP Bot2] تم الإرسال بنجاح.")
+            return True
+    except Exception as e:
+        log.warning(f"[HTTP Bot2] {e}")
+
+    # احتياطي الطوارئ: استخدام البوت الأساسي إذا لم يكن البوت الثاني مشرفاً في القناة
+    log.warning("⚠️ [Bot2] فشل الإرسال — جاري الإرسال عبر البوت الأساسي (الاحتياطي)...")
+    return _send_single(text, is_public_allowed=is_public_allowed, chat_id=chat_id)
+
+
+async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
+    """MTProto للبوت الثالث @Dsssoppp78_bot — خاص بالقوالب الفورية S1-S12"""
+    try:
+        client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        success = False
+        for chat in targets:
+            try:
+                await client.send_message(chat, text)
+                success = True
+            except Exception as inner_e:
+                log.warning(f"[Bot3 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
+        await client.disconnect()
+        return success
+    except Exception as e:
+        log.warning(f"[Bot3 Telethon] {e}")
+        return False
+
+
+def _send_single_bot3(text: str, chat_id=None) -> bool:
+    """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot3_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot3] تم الارسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot3_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot3] تم الارسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"[Telethon Bot3 loop] {e}")
+    except Exception as e:
+        log.warning(f"[Telethon Bot3] {e}")
+    
+    # محاولة الإرسال عبر HTTP الخاص بالبوت الثالث
+    try:
+        import os
+        token_3 = os.environ.get('TELEGRAM_BOT_TOKEN_3', TELEGRAM_BOT_TOKEN)
+        url = f"https://api.telegram.org/bot{token_3}/sendMessage"
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        http_ok = True
+        for chat in targets:
+            r = requests.post(url, json={"chat_id": str(chat), "text": text}, timeout=15)
+            if not r.ok: http_ok = False
+        if http_ok:
+            log.info("[HTTP Bot3] تم الارسال بنجاح.")
+            return True
+    except Exception as e:
+        log.warning(f"[HTTP Bot3] {e}")
+
+    # احتياطي الطوارئ: استخدام البوت الأساسي إذا لم يكن البوت الثالث مشرفاً في القناة
+    log.warning("⚠️ [Bot3] فشل الارسال — جاري الارسال عبر البوت الاساسي (الاحتياطي)...")
+    return _send_single(text, is_public_allowed=True, chat_id=chat_id)
 
 
 

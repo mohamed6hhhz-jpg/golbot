@@ -5127,7 +5127,6 @@ def _build_template_5(d: dict) -> str:
 
 def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: str, t4: str, t5: str) -> str:
     """بناء القالب السادس والأخير (الخلاصة الذكية) عبر الذكاء الاصطناعي"""
-    from groq import Groq
     import random
     import re
     
@@ -7810,10 +7809,6 @@ def _fetch_breaking_news() -> str:
 def _build_sudden_news_alert(data: dict) -> str:
     """رادار الأخبار العاجلة — يستخدم الأخبار الحقيقية أو تحليل السوق عند تعذّر الجلب"""
     import random
-    try:
-        from groq import Groq
-    except:
-        pass
 
     HEADER = "🚨 **رادار الأخبار العاجلة (Breaking News)** 🚨\n━━━━━━━━━━━━━━━━━━━━━━━━━━"
 

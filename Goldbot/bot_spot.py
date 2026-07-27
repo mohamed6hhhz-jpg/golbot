@@ -13,6 +13,16 @@ import asyncio
 import threading
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+import socket
+
+def _patch_socket_ipv4_only():
+    """إجبار بايثون على استخدام IPv4 فقط لتفادي مشاكل تعليق شبكات IPv6 في HuggingFace عند الاتصال بـ api.telegram.org"""
+    old_getaddrinfo = socket.getaddrinfo
+    def ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        return old_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+    socket.getaddrinfo = ipv4_getaddrinfo
+
+_patch_socket_ipv4_only()
 
 # ── كلايانت Telethon مشترك ودائم — يتصل مرة واحدة عند التشغيل ──
 _SHARED_CLIENT: TelegramClient | None = None
@@ -47,8 +57,8 @@ TELEGRAM_BOT_TOKEN_2 = os.environ.get("TELEGRAM_BOT_TOKEN_2", TELEGRAM_TOKENS.ge
 TELEGRAM_BOT_TOKEN_3 = os.environ.get("TELEGRAM_BOT_TOKEN_3", TELEGRAM_TOKENS.get("bot3", ""))  # @Dsssoppp78_bot
 TELEGRAM_BOT_TOKEN_4 = os.environ.get("TELEGRAM_BOT_TOKEN_4", TELEGRAM_TOKENS.get("bot4", ""))  # @Boonnii_bot
 
-TARGET_CHATS = ["@spotGol"]  # Fallback
-BOT1_CHATS = ["@spotGol"]
+TARGET_CHATS = [-1003935552363]  # Fallback
+BOT1_CHATS = [-1003935552363]
 BOT2_CHATS = [-1004464751054]
 BOT3_CHATS = [-1004311302624]
 BOT4_CHATS = [-1004412766977]

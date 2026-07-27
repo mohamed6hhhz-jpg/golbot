@@ -13,6 +13,16 @@ import asyncio
 import threading
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+import socket
+
+def _patch_socket_ipv4_only():
+    """إجبار بايثون على استخدام IPv4 فقط لتفادي مشاكل تعليق شبكات IPv6 في HuggingFace عند الاتصال بـ api.telegram.org"""
+    old_getaddrinfo = socket.getaddrinfo
+    def ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        return old_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+    socket.getaddrinfo = ipv4_getaddrinfo
+
+_patch_socket_ipv4_only()
 
 # ── كلايانت Telethon مشترك ودائم — يتصل مرة واحدة عند التشغيل ──
 _SHARED_CLIENT: TelegramClient | None = None

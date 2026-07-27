@@ -2887,9 +2887,17 @@ def _http_fallback_send(text: str, token: str, default_chats: list, chat_id=None
     import requests
     import time
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+    ip_url = f"https://149.154.167.220/bot{token}/sendMessage"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
+    ip_headers = dict(headers)
+    ip_headers["Host"] = "api.telegram.org"
+    try:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    except Exception:
+        pass
     success = True
     targets = [chat_id] if chat_id else default_chats
     for chat in targets:
@@ -2897,31 +2905,39 @@ def _http_fallback_send(text: str, token: str, default_chats: list, chat_id=None
         chat_success = False
         for attempt in range(3):
             try:
-                with httpx.Client(timeout=35.0, headers=headers) as client:
+                with httpx.Client(timeout=12.0, headers=headers) as client:
                     r = client.post(url, json=payload)
                     r.raise_for_status()
                     chat_success = True
                     break
             except Exception as e:
-                log.warning(f"⚠️ [HTTP Fallback httpx] {attempt+1}/3 — {e} — تجربة requests...")
+                log.warning(f"⚠️ [HTTP Fallback httpx] {attempt+1}/3 — {e} — تجربة Direct IPv4...")
                 try:
-                    r = requests.post(url, json=payload, headers=headers, timeout=35.0)
+                    r = requests.post(ip_url, json=payload, headers=ip_headers, timeout=10.0, verify=False)
                     r.raise_for_status()
                     chat_success = True
+                    log.info("✅ [HTTP Fallback Direct IPv4] تم الإرسال بنجاح عبر IP مباشر.")
                     break
                 except Exception as e2:
-                    wait = 2 ** attempt
-                    log.warning(f"⚠️ [HTTP Fallback requests] {attempt+1}/3 — {e2} — انتظار {wait}s")
-                    time.sleep(wait)
+                    log.warning(f"⚠️ [HTTP Fallback Direct IPv4] {attempt+1}/3 — {e2} — تجربة requests...")
+                    try:
+                        r = requests.post(url, json=payload, headers=headers, timeout=12.0)
+                        r.raise_for_status()
+                        chat_success = True
+                        break
+                    except Exception as e3:
+                        wait = 2 ** attempt
+                        log.warning(f"⚠️ [HTTP Fallback requests] {attempt+1}/3 — {e3} — انتظار {wait}s")
+                        time.sleep(wait)
         if not chat_success: success = False
     return success
 
 async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     """MTProto باستخدام توكن البوت — يتجاوز حجب HTTP نهائياً ولا يتعارض مع جلسات المستخدم"""
     try:
-        # استخدام ملف جلسة محلي بدلاً من الذاكرة لتجنب تسجيل الدخول بالتوكن في كل رسالة (يمنع الـ FloodWait)
-        client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
-        await client.start(bot_token=TELEGRAM_BOT_TOKEN)
+        with _CLIENT_LOCK:
+            client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
+            await client.start(bot_token=TELEGRAM_BOT_TOKEN)
         
         targets = [chat_id] if chat_id else BOT1_CHATS
         success = False
@@ -2945,8 +2961,9 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
 async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
     """MTProto للبوت الثاني — يتجاوز حجب HTTP على HuggingFace تماماً"""
     try:
-        client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
-        await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
+        with _CLIENT_LOCK:
+            client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
+            await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
         targets = [chat_id] if chat_id else BOT2_CHATS
         success = False
         for chat in targets:
@@ -2998,8 +3015,9 @@ def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -
 async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
     """MTProto للبوت الثالث @Dsssoppp78_bot — خاص بالقوالب الفورية S1-S12"""
     try:
-        client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
-        await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
+        with _CLIENT_LOCK:
+            client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
+            await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
         targets = [chat_id] if chat_id else BOT3_CHATS
         success = False
         for chat in targets:
@@ -3021,8 +3039,9 @@ async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
 async def _telethon_bot4_send(text: str, chat_id=None) -> bool:
     """MTProto للبوت الرابع @Boonnii_bot — خاص بالقوالب الجديدة"""
     try:
-        client = TelegramClient("goldbot_bot4_session", API_ID, API_HASH)
-        await client.start(bot_token=TELEGRAM_BOT_TOKEN_4)
+        with _CLIENT_LOCK:
+            client = TelegramClient("goldbot_bot4_session", API_ID, API_HASH)
+            await client.start(bot_token=TELEGRAM_BOT_TOKEN_4)
         targets = [chat_id] if chat_id else BOT4_CHATS
         success = False
         for chat in targets:

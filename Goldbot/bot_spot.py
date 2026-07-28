@@ -2187,7 +2187,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    🔴 المقاومات: R1: {d['r1']}$ | R2: {d['r2']}$
    💠 المحور: Pivot: {d['pivot']}$
    🟢 الدعوم: S1: {d['s1']}$ | S2: {d['s2']}$
-   {('✅ مصدر البيانات: فوري (XAU/USD)' if d['gold_spot'] else '⚠️ تنبيه: الـ Spot غير متاح — البيانات من الآجلة (GC=F)')} {('| ⚠️ مستويات مُعاد حسابها (ATR)' if d['pivot_source']=='atr' else '')} | 📅 {d['pivot_data_date']} | 🎯 الكفاءة: {d['pivot_conf']}%
+   {('✅ فوري (XAU/USD)' if d['gold_spot'] else '⚠️ آجل (GC=F) — الـ Spot غير متاح')} | {('✅ ' if 'اليوم' in d['pivot_data_date'] or 'أمس' in d['pivot_data_date'] else '⚠️ ')}📅 {d['pivot_data_date']}{(' — طبيعي' if 'أمس' in d['pivot_data_date'] else '')} | {('⚠️ مستويات مُعاد حسابها (ATR)' if d['pivot_source']=='atr' else '✅ بيفوت كلاسيكي')} | 🎯 الكفاءة: {d['pivot_conf']}%
    ═════════════════════════════
    🟡 {fib_line}
    ═════════════════════════════

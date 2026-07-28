@@ -8748,12 +8748,48 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             send_to_4h_channel = True
             LAST_4H_REPORT_TIME = now
 
+        def _inject_live_price(chunk_text):
+            if "⏱️ السعر الفوري وقت بناء هذا القسم:" not in chunk_text:
+                return chunk_text
+            
+            live_p = None
+            try:
+                import requests
+                _td_r = requests.get(f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}", timeout=4)
+                if _td_r.status_code == 200 and _td_r.json().get('price'):
+                    live_p = round(float(_td_r.json().get('price')), 2)
+            except:
+                pass
+                
+            if not live_p:
+                try:
+                    import requests
+                    r = requests.get("https://api.metals.live/v1/spot/gold", timeout=4)
+                    if r.status_code == 200:
+                        _j = r.json()
+                        _p = _j.get('price') or _j.get('gold') or (_j[0].get('gold') if isinstance(_j, list) else None)
+                        if _p: live_p = round(float(_p), 2)
+                except:
+                    pass
+            
+            if live_p:
+                now_cairo = cairo_now().strftime('%Y-%m-%d %H:%M:%S')
+                import re
+                chunk_text = re.sub(
+                    r"⏱️ السعر الفوري وقت بناء هذا القسم:.*$",
+                    f"⏱️ السعر الفوري (لحظة الإرسال): {live_p}$ — {now_cairo} القاهرة",
+                    chunk_text,
+                    flags=re.MULTILINE
+                )
+            return chunk_text
+
         log.info("⏳ [Spot] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
         with SEND_LOCK:
             log.info("🔒 [Spot] حصل على القفل — بدء إرسال الرسائل...")
             log.info(f"📤 [Spot] إرسال {total_templates} قالب ({len(flat_chunks)} رسالة) للبوت الأول...")
 
             for tmpl_idx, title, chunk, chat_id in flat_chunks:
+                chunk = _inject_live_price(chunk)
                 subtitle = _get_subtitle(chunk, title)
                 final_text = (
                     f"{prefix}[{tmpl_idx}/{total_templates}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
@@ -8782,6 +8818,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 log.info(f"📤 إرسال {total_templates_2} قالب ({len(flat_chunks_2)} رسالة) للبوت الثاني...")
                 
                 for tmpl_idx2, title2, chunk2, chat_id2 in flat_chunks_2:
+                    chunk2 = _inject_live_price(chunk2)
                     subtitle2 = _get_subtitle(chunk2, title2)
                     final_text2 = (
                         f"{prefix}[{tmpl_idx2}/{total_templates_2}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
@@ -8814,6 +8851,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 total_templates_3 = len(bot3_reports)  # عدد ثابت دائماً 16
                 log.info(f"📤 [Bot3] ارسال {total_templates_3} قالب فوري عبر @Dsssoppp78_bot...")
                 for tmpl_idx3, title3, chunk3, cid3 in flat_chunks_3:
+                    chunk3 = _inject_live_price(chunk3)
                     final_text3 = (
                         f"📊 [{tmpl_idx3}/{total_templates_3}] تقارير سوق الفوري (XAU/USD Spot)\n"
                         f"{title3}\n\n{chunk3}"
@@ -8839,6 +8877,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             if flat_chunks_4:
                 log.info(f"📤 [Bot4] إرسال {BOT4_TOTAL} قالب جديد عبر @Boonnii_bot...")
                 for tmpl_idx4, title4, chunk4, cid4 in flat_chunks_4:
+                    chunk4 = _inject_live_price(chunk4)
                     final_text4 = (
                         f"🆕 [{tmpl_idx4}/{BOT4_TOTAL}] قوالب الذهب المتقدمة (XAU/USD)\n"
                         f"{title4}\n\n{chunk4}"

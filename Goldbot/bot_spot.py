@@ -3092,6 +3092,36 @@ async def _telethon_bot4_send(text: str, chat_id=None) -> bool:
         return False
 
 
+def _send_single_bot3(text: str, chat_id=None) -> bool:
+    """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot3_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot3] تم الارسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot3_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot3] تم الارسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"[Telethon Bot3 loop] {e}")
+    except Exception as e:
+        log.warning(f"[Telethon Bot3] {e}")
+        
+    log.warning("[Bot3] فشل الإرسال عبر Telethon — جاري المحاولة عبر HTTP...")
+    if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_3, BOT3_CHATS, chat_id):
+        log.info("✅ [Bot3 HTTP] تم الإرسال بنجاح.")
+        return True
+        
+    log.error("[Bot3] فشل الإرسال عبر جميع الوسائل.")
+    return False
+
+
 def _send_single_bot4(text: str, chat_id=None) -> bool:
     """الارسال للبوت الرابع @Boonnii_bot عبر Telethon MTProto"""
     try:

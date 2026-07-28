@@ -1707,11 +1707,52 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
             pcr_source = "مؤشر تدفق السيولة البديل"
 
 
-    # ── Pivot Points ──
+    # ── Pivot Points (مصحح للسعر الفوري — Fix 1: تعديل الـ Basis بين الآجلة والفوري) ──
     ph, pl, pc = float(gold_daily['High'].iloc[-2]), float(gold_daily['Low'].iloc[-2]), float(gold_daily['Close'].iloc[-2])
+
+    # Fix 1: تعديل بيانات OHLC بحسب الفارق بين سعر الآجلة (GC=F) وسعر الفوري الحقيقي (XAU/USD)
+    # بذلك تصبح مستويات الدعم والمقاومة متوافقة مع السعر الفوري المعروض للعميل
+    _piv_basis = 0.0
+    if gold_spot and gold_futures and gold_futures > 0 and gold_spot > 0:
+        _piv_basis = round(float(gold_futures) - float(gold_spot), 2)
+        if abs(_piv_basis) < 50:  # تجاهل الفارق إذا كان غير منطقي
+            ph = round(ph - _piv_basis, 2)
+            pl = round(pl - _piv_basis, 2)
+            pc = round(pc - _piv_basis, 2)
+
     pivot = round((ph + pl + pc) / 3, 2)
     r1    = round(2*pivot - pl, 2);  r2 = round(pivot + (ph-pl), 2); r3 = round(ph + 2*(pivot-pl), 2)
     s1    = round(2*pivot - ph, 2);  s2 = round(pivot - (ph-pl), 2); s3 = round(pl - 2*(ph-pivot), 2)
+
+    # Fix 2: فلتر منطق الدعم/المقاومة — يضمن دائماً: الدعم تحت السعر | المقاومة فوق السعر
+    # إذا كانت المستويات مقلوبة (بسبب تغيرات السوق الكبيرة) نعيد حسابها من ATR مباشرة
+    _ref_price = float(gold_spot if gold_spot else (gold_futures if gold_futures else 0))
+    _atr_safe  = float(atr if atr and atr > 0 else 50.0)
+    if _ref_price > 0 and (s1 >= _ref_price or s2 >= _ref_price or pivot > _ref_price + _atr_safe * 0.6):
+        log.warning(
+            f"⚠️ [Pivot Fix2] مستويات البيفوت الكلاسيكي خارج النطاق المنطقي "
+            f"(S1={s1}$ >= سعر={_ref_price}$، Pivot={pivot}$) — "
+            f"إعادة حساب تلقائية بناءً على ATR={_atr_safe:.1f}$"
+        )
+        pivot = round(_ref_price, 2)
+        r1    = round(_ref_price + _atr_safe * 0.50, 2)
+        r2    = round(_ref_price + _atr_safe * 1.00, 2)
+        r3    = round(_ref_price + _atr_safe * 1.50, 2)
+        s1    = round(_ref_price - _atr_safe * 0.50, 2)
+        s2    = round(_ref_price - _atr_safe * 1.00, 2)
+        s3    = round(_ref_price - _atr_safe * 1.50, 2)
+        # metadata: ATR Fallback
+        _pivot_source    = "ATR (إعادة حساب تلقائية)"
+        _pivot_conf      = 70
+        _pivot_data_date = "السعر الحالي"
+    else:
+        # metadata: Classic Pivot (مُصحح للفوري)
+        try:
+            _pivot_data_date = gold_daily.index[-2].strftime("%Y-%m-%d")
+        except Exception:
+            _pivot_data_date = "أمس"
+        _pivot_source = "بيفوت كلاسيكي (مُصحح للفوري)"
+        _pivot_conf   = 90
 
     # ── التسميات ──
     rsi_label   = "تشبع شراء 🔴" if rsi > 70 else ("تشبع بيع 🟢" if rsi < 30 else "محايد ⚪")
@@ -1767,6 +1808,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         atr=atr, atr_regime=atr_reg, variance=variance, fib=fib, divergence=divergence,
         swing_high=swing_high, swing_low=swing_low,
         pivot=pivot, r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
+        pivot_source=_pivot_source, pivot_conf=_pivot_conf, pivot_data_date=_pivot_data_date,
         round_numbers=round_numbers, hist_ctx=hist_ctx,
         real_yield_signal=real_yield_signal,
         real_yield_brief=real_yield_brief,
@@ -1956,9 +1998,11 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     # ── السعر الفوري والآجل مع توضيح مصدر البيانات ──
     futures_label = f"{d['gold_futures']:.2f}$  ⏱ {d['futures_date']}"
     if d['gold_spot']:
-        spot_label = f"{d['gold_spot']:.2f}$  ⏱ {d['spot_date']}"
+        spot_label      = f"{d['gold_spot']:.2f}$  ⏱ {d['spot_date']}"
+        price_type_warn = ""  # فوري صحيح — لا تحذير
     else:
-        spot_label = f"غير متاح (آخر معلوم: راجع الآجل)"
+        spot_label      = f"غير متاح (آخر معلوم: راجع الآجل)"
+        price_type_warn = "\n   ⚠️ تنبيه: جميع مصادر السعر الفوري (Spot) غير متاحة — السعر المعروض آجل GC=F وليس فورياً"
     contango_str = (f"  (+{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
                     else f"  ({d['contango']:.2f}$)" if d['contango'] else "")
 
@@ -2058,7 +2102,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📍 السعر الحالي
-   سوق الفوري (Spot) : {spot_label}
+   سوق الفوري (Spot) : {spot_label}{price_type_warn}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 ملخص السوق
@@ -2134,6 +2178,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    🔴 المقاومات: R1: {d['r1']}$ | R2: {d['r2']}$
    💠 المحور: Pivot: {d['pivot']}$
    🟢 الدعوم: S1: {d['s1']}$ | S2: {d['s2']}$
+   📅 مصدر المستويات: {d['pivot_source']} | تاريخ البيانات: {d['pivot_data_date']} | كفاءة المستويات: {d['pivot_conf']}%
    ═════════════════════════════
    🟡 {fib_line}
    ═════════════════════════════

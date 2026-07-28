@@ -4613,7 +4613,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             
         s9_report_bot2 = _build_futures_s9(data)
         bot2_reports.append(("👑 مصفوفة التداول السريعة والاسكالبينج الاحترافي (Futures)", s9_report_bot2, None))
-        bot2_reports.append(("[16/16] المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, True), None))
+        bot2_reports.append(("🎯 المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, True), None))
         bot2_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_futures_s14(data), None))
         bot2_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_futures_s15(data), None))
         bot2_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_futures_s16(data), None))
@@ -6833,7 +6833,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot2_reports.append(("الخلاصة المحورية", _t6_text, None))
         
         # (Spot reports are handled by bot_spot.py)
-        bot2_reports.append(("[16/16] المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
+        bot2_reports.append(("🎯 المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
         bot2_reports.append(("⏰ تنبيه مبكر — انعكاس مرتقب", _build_early_warning_alert(data), None))
         bot2_reports.append(("🚨 رادار الأخبار العاجلة (Breaking News)", _build_sudden_news_alert(data), None))
         bot2_reports.append(("🏦 رادار السيولة المؤسساتية (Smart Money)", _build_institutional_liquidity_map(data), None))

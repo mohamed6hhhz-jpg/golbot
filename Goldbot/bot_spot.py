@@ -1742,17 +1742,25 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         s2    = round(_ref_price - _atr_safe * 1.00, 2)
         s3    = round(_ref_price - _atr_safe * 1.50, 2)
         # metadata: ATR Fallback
-        _pivot_source    = "ATR (إعادة حساب تلقائية)"
-        _pivot_conf      = 70
-        _pivot_data_date = "السعر الحالي"
+        _pivot_source    = "atr"
+        _pivot_conf      = 100
+        _pivot_data_date = f"اليوم ({cairo_now().strftime('%Y-%m-%d')}) — سعر حي"
     else:
-        # metadata: Classic Pivot (مُصحح للفوري)
+        # metadata: Classic Pivot
         try:
-            _pivot_data_date = gold_daily.index[-2].strftime("%Y-%m-%d")
+            _data_d = gold_daily.index[-2].date()
+            _today_d = cairo_now().date()
+            _days_diff = (_today_d - _data_d).days
+            if _days_diff == 0:
+                _pivot_data_date = f"اليوم ({_data_d})"
+            elif _days_diff == 1:
+                _pivot_data_date = f"أمس ({_data_d})"
+            else:
+                _pivot_data_date = f"{_data_d} (قبل {_days_diff} أيام)"
         except Exception:
             _pivot_data_date = "أمس"
-        _pivot_source = "بيفوت كلاسيكي (مُصحح للفوري)"
-        _pivot_conf   = 90
+        _pivot_source = "spot"
+        _pivot_conf   = 100
 
     # ── التسميات ──
     rsi_label   = "تشبع شراء 🔴" if rsi > 70 else ("تشبع بيع 🟢" if rsi < 30 else "محايد ⚪")
@@ -2165,6 +2173,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔢 خريطة المستويات والصفقات (مبنية على الـ {market_suffix})
+   ⏱️ السعر الفوري وقت بناء هذا القسم: {gold:.2f}$ — {cairo_now().strftime('%Y-%m-%d %H:%M')} القاهرة
    🟣 مقاومة نفسية: {rn['nearest_resistance']}$ (+{rn['dist_to_resistance']}$) | دعم نفسي: {rn['nearest_support']}$ (-{rn['dist_to_support']}$)
    ═════════════════════════════
    📍 Swing High : {d['swing_high']}$
@@ -2178,7 +2187,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    🔴 المقاومات: R1: {d['r1']}$ | R2: {d['r2']}$
    💠 المحور: Pivot: {d['pivot']}$
    🟢 الدعوم: S1: {d['s1']}$ | S2: {d['s2']}$
-   📅 مصدر المستويات: {d['pivot_source']} | تاريخ البيانات: {d['pivot_data_date']} | كفاءة المستويات: {d['pivot_conf']}%
+   {('✅ مصدر البيانات: فوري (XAU/USD)' if d['gold_spot'] else '⚠️ تنبيه: الـ Spot غير متاح — البيانات من الآجلة (GC=F)')} {('| ⚠️ مستويات مُعاد حسابها (ATR)' if d['pivot_source']=='atr' else '')} | 📅 {d['pivot_data_date']} | 🎯 الكفاءة: {d['pivot_conf']}%
    ═════════════════════════════
    🟡 {fib_line}
    ═════════════════════════════

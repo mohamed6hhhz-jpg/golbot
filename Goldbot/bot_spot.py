@@ -1728,11 +1728,16 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     # إذا كانت المستويات مقلوبة (بسبب تغيرات السوق الكبيرة) نعيد حسابها من ATR مباشرة
     _ref_price = float(gold_spot if gold_spot else (gold_futures if gold_futures else 0))
     _atr_safe  = float(atr if atr and atr > 0 else 50.0)
-    if _ref_price > 0 and (s1 >= _ref_price or s2 >= _ref_price or pivot > _ref_price + _atr_safe * 0.6):
-        log.warning(
-            f"⚠️ [Pivot Fix2] مستويات البيفوت الكلاسيكي خارج النطاق المنطقي "
-            f"(S1={s1}$ >= سعر={_ref_price}$، Pivot={pivot}$) — "
-            f"إعادة حساب تلقائية بناءً على ATR={_atr_safe:.1f}$"
+    
+    # فلتر الجودة (Quality Filter): تم التعديل بناءً على طلب العميل ليكون دائماً ATR لضمان الدقة والاستقرار
+    _is_out_of_bounds = True
+    _is_too_squished  = True
+
+    if _ref_price > 0:
+        log.info(
+            f"⚠️ [Pivot Fix2] الاعتماد الدائم على ATR لضمان جودة المستويات "
+            f"(ATR={_atr_safe:.1f}$) — "
+            f"إعادة حساب تلقائية للحفاظ على الجودة العالية."
         )
         pivot = round(_ref_price, 2)
         r1    = round(_ref_price + _atr_safe * 0.50, 2)

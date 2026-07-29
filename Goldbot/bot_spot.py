@@ -9436,8 +9436,8 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
                     f"⚠️ تنبيه المخاطر: {risk_note} — الالتزام بالارتكاز أمر إلزامي.",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",
                     "🤖 تم توليد هذا الحكم النهائي عبر محرك القرار الخوارزمي الشامل لمنظومة Goldbot الملكية."
-                ]
-                return "\n".join(ai_lines)
+            ]
+            return "\n".join(ai_lines)
     except Exception as e:
         log.error(f"[AI Grand Summary] Failed, using fallback. Error: {e}")
     return fallback_text

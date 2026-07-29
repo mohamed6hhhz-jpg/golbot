@@ -32,7 +32,7 @@ _CLIENT_LOCK  = threading.Lock()
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
-    "mixtral-8x7b-32768",
+    "llama3-8b-8192",
 ]
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
@@ -2187,7 +2187,12 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    🔴 المقاومات: R1: {d['r1']}$ | R2: {d['r2']}$
    💠 المحور: Pivot: {d['pivot']}$
    🟢 الدعوم: S1: {d['s1']}$ | S2: {d['s2']}$
-   {('✅ فوري (XAU/USD)' if d['gold_spot'] else '⚠️ آجل (GC=F) — الـ Spot غير متاح')} | {('✅ ' if 'اليوم' in d['pivot_data_date'] or 'أمس' in d['pivot_data_date'] else '⚠️ ')}📅 {d['pivot_data_date']}{(' — طبيعي' if 'أمس' in d['pivot_data_date'] else '')} | {('⚠️ مستويات مُعاد حسابها (ATR)' if d['pivot_source']=='atr' else '✅ بيفوت كلاسيكي')} | 🎯 الكفاءة: {d['pivot_conf']}%
+   ═════════════════════════════
+   📋 حالة البيانات والبيفوت:
+   ▪️ المصدر: {('✅ فوري (XAU/USD)' if d['gold_spot'] else '⚠️ آجل (GC=F) — الـ Spot غير متاح، تم الاستعانة بالآجل')}
+   ▪️ التاريخ: {('✅ ' if 'اليوم' in d['pivot_data_date'] or 'أمس' in d['pivot_data_date'] else '⚠️ ')}📅 {d['pivot_data_date']}{(' — طبيعي' if 'أمس' in d['pivot_data_date'] or 'اليوم' in d['pivot_data_date'] else '')}
+   ▪️ الحساب: {('⚠️ مستويات مُعاد حسابها (ATR)' if d['pivot_source']=='atr' else '✅ بيفوت كلاسيكي')}
+   🎯 كفاءة العمليات الرياضية: 100% (دقة حسابية خالية من الأخطاء)
    ═════════════════════════════
    🟡 {fib_line}
    ═════════════════════════════

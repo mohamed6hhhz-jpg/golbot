@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
-    "mixtral-8x7b-32768"
+    "llama3-8b-8192"
 ]
 
 def generate_ai_template(api_key: str, template_num: int, title: str, context: dict, is_spot: bool) -> str:

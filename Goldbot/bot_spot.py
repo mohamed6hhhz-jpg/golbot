@@ -9248,29 +9248,20 @@ MACD: {macd}
 لا تكتب مقدمات، فقط الخلاصة القوية المباشرة.
 استخدم الرموز التعبيرية 🟢🔴⚪ للتعبير عن الاتجاه والاحترافية.
 """
-        import random, requests
-        api_key = random.choice(GROQ_KEYS)
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        
         try:
-            payload = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.3,
-                "max_tokens": 600
-            }
-            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
-            resp.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            if resp.status_code == 429:
-                log.warning(f"⚠️ [llama-3.3-70b-versatile] Rate limit hit for {group_name} summary, falling back to llama-3.1-8b-instant")
-                payload["model"] = "llama-3.1-8b-instant"
-                resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
-                resp.raise_for_status()
-            else:
-                raise e
+            from Goldbot.ai_client import generate_robust_ai_response
+        except ImportError:
+            from ai_client import generate_robust_ai_response
 
-        ai_summary = resp.json()["choices"][0]["message"]["content"].strip()
+        ai_summary = generate_robust_ai_response(
+            system_prompt="",
+            user_prompt=prompt,
+            max_tokens=600,
+            temperature=0.3
+        ).strip()
+        
+        if "فشل توليد التقرير" in ai_summary:
+            raise Exception("All AI keys exhausted or invalid.")
         
         return f"👑 الخلاصة المحورية — {group_name}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📅 التوقيت: {now_str} | عدد القوالب: {total_tmpl}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n{ai_summary}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🤖 تم توليد هذه الخلاصة بالذكاء الاصطناعي بناءً على القوالب والبيانات الحية."
     except Exception as e:
@@ -9403,20 +9394,21 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
 2. اعتمد على الأرقام الموحدة المذكورة بالأعلى فقط (الدعم {s1} والمقاومة {r1} والارتكاز {pivot}) ولا تذكر أي أرقام أخرى منعاً للتعارض.
 3. وجه كلامك للمتداول بوضوح حول أفضل خطة للتعامل مع السوق في الجلسة الحالية.
 """
-        api_key = random.choice(GROQ_KEYS) if GROQ_KEYS else ""
-        if api_key:
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            payload = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.3,
-                "max_tokens": 500
-            }
-            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=12)
-            if resp.status_code == 200:
-                ai_summary = resp.json()["choices"][0]["message"]["content"].strip()
-                ai_lines = [
-                    "👑🏆 الملخص العام والشامل للمنظومة الخوارزمية (Grand Master Summary) 🏆👑",
+        try:
+            from Goldbot.ai_client import generate_robust_ai_response
+        except ImportError:
+            from ai_client import generate_robust_ai_response
+
+        ai_summary = generate_robust_ai_response(
+            system_prompt="",
+            user_prompt=prompt,
+            max_tokens=500,
+            temperature=0.3
+        ).strip()
+        
+        if "فشل توليد التقرير" not in ai_summary:
+            ai_lines = [
+                "👑🏆 الملخص العام والشامل للمنظومة الخوارزمية (Grand Master Summary) 🏆👑",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",
                     f"📅 التوقيت: {now_str}",
                     f"⚡ تم دمج وربط نتائج 50 قالباً تحليلياً من البوتات الأربعة (@spotGol, Bot2, @Dsssoppp78_bot, @Boonnii_bot)",

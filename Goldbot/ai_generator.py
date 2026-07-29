@@ -45,25 +45,14 @@ def generate_ai_template(api_key: str, template_num: int, title: str, context: d
 
     prompt = f"قم بكتابة تقرير بعنوان '{title}' بناءً على البيانات التالية:\n{context}\n\nيجب أن يكون الرد منسقاً بشكل جذاب وواضح بصيغة الماركداون (Markdown) مع استخدام الإيموجي المناسب."
     
-    for model_name in GROQ_MODELS:
-        for retry in range(3): # Retry logic specifically for 429 inside the same model
-            try:
-                resp = client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt},
-                    ],
-                    model=model_name,
-                    temperature=0.1,
-                    max_tokens=1500,
-                )
-                return f"[{'الفوري' if is_spot else 'الآجل'}] {template_num}/12 {title}\\n\\n" + resp.choices[0].message.content
-            except Exception as e:
-                err = str(e).lower()
-                if "429" in err or "too many" in err:
-                    time.sleep(10) # wait 10 seconds and retry same model
-                    continue
-                else:
-                    time.sleep(2)
-                    break # break inner loop to try next model
-    return f"[{'الفوري' if is_spot else 'الآجل'}] {template_num}/12 {title}\\n\\n⚠️ فشل توليد التقرير."
+    try:
+        from Goldbot.ai_client import generate_robust_ai_response
+    except ImportError:
+        from ai_client import generate_robust_ai_response
+        
+    ai_content = generate_robust_ai_response(system_prompt, prompt, max_tokens=1500)
+    
+    prefix = f"[{'الفوري' if is_spot else 'الآجل'}] {template_num}/12 {title}\n\n"
+    if "فشل توليد التقرير" in ai_content:
+        return prefix + "⚠️ فشل توليد التقرير."
+    return prefix + ai_content

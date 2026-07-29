@@ -135,3 +135,65 @@ class UniversalAIClient:
                             **kwargs
                         )
                 raise
+
+def generate_robust_ai_response(system_prompt: str, user_prompt: str, max_tokens: int = 1500, temperature: float = 0.1) -> str:
+    """
+    Robust generator that attempts all available API keys (Groq and OpenAI) until success.
+    Prevents crashing and gracefully falls back to OpenAI if Groq hits 429/401 limit.
+    """
+    import time
+    all_keys = get_api_keys()
+    if not all_keys:
+        return "⚠️ لم يتم العثور على أي مفاتيح ذكاء اصطناعي للعمل."
+    
+    groq_models = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "llama3-8b-8192"
+    ]
+    
+    for key in all_keys:
+        is_openai = key.startswith("sk-")
+        try:
+            client = UniversalAIClient(api_key=key)
+            if is_openai:
+                resp = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                if hasattr(resp, "choices") and resp.choices:
+                    return resp.choices[0].message.content
+                return str(resp)
+            else:
+                # Iterate models for Groq keys to handle 429 inside the same key
+                for model in groq_models:
+                    try:
+                        resp = client.chat.completions.create(
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt}
+                            ],
+                            model=model,
+                            temperature=temperature,
+                            max_tokens=max_tokens
+                        )
+                        if hasattr(resp, "choices") and resp.choices:
+                            return resp.choices[0].message.content
+                        return str(resp)
+                    except Exception as e:
+                        err_str = str(e).lower()
+                        if "429" in err_str or "too many" in err_str:
+                            time.sleep(2)
+                            continue # Try next model
+                        # Auth or other error, break model loop to try next key
+                        log.warning(f"⚠️ [AI Robust] Key {key[:10]}... model {model} failed: {e}. Trying next key...")
+                        break 
+        except Exception as key_err:
+            log.warning(f"⚠️ [AI Robust] Key {key[:10]}... failed: {key_err}. Trying next key...")
+            continue
+            
+    return "⚠️ فشل توليد التقرير: جميع المفاتيح استنفدت أو غير صالحة."

@@ -8440,7 +8440,10 @@ def _build_liquidity_time_targets(data: dict) -> str:
     return template.strip()
 
 
+last_cot_report_date = None
+
 def send_reports(data: dict, report_text: str, prefix: str = ""):
+    global last_cot_report_date
     try:
         from Goldbot.send_lock import SEND_LOCK, _futures_cache
     except ImportError:
@@ -8915,14 +8918,36 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             except Exception as _e4:
                 log.error(f"❌ [Summary4] خطأ: {_e4}")
 
-            # إرسال الملخص العام والشامل الملكي (الجامع للملخصات الأربعة) إلى الجروب الخامس (@Summariesboot54_bot)
+            # ── البوت السادس (المدمج في السلسلة) ──
+            try:
+                from Goldbot.bot_6 import process_and_send_bot6
+                last_cot_report_date, bot6_reports = process_and_send_bot6(data, last_cot_report_date)
+                
+                if bot6_reports:
+                    flat_chunks_5 = []
+                    for idx, (title, content) in enumerate(bot6_reports, 1):
+                        flat_chunks_5.append((idx, title, content, None))
+                    
+                    _summary5_text = _build_group_summary(data, "البوت الخامس (المحرك الهجين - COT وكسر الأرقام)", flat_chunks_5)
+                    from Goldbot.bot_6 import TELEGRAM_BOT6_TOKEN, TELEGRAM_BOT6_CHAT
+                    send_summary_to_bot(TELEGRAM_BOT6_TOKEN, _summary5_text, TELEGRAM_BOT6_CHAT)
+                    log.info("✅ [Summary5] تم إرسال خلاصة البوت السادس/الخامس بنجاح.")
+                else:
+                    _summary5_text = "لا توجد قوالب جديدة لهذا البوت حالياً."
+                    
+            except Exception as _e5_bot:
+                log.error(f"❌ [Bot 6 Error] خطأ أثناء تنفيذ البوت السادس: {_e5_bot}")
+                _summary5_text = ""
+
+            # إرسال الملخص العام والشامل الملكي (الجامع للملخصات الخمسة) إلى الجروب الخامس (@Summariesboot54_bot)
             try:
                 _grand_summary_text = _build_grand_master_summary(
                     data,
                     locals().get('_summary1_text', ''),
                     locals().get('_summary2_text', ''),
                     locals().get('_summary3_text', ''),
-                    locals().get('_summary4_text', '')
+                    locals().get('_summary4_text', ''),
+                    locals().get('_summary5_text', '')
                 )
                 if TELEGRAM_BOT_TOKEN_5 and BOT5_CHATS:
                     for c in BOT5_CHATS:
@@ -9023,6 +9048,7 @@ def run_bot():
     consec_failures      = {'futures': 0, 'spot': 0}
     all_models_notified  = False
     last_report_date     = None
+    last_cot_report_date = None
     market_closed_notified = False
     has_sent_initial       = False
     day_names = ["اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت","أحد"]
@@ -9284,8 +9310,8 @@ MACD: {macd}
         return fallback_text
 
 
-def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text: str, s4_text: str) -> str:
-    """الملخص الشامل والنهائي الملكي الجامع للملخصات الأربعة ولـ 50 قالباً خوارزمياً"""
+def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text: str, s4_text: str, s5_text: str) -> str:
+    """الملخص الشامل والنهائي الملكي الجامع للملخصات الخمسة ولـ 50 قالباً خوارزمياً"""
     nums = _s_nums(data)
     gold   = nums['gold']
     atr    = nums['atr']
@@ -9353,7 +9379,7 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
         "👑🏆 الملخص العام والشامل للمنظومة الخوارزمية (Grand Master Summary) 🏆👑",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
         f"📅 التوقيت: {now_str}",
-        f"⚡ تم دمج وربط نتائج 50 قالباً تحليلياً من البوتات الأربعة (@spotGol, Bot2, @Dsssoppp78_bot, @Boonnii_bot)",
+        f"⚡ تم دمج وربط نتائج القوالب التحليلية من البوتات الخمسة للمنظومة",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
         "🎯 الحكم الخوارزمي والمؤسسي الموحد:",
         f"   ├ 🏆 القرار النهائي للمنظومة: {grand_verdict}",
@@ -9366,11 +9392,12 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
         f"   ├ 🔴 مناطق العرض والمقاومة: R1 = {r1:.2f}$ | R2 = {r2:.2f}$",
         f"   └ 🛡️ نقطة الارتكاز المحورية (Pivot): {pivot:.2f}$",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "📋 محصلة الركائز الأربعة للمنظومة:",
+        "📋 محصلة الركائز الخمسة للمنظومة:",
         "   🔹 البوت 1 (الكمي الأساسي): تحديد الاتجاه العام وبيئة الاقتصاد الكلي.",
         "   🔹 البوت 2 (المتخصص المتقدم): خوارزميات السيولة، المؤسسات، ومناطق الارتكاز المغناطيسية.",
         "   🔹 البوت 3 (الفوري الدقيق): التحليل اللحظي ومناطق الصفقات الفورية المضاربية.",
         "   🔹 البوت 4 (الرادار ومحافظ الحيتان): صفقات البلوك تريز، مصفوفة الزمن، وهيمنة الحيتان.",
+        "   🔹 البوت 5 (المحرك الهجين): تقارير COT المؤسسية، ومناطق العرض ونظام كسر الأرقام.",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
         f"⚠️ تنبيه المخاطر: {risk_note} — الالتزام بالارتكاز أمر إلزامي.",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
@@ -9381,7 +9408,7 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
     try:
         import random, requests
         prompt = f"""أنت كبير المحللين الاقتصاديين وخبير الخوارزميات المؤسسية لمنظومة Goldbot الملكية.
-مطلوب منك كتابة "خلاصة تنفيذية عليا" موجزة في 4-5 أسطر تربط بين ملخصات البوتات الأربعة التالية للذهب (XAU/USD) لتكون وثيقة واحدة متناغمة دون أي تعارض أو تناقض.
+مطلوب منك كتابة "خلاصة تنفيذية عليا" موجزة في 4-5 أسطر تربط بين ملخصات البوتات الخمسة التالية للذهب (XAU/USD) لتكون وثيقة واحدة متناغمة دون أي تعارض أو تناقض.
 
 البيانات الفنية الموحدة لجميع البوتات:
 السعر الحالي: {gold}$
@@ -9404,8 +9431,11 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
 ملخص البوت الرابع:
 {s4_text[:400]}
 
+ملخص البوت الخامس (COT وكسر الأرقام):
+{s5_text[:400]}
+
 التعليمات:
-1. اكتب فقرة متصلة احترافية جداً وموجزة (4 إلى 5 أسطر فقط) تلخص المشهد العام للذهب وتربط الاتجاه اللحظي واليومي بنظرة الحيتان المؤسسية.
+1. اكتب فقرة متصلة احترافية جداً وموجزة (4 إلى 5 أسطر فقط) تلخص المش المشهد العام للذهب وتربط الاتجاه اللحظي واليومي بنظرة الحيتان المؤسسية، وتستفيد من بيانات COT والعرض المذكورة في البوت الخامس.
 2. اعتمد على الأرقام الموحدة المذكورة بالأعلى فقط (الدعم {s1} والمقاومة {r1} والارتكاز {pivot}) ولا تذكر أي أرقام أخرى منعاً للتعارض.
 3. وجه كلامك للمتداول بوضوح حول أفضل خطة للتعامل مع السوق في الجلسة الحالية.
 """
@@ -9417,7 +9447,7 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
         ai_summary = generate_robust_ai_response(
             system_prompt="",
             user_prompt=prompt,
-            max_tokens=500,
+            max_tokens=600,
             temperature=0.3
         ).strip()
         
@@ -9426,7 +9456,7 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
                 "👑🏆 الملخص العام والشامل للمنظومة الخوارزمية (Grand Master Summary) 🏆👑",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",
                     f"📅 التوقيت: {now_str}",
-                    f"⚡ تم دمج وربط نتائج 50 قالباً تحليلياً من البوتات الأربعة (@spotGol, Bot2, @Dsssoppp78_bot, @Boonnii_bot)",
+                    f"⚡ تم دمج وربط نتائج القوالب التحليلية من البوتات الخمسة للمنظومة",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",
                     "🎯 الحكم الخوارزمي والمؤسسي الموحد:",
                     f"   ├ 🏆 القرار النهائي للمنظومة: {grand_verdict}",
@@ -9442,11 +9472,12 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
                     f"   ├ 🔴 مناطق العرض والمقاومة: R1 = {r1:.2f}$ | R2 = {r2:.2f}$",
                     f"   └ 🛡️ نقطة الارتكاز المحورية (Pivot): {pivot:.2f}$",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    "📋 محصلة الركائز الأربعة للمنظومة:",
+                    "📋 محصلة الركائز الخمسة للمنظومة:",
                     "   🔹 البوت 1 (الكمي الأساسي): تحديد الاتجاه العام وبيئة الاقتصاد الكلي.",
                     "   🔹 البوت 2 (المتخصص المتقدم): خوارزميات السيولة، المؤسسات، ومناطق الارتكاز المغناطيسية.",
                     "   🔹 البوت 3 (الفوري الدقيق): التحليل اللحظي ومناطق الصفقات الفورية المضاربية.",
                     "   🔹 البوت 4 (الرادار ومحافظ الحيتان): صفقات البلوك تريز، مصفوفة الزمن، وهيمنة الحيتان.",
+                    "   🔹 البوت 5 (المحرك الهجين): تقارير COT المؤسسية، ومناطق العرض ونظام كسر الأرقام.",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",
                     f"⚠️ تنبيه المخاطر: {risk_note} — الالتزام بالارتكاز أمر إلزامي.",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",

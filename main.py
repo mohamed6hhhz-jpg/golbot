@@ -163,7 +163,7 @@ async def startup_event():
     print("[Orchestrator] Goldbot Spot task created (Futures disabled).")
     
     # Start Bot 6
-    threading.Thread(target=run_bot6, daemon=True, name="Goldbot-Bot6").start()
+    # threading.Thread(target=run_bot6, daemon=True, name="Goldbot-Bot6").start()
     print("[Orchestrator] Bot 6 (COT/SD/Bias/Breakout) task created.")
 
     # 2. Start auto-copy Telegram bot on the main asyncio event loop

@@ -1,0 +1,1 @@
+        bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7 or _build_template_7(data), None))

@@ -1,0 +1,20 @@
+def send_to_telegram(message: str, chat_id=None) -> bool:
+    global LAST_PUBLIC_REPORT_TIME
+    if not message:
+        return False
+    now = time.time()
+    is_public = False
+    if now - LAST_PUBLIC_REPORT_TIME >= 3500:
+        is_public = True
+        if not chat_id:
+            LAST_PUBLIC_REPORT_TIME = now
+    chunks = _split_message(message)
+    log.info(f'📤 إرسال في {len(chunks)} جزء... (Public Allowed: {is_public}, Chat: {chat_id})')
+    all_ok = True
+    for i, chunk in enumerate(chunks, 1):
+        ok = _send_single(chunk, is_public, chat_id)
+        log.info(f'✅ جزء {i}/{len(chunks)} وصل.' if ok else f'❌ فشل جزء {i}/{len(chunks)}.')
+        all_ok = all_ok and ok
+        if i < len(chunks):
+            time.sleep(1.5)
+    return all_ok

@@ -1,0 +1,60 @@
+def _send_single(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+    """إرسال عبر MTProto (Bot) أولاً للهروب من مشاكل Timeout، والـ HTTP كاحتياطي."""
+    try:
+        ok = asyncio.run(_telethon_bot_send(text, is_public_allowed, chat_id))
+        if ok:
+            log.info("✅ [Telethon Bot (Spot)] تم الإرسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot_send(text, is_public_allowed, chat_id))
+            loop.clos
+def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+    """الإرسال للبوت الثاني عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot2_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot2] تم الإرسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot2_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot2] تم الإر
+def _send_single_bot3(text: str, chat_id=None) -> bool:
+    """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot3_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot3] تم الارسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot3_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot3] تم الارسال بنجاح.")
+   
+def _send_single_bot4(text: str, chat_id=None) -> bool:
+    """الارسال للبوت الرابع @Boonnii_bot عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot4_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot4] تم الارسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot4_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot4] تم الارسال بنجاح.")
+      

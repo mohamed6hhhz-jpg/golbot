@@ -1,0 +1,34 @@
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\fix_bot2_telethon.py: def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\fix_bot2_telethon.py: OLD_BOT2_FUNC_START = 'def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:\n    """الإرسال للبوت الثاني عبر HTTP API"""'
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\fix_bot2_telethon.py: # Find and replace the entire old HTTP-based _send_single_bot2
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\fix_bot2_telethon.py: # We'll find from def _send_single_bot2 to the next def
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\fix_bot2_telethon.py: pattern = r'def _send_single_bot2\(text: str, is_public_allowed: bool = True, chat_id=None\) -> bool:.*?(?=\ndef )'
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\fix_bot2_telethon.py: print(f"  OK: Replaced _send_single_bot2 with Telethon version in {filepath.split(chr(92))[-1]}")
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\fix_bot2_telethon.py: print(f"  WARNING: Could not find _send_single_bot2 pattern in {filepath.split(chr(92))[-1]}")
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\patch_bot2.py: # 2. Duplicate _http_send as _send_single_bot2
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\patch_bot2.py: if 'def _send_single_bot2' not in text:
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\patch_bot2.py: # We find _send_single and insert _send_single_bot2 right before it
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\patch_bot2.py: bot2_func = """def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\patch_bot2.py: print(f"[{filepath}] Added _send_single_bot2.")
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\patch_bot2.py: # 3. Change `ok2 = _send_single(final_text2, is_public, chat_id2)` to `ok2 = _send_single_bot2(...)`
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\patch_bot2.py: text = text.replace(loop2_search, "ok2 = _send_single_bot2(final_text2, is_public, chat_id2)")
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\patch_bot2.py: "_send_single_bot2(final_text2, is_public, \"@SovereignMaaregFund\")")
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\patch_bot2.py: print(f"[{filepath}] Switched bot 2 loop to use _send_single_bot2.")
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4 = []
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_liquidity_breakout_detector(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_institutional_whale_tracker(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_dynamic_price_targets(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_live_liquidity_spike(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_liquidity_concentration_zones(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_global_options_radar(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_whale_wallet_monitor(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_total_liquidity_flow_matrix(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_smart_money_vs_retail(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_ultimate_quant_score(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: bot4.append(bot_spot._build_timeframe_impact_matrix(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: with open(r"c:\Users\lenovo\Desktop\alltoools\test_bot4_output.txt", "w", encoding="utf-8") as f:
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: for i, r in enumerate(bot4):
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: print(f"Warning in Bot4 Template {i+1}: zero contracts or empty")
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: print("Bot 4 Templates generated and saved to test_bot4_output.txt")
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: with open(r"c:\Users\lenovo\Desktop\alltoools\test_bot4_output.txt", "r", encoding="utf-8") as f:
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_templates.py: print("WARNING: Found NaN or None in Bot4 output.")

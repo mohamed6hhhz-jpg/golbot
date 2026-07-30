@@ -1,0 +1,29 @@
+def _send_single(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+    """إرسال عبر MTProto (Bot) أولاً للهروب من مشاكل Timeout، والـ HTTP كاحتياطي."""
+    try:
+        ok = asyncio.run(_telethon_bot_send(text, is_public_allowed, chat_id))
+        if ok:
+            log.info("✅ [Telethon Bot (Spot)] تم الإرسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot_send(text, is_public_allowed, chat_id))
+            loop.close()
+            if ok:
+                log.info("✅ [Telethon Bot (Spot)] تم الإرسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"⚠️ [Telethon Bot (Spot) loop] {e}")
+    except Exception as e:
+        log.warning(f"⚠️ [Telethon Bot (Spot)] {e}")
+
+    log.warning("⚠️ [Telethon Bot (Spot)] فشل — جاري المحاولة عبر HTTP...")
+    if _http_send(text, is_public_allowed, chat_id):
+        log.info("✅ [HTTP] تم الإرسال بنجاح.")
+        return True
+    log.error("❌ فشل الإرسال من جميع الوسائل.")
+    return False
+
+

@@ -1,0 +1,20 @@
+
+            minutes_counter[mode] += 1
+            
+        time.sleep(60)
+
+if __name__ == "__main__":
+    try:
+        run_bot()
+    except KeyboardInterrupt:
+        print("\nBot stopped by user.")
+
+import requests
+
+
+
+def _build_group_summary(data: dict, group_name: str, flat_chunks: list) -> str:
+    """خلاصة محورية مخصصة لكل مجموعة تقارير — مبنية على بيانات السوق الحية وتوليد الذكاء الاصطناعي"""
+    nums = _s_nums(data)
+    gold   = nums['gold']
+    atr    = nums['atr']

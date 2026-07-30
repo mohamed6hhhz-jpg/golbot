@@ -13,6 +13,7 @@ from python.main import app
 # Import V4 Bots
 from Goldbot.bot_spot import run_bot as run_spot
 from Goldbot.bot_futures import run_bot as run_futures
+from Goldbot.bot_6 import run_bot6
 
 # Import the Auto_Sheets_Bot async function
 from Auto_Sheets_Bot.bot import start_sheets_bot
@@ -160,6 +161,10 @@ async def startup_event():
     threading.Thread(target=run_spot, daemon=True, name="Goldbot-Spot").start()
     # threading.Thread(target=run_futures, daemon=True, name="Goldbot-Futures").start()
     print("[Orchestrator] Goldbot Spot task created (Futures disabled).")
+    
+    # Start Bot 6
+    threading.Thread(target=run_bot6, daemon=True, name="Goldbot-Bot6").start()
+    print("[Orchestrator] Bot 6 (COT/SD/Bias/Breakout) task created.")
 
     # 2. Start auto-copy Telegram bot on the main asyncio event loop
     # asyncio.create_task(start_telethon_bot())

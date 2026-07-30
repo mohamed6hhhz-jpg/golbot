@@ -1,0 +1,482 @@
+async def _generate_all():
+            async def wrap(idx, func, *args):
+                await asyncio.sleep(idx * 25)  # Stagger by 18 seconds to safely avoid 429 rate limit
+                for attempt in range(3):
+                    try:
+                        res = await asyncio.to_thread(func, *args)
+                        if "تعذر توليد" in str(res):
+                            log.warning(f"Rate limit or failure hit for T{idx}, attempt {attempt+1}/3. Waiting 25s...")
+                            await asyncio.sleep(25)
+                            continue
+                        return res
+                    except Exception as e:
+                        if "429" in str(e):
+                            log.warning(f"Exception 429 hit for T{idx}, waiting 25s...")
+                            await asyncio.sleep(25)
+                        else:
+                            return f"⚠️ خطأ: {e}"
+                return "⚠️ تعذر توليد التقرير بسبب الضغط على السيرفر."
+
+            return await asyncio.gather(
+                wrap(0, _build_template_0, data),
+                wrap(1, _build_template_1, data),
+                wrap(2, _build_template_2, data),
+                wrap(3, _build_template_3, data),
+                wrap(4, _build_template_4, data),
+                wrap(5, _build_template_5, data),
+                wrap(7, _build_template_7, data),
+                wrap(8, _build_template_8, data),
+                wrap(9, _build_template_9, data),
+                wrap(10, _build_template_10, data),
+                wrap(11, _build_template_11, data),
+                wrap(13, _build_template_13, data),
+                wrap(6, _build_summary_template, data, report_text, "الفوري"),
+                return_exceptions=True
+            )
+
+        log.info("🤖 [Spot] جاري توليد القوالب الذكية الستة بالتوازي...")
+        loop = asyncio.new_event_loop()
+        results = loop.run_until_complete(_generate_all())
+        loop.close()
+
+        for i, res in enumerate(results):
+            if isinstance(res, Exception):
+                log.error(f"Error T{i}: {res}")
+                results[i] = ""
+                
+        t0, t1, t2, t3, t4, t5, t7, t8, t9, t10, t11, t13, t6 = results
+        
+        # Inject the Master Summary & High Lot Sniper into Bot2 (the 13-chunk report)
+        s12_report = _build_spot_s12(data)
+        if s12_report:
+            raw_reports.append(("👑 الخلاصة المحورية لليوم (الفوري - Spot)", s12_report, None))
+            
+        s9_report = _build_spot_s9(data)
+        if s9_report:
+            raw_reports.append(("👑 مصفوفة التداول السريعة (الفوري - Spot)", s9_report, None))
+            
+        s6_report = _build_spot_s6(data)
+        if s6_report:
+            raw_reports.append(("👑 قناص اللوت العالي والسكالبينج الشامل (الفوري - Spot)", s6_report, None))
+
+
+
+        raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الفوري)", t0 if t0 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        raw_reports.append(("📊 التقرير الفني المتقدم (الفوري)", t1 if t1 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الفوري)", t2 if t2 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        raw_reports.append(("⚠️ تقرير شهية المخاطرة (الفوري)", t3 if t3 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        raw_reports.append(("📈 تقرير عوائد السندات (الفوري)", t4 if t4 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        raw_reports.append(("💱 تقرير قوة العملات (الفوري)", t5 if t5 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        
+        # ── 4. قالب سيولة اليومي ──
+        from datetime import datetime
+        import pytz
+        from datetime import timedelta
+        CAIRO_TZ_LOCAL = pytz.timezone('Africa/Cairo')
+        today_str = datetime.now(CAIRO_TZ_LOCAL).strftime("%d/%m/%Y")
+        atr_val = data.get('atr', 20)
+        gld = data.get('gold', 2000)
+        
+        buy_lvl = round(gld + (atr_val * 0.4), 2)
+        buy_t1 = round(buy_lvl + (atr_val * 0.5), 2)
+        buy_t2 = round(buy_lvl + (atr_val * 1.0), 2)
+        buy_t3 = round(buy_lvl + (atr_val * 1.5), 2)
+
+        sell_lvl = round(gld - (atr_val * 0.4), 2)
+        sell_t1 = round(sell_lvl - (atr_val * 0.5), 2)
+        sell_t2 = round(sell_lvl - (atr_val * 1.0), 2)
+        sell_t3 = round(sell_lvl - (atr_val * 1.5), 2)
+
+        daily_liquidity_block = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💧 سيولة اليومي ({today_str})
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ شراء مع الاتجاه (Buy Stop)
+الكسر والثبات أعلى: {buy_lvl}$
+🎯 الأهداف:
+1️⃣ {buy_t1}$
+2️⃣ {buy_t2}$
+3️⃣ {buy_t3}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛑 بيع مع الاتجاه (Sell Stop)
+الكسر والثبات أسفل: {sell_lvl}$
+🎯 الأهداف:
+1️⃣ {sell_t1}$
+2️⃣ {sell_t2}$
+3️⃣ {sell_t3}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ تنبيه: الدخول فقط بعد الكسر والثبات (إغلاق شمعة 15 دقيقة).
+"""
+
+        # ── 5. صفقات Buy Limit / Sell Limit ──
+        buy_limit_price = round(data.get('s2', gld - atr_val*1.5), 2)
+        buy_limit_sl = round(buy_limit_price - (atr_val*0.6), 2)
+        buy_limit_tp = round(buy_limit_price + (atr_val*1.2), 2)
+        
+        sell_limit_price = round(data.get('r2', gld + atr_val*1.5), 2)
+        sell_limit_sl = round(sell_limit_price + (atr_val*0.6), 2)
+        sell_limit_tp = round(sell_limit_price - (atr_val*1.2), 2)
+
+        limits_block = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏳ الأوامر المعلقة اللحظية (Limit Orders)
+(جودة وتمركز > 65% | تحديث ديناميكي)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🟢 أمر شراء معلق (Buy Limit):
+🔹 الدخول: {buy_limit_price}$
+🎯 الهدف: {buy_limit_tp}$
+🛑 الوقف: {buy_limit_sl}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔴 أمر بيع معلق (Sell Limit):
+🔹 الدخول: {sell_limit_price}$
+🎯 الهدف: {sell_limit_tp}$
+🛑 الوقف: {sell_limit_sl}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+        # ── 6. إغلاق بجسم فريم 5 دقائق ──
+        b5_buy = round(gld + (atr_val * 0.25), 2)
+        b5_buy_tp = round(b5_buy + (atr_val * 0.6), 2)
+        
+        b5_sell = round(gld - (atr_val * 0.25), 2)
+        b5_sell_tp = round(b5_sell - (atr_val * 0.6), 2)
+
+        breakout_5m_block = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ صفقات الاختراق اللحظي السريعة (Breakout)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🟢 إشارة الشراء:
+اختراق مستوى: {b5_buy}$
+🎯 الهدف السريع: {b5_buy_tp}$
+
+🔴 إشارة البيع:
+كسر مستوى: {b5_sell}$
+🎯 الهدف السريع: {b5_sell_tp}$
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ شرط أساسي للتنفيذ:
+إغلاق شمعة (5 دقائق) بالكامل فوق مستوى الكسر للشراء، أو أسفل مستوى الكسر للبيع.
+"""
+
+        bot2_reports = []
+        bot2_reports.append(("💧 سيولة اليومي", daily_liquidity_block, None))
+        bot2_reports.append(("⏳ الأوامر المعلقة اللحظية", limits_block, None))
+        bot2_reports.append(("⚡ صفقات الاختراق اللحظي", breakout_5m_block, None))
+        
+        # القالب الجديد للمستويات
+        bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
+        # القالب الذكي الجديد CFTC (t11)
+        bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(data), None))
+        t13_src = t13 if t13 and 'تعذر' not in str(t13) else _build_template_13(data)
+        if not t13_src:
+            t13_src = "━━━━━━━━━━━━━━━━━━━━━━━━━━" + "━━━━━━━━━━━━━━━━━━━━━━━━━━".join(_build_template_13.__code__.co_consts) # Fallback if everything fails
+        
+        import re
+        t13_clean = re.sub(r'\[.*?\]', '', t13_src, flags=re.DOTALL)
+        t13_clean = re.sub(r'\n\s*\n', '\n\n', t13_clean).strip()
+        bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13_clean, None))
+
+        # القوالب الفورية S1-S12 — البوت الثالث @Dsssoppp78_bot
+        bot3_reports = []
+        try:
+            bot3_reports.append(("[فوري] 1/12 الاسعار والفيبوناتشي",       _build_spot_s1(data),  None))
+            bot3_reports.append(("[فوري] 2/12 الاطارات الزمنية",            _build_spot_s2(data),  None))
+            bot3_reports.append(("[فوري] 3/12 زيرو انعكاس",                 _build_spot_s3(data),  None))
+            bot3_reports.append(("[فوري] 4/12 السكالبينج",                   _build_spot_s4(data),  None))
+            bot3_reports.append(("[فوري] 5/12 السوينج",                      _build_spot_s5(data),  None))
+            bot3_reports.append(("[فوري] 6/12 اللوت العالي",                 _build_spot_s6(data),  None))
+            bot3_reports.append(("[فوري] 7/12 التحليل الفني والزخم",         _build_spot_s7(data),  None))
+            bot3_reports.append(("[فوري] 8/12 الاقتصاد الكلي",              _build_spot_s8(data),  None))
+            bot3_reports.append(("[فوري] 9/12 شهية المخاطرة",               _build_spot_s9(data),  None))
+            bot3_reports.append(("[فوري] 10/12 عوائد السندات",              _build_spot_s10(data), None))
+            bot3_reports.append(("[فوري] 11/12 قوة العملات DXY",             _build_spot_s11(data), None))
+            bot3_reports.append(("[فوري] 12/12 الخلاصة المحورية",            _build_spot_s12(data), None))
+            bot3_reports.append(("[فوري] 13/13 المستهدف الأسبوعي", _build_friday_target(data, False), None))
+            bot3_reports.append(("[فوري] 14/14 مسار القمة والقاع", _build_spot_s14(data), None))
+            bot3_reports.append(("[فوري] 15/15 الرادار المؤسساتي والسيولة", _build_spot_s15(data), None))
+            bot3_reports.append(("[فوري] 16/16 استراتيجية اللوت الكامل", _build_spot_s16(data), None))
+            log.info(f"[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي")
+        except Exception as _se:
+            log.warning(f"[S1-S12] خطا في توليد القوالب الفورية: {_se}")
+
+        bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7 or _build_template_7(data), None))
+        bot2_reports.append(("🐋 تاثير الاسواق والمؤسسات (الفوري)", t8 or _build_template_8(data), None))
+        bot2_reports.append(("📊 تقرير اتجاه الذهب اليومي (الفوري)", t9 or _build_template_9(data), None))
+        bot2_reports.append(("📆 التقرير الاسبوعي الشامل (الفوري)", t10 or _build_template_10(data), None))
+        _t6_text = t6 if t6 and 'تعذر' not in str(t6) else f"الخلاصة: اتجاه {data.get('confluence', {}).get('verdict', 'محايد')} — السعر {data.get('gold', 0):.2f}$"
+        bot2_reports.append(("الخلاصة المحورية", _t6_text, None))
+        
+        s12_report = _build_spot_s12(data)
+        bot2_reports.append(("👑 الخلاصة المحورية والدقيقة (الجيل الخامس - Spot)", s12_report or f"الخلاصة المحورية: السعر {data.get('gold',0):.2f}$", None))
+            
+        s9_report = _build_spot_s9(data)
+        bot2_reports.append(("👑 مصفوفة التداول السريعة والاسكالبينج الاحترافي (Spot)", s9_report or f"مصفوفة التداول: السعر {data.get('gold',0):.2f}$", None))
+        bot2_reports.append(("[16/16] المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
+        bot2_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
+        bot2_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
+        bot2_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
+        bot2_reports.append(("⏰ تنبيه مبكر — انعكاس مرتقب", _build_early_warning_alert(data), None))
+        bot2_reports.append(("🚨 رادار الأخبار العاجلة (Breaking News)", _build_sudden_news_alert(data), None))
+        bot2_reports.append(("🏦 رادار السيولة المؤسساتية (Smart Money)", _build_institutional_liquidity_map(data), None))
+        bot2_reports.append(("🌊 كاشف السيولة وأحجام العقود", _build_volume_contracts_tracker(data), None))
+        bot2_reports.append(("🎯 أهداف السيولة الزمنية (Targets)", _build_liquidity_time_targets(data), None))
+
+
+
+        # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──
+
+        # ── تسطيح وإرسال ──
+        raw_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
+        raw_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
+        raw_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
+        raw_reports.append(("⏰ تنبيه مبكر — انعكاس مرتقب", _build_early_warning_alert(data), None))
+        raw_reports.append(("🚨 رادار الأخبار العاجلة (Breaking News)", _build_sudden_news_alert(data), None))
+        raw_reports.append(("🏦 رادار السيولة المؤسساتية (Smart Money)", _build_institutional_liquidity_map(data), None))
+        raw_reports.append(("🌊 كاشف السيولة وأحجام العقود", _build_volume_contracts_tracker(data), None))
+        raw_reports.append(("🎯 أهداف السيولة الزمنية (Targets)", _build_liquidity_time_targets(data), None))
+
+        flat_chunks = []
+        for title, txt, chat_id in raw_reports:
+            for chunk in _split_message(txt):
+                flat_chunks.append((title, chunk, chat_id))
+        total = len(flat_chunks)
+
+        flat_chunks_2 = []
+        if 'bot2_reports' in locals():
+            for title, txt, chat_id in bot2_reports:
+                for chunk in _split_message(txt):
+                    flat_chunks_2.append((title, chunk, chat_id))
+        total_2 = len(flat_chunks_2)
+
+        global LAST_PUBLIC_REPORT_TIME, LAST_4H_REPORT_TIME
+        now = time.time()
+        is_public = False
+        if now - LAST_PUBLIC_REPORT_TIME >= 14000:
+            is_public = True
+            LAST_PUBLIC_REPORT_TIME = now
+            
+        send_to_4h_channel = False
+        if now - LAST_4H_REPORT_TIME >= 4 * 3600:
+            send_to_4h_channel = True
+            LAST_4H_REPORT_TIME = now
+
+        log.info("⏳ [Spot] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
+        with SEND_LOCK:
+            log.info("🔒 [Spot] حصل على القفل — بدء إرسال الرسائل...")
+            log.info(f"📤 [Spot] إرسال {total} رسالة متسلسلة...")
+
+            for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
+                subtitle = _get_subtitle(chunk, title)
+                final_text = (
+                    f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
+                    f"{subtitle}\n\n{chunk}"
+                )
+                ok = _send_single(final_text, is_public, chat_id)
+                
+                # Send to SovereignMaaregFund if 4 hours have passed
+                if send_to_4h_channel and not chat_id:
+                    _send_single(final_text, is_public, "@Maaregsovereinefund")
+                    
+                log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
+                time.sleep(2)
+
+            # ── إرسال للبوت الجديد (القسم الثاني) ──
+            if flat_chunks_2:
+                log.info(f"📤 إرسال {total_2} رسالة متسلسلة للبوت المستقل (الجزء الثاني)...")
+                import os
+                # استدعاء توكن البوت الجديد (مؤقتاً نستخدم نفس الإرسال المخصص إذا لم يتوفر التوكن، لكن يمكن للعميل تغييره)
+                bot2_token = os.environ.get('TELEGRAM_BOT_TOKEN_2', TELEGRAM_BOT_TOKEN) 
+                
+                for i2, (title2, chunk2, chat_id2) in enumerate(flat_chunks_2, 1):
+                    subtitle2 = _get_subtitle(chunk2, title2)
+                    final_text2 = (
+                        f"{prefix}[{i2}/{total_2}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
+                        f"{subtitle2}\n\n{chunk2}"
+                    )
+                    # For bot 2, we will send to TARGET_CHATS unless specified
+                    ok2 = _send_single_bot2(final_text2, is_public, chat_id2)
+                    
+                    if send_to_4h_channel and not chat_id2:
+                        _send_single_bot2(final_text2, is_public, "@Maaregsovereinefund")
+                        
+                    log.info(f"✅ رسالة البوت الثاني {i2}/{total_2} وصلت." if ok2 else f"❌ فشل رسالة البوت الثاني {i2}/{total_2}.")
+                    time.sleep(2)
+
+            # ── البوت الثالث: القوالب الفورية S1-S12 (@Dsssoppp78_bot) ──
+            if 'bot3_reports' in locals() and bot3_reports:
+                flat_chunks_3 = []
+                for title3, txt3, cid3 in bot3_reports:
+                    if txt3:
+                        for chunk3 in _split_message(txt3):
+                            flat_chunks_3.append((title3, chunk3, cid3))
+                total_3 = len(flat_chunks_3)
+                log.info(f"📤 [Bot3] ارسال {total_3} قالب فوري عبر @Dsssoppp78_bot...")
+                for i3, (title3, chunk3, cid3) in enumerate(flat_chunks_3, 1):
+                    final_text3 = (
+                        f"📊 [{i3}/{total_3}] تقارير سوق الفوري (XAU/USD Spot)\n"
+                        f"{title3}\n\n{chunk3}"
+                    )
+                    ok3 = _send_single_bot3(final_text3, cid3)
+                    
+                    if send_to_4h_channel and not cid3:
+                        _send_single_bot3(final_text3, "@Maaregsovereinefund")
+                        
+                    log.info(f"{'✅' if ok3 else '❌'} [Bot3] {i3}/{total_3}")
+                    time.sleep(2)
+
+            log.info("🔓 [Spot] تم الارسال، تحرير القفل لانتظار الخلاصة...")
+
+        # ══════════════════════════════════════════════════════
+        #  الخلاصة النهائية المشتركة — تأتي هنا بعد كل الرسائل
+        # ══════════════════════════════════════════════════════
+#         log.info("🏆 [Combined] توليد الخلاصة النهائية المشتركة (آجل + فوري)...")
+#         try:
+#             fc = _futures_cache  # بيانات الآجل المحفوظة
+#             # لو بيانات الآجل مش موجودة، ننتظر حتى 15 دقيقة ريحة 30 ثانية
+#             if not fc or not fc.get("t1"):
+#                 log.info("⏳ [Combined] Futures لم ينتهِ بعد — ننتظر حتى 15 دقيقة...")
+#                 for _ in range(30):  # 30 × 30 ثانية = 15 دقيقة
+#                     time.sleep(30)
+#                     fc = _futures_cache
+#                     if fc and fc.get("t1"):
+#                         log.info("✅ [Combined] بيانات الآجل وصلت — نبني الخلاصة الآن.")
+#                         break
+#                 else:
+#                     log.warning("⚠️ [Combined] انتهى وقت الانتظار — الخلاصة مؤجلة.")
+#             if fc and fc.get("t1"):
+#                 # احسب الاتجاه المشترك من البوتين بشكل آلي
+#                 spot_score  = data.get('tf_daily', {}).get('score', 0)
+#                 fut_score   = fc.get('score', spot_score)  # بيانات الآجل
+#                 avg_score   = (spot_score + fut_score) / 2
+#                 bull_pct = max(0, min(100, round(50 + avg_score * 12)))
+#                 bear_pct = 100 - bull_pct
+# 
+#                 combined = _build_combined_summary(
+#                     spot_data=data,
+#                     futures_report=fc.get("report_text", ""),
+#                     spot_report=report_text,
+#                     futures_t1=fc.get("t1", ""),
+#                     futures_t2=fc.get("t2", ""),
+#                     spot_t1=t1,
+#                     spot_t2=t2,
+#                     futures_t0=fc.get("t0", ""),
+#                     spot_t0=t0,
+#                     bull_pct=bull_pct,
+#                     bear_pct=bear_pct,
+#                 )
+#                 if combined:
+#                     summary_msg = (
+#                         "🏆 الخلاصة النهائية الشاملة | آجل + فوري\n"
+#                         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+#                         + combined
+#                     )
+#                     ok = _send_single(summary_msg, is_public, None)
+#                     log.info("✅ [Combined] تم إرسال الخلاصة المشتركة." if ok else "❌ [Combined] فشل إرسال الخلاصة المشتركة.")
+#         except Exception as e:
+#             log.error(f"❌ [Combined] خطأ في الخلاصة المشتركة: {e}")
+# 
+
+        try:
+ 
+
+            if 't6' in locals() and t6:
+ 
+
+                with open('temp_summary_spot.txt', 'w', encoding='utf-8') as f:
+ 
+
+                    f.write(t6)
+ 
+
+                send_summary_to_bot('8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4', t6, '@spotGol')
+ 
+
+        except Exception as e:
+ 
+
+            log.error(f"Failed injecting spot summary: {e}") 
+
+        log.info("🔓 [Spot] أطلق القفل — انتهى الدورة الكاملة.")
+
+
+
+# ══════════════════════════════════════════════
+#  9. الحلقة الرئيسية
+# ══════════════════════════════════════════════
+def run_bot():
+    log.info("🚀 [Spot] Goldbot Pro+ v4 — نسخة الفوري")
+
+    last_gold_price      = {'futures': None, 'spot': None}
+    minutes_counter      = {'futures': 0, 'spot': 0}
+    morning_sent_today   = {'futures': False, 'spot': False}
+    closing_sent_today   = {'futures': False, 'spot': False}
+    heartbeat_sent_today = {'futures': False, 'spot': False}
+    consec_failures      = {'futures': 0, 'spot': 0}
+    all_models_notified  = False
+    last_report_date     = None
+    market_closed_notified = False
+    has_sent_initial       = False
+    day_names = ["اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت","أحد"]
+
+    while True:
+        now_cairo  = cairo_now()
+        today      = now_cairo.date()
+        hour_cairo = now_cairo.hour
+        weekday    = now_cairo.weekday()
+
+        if last_report_date != today:
+            for m in ['futures', 'spot']:
+                morning_sent_today[m]   = False
+                closing_sent_today[m]   = False
+                heartbeat_sent_today[m] = False
+            all_models_notified  = False
+
+        if not is_market_open() and has_sent_initial:
+            if not market_closed_notified:
+                now_c    = cairo_now()
+                wday     = now_c.weekday()
+                hr       = now_c.hour
+                if wday in (5, 6):
+                    reason   = "عطلة نهاية الأسبوع"
+                    reopen   = "الاثنين 01:00 بتوقيت القاهرة"
+                    details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
+                elif wday == 0 and hr < MARKET_OPEN_HOUR:
+                    reason   = "ما زلنا في ساعات الإغلاق"
+                    reopen   = f"الاثنين {MARKET_OPEN_HOUR:02d}:00 بتوقيت القاهرة"
+                    details  = "أسواق الذهب تبدأ جلستها الأسبوعية يوم الاثنين فجراً."
+                else:
+                    reason   = "السوق خارج ساعات التداول"
+                    reopen   = "قريباً"
+                    details  = "تُتداول أسواق الذهب من الاثنين حتى الجمعة."
+
+                closed_msg = (
+                    f"🛌 سوق الذهب مغلق حالياً\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📅 السبب: {reason}\n"
+                    f"📖 التفاصيل: {details}\n"
+                    f"⏰ موعد الفتح: {reopen}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🕐 {now_c.strftime('%Y-%m-%d %H:%M')} بتوقيت القاهرة\n"
+                    f"✅ البوت يعمل وسيُرسل التقرير فور فتح السوق."
+                )
+                send_to_telegram(closed_msg)
+                market_closed_notified = True
+                log.info("📢 تم إرسال إشعار إغلاق السوق للقناة.")
+
+            log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
+            for m in ['futures', 'spot']: last_gold_price[m] = None
+            time.sleep(30 * 60)
+            continue
+
+        market_closed_notified = False
+
+        for mode in ['spot']:
+            data = get_full_market_data(mode=mode)
+            if data and data["gold"]:
+                consec_failures[mode] = 0
+                all_models_notified = False
+                current_gold = data["gold"]
+
+                if last_gold_price[mode] is None and last_report_date != today:
+                    log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
+                    report = generate_report(data, is_alert=False)
+                    send_reports

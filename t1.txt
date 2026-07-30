@@ -1,0 +1,378 @@
+def _build_template_1(d: dict) -> str:
+    """بناء القالب الأول (الموجز الكلاسيكي المنفصل)"""
+    w_bias = d['tf_weekly'].get('bias', 'متذبذب')
+    w_icon = '📈' if 'صاعد' in w_bias else ('📉' if 'هابط' in w_bias else '↔️')
+    
+    d_bias = d['tf_daily'].get('bias', 'متذبذب')
+    d_icon = '📈' if 'صاعد' in d_bias else ('📉' if 'هابط' in d_bias else '↔️')
+    
+    gold = d['gold']
+    vwap = d.get('vwap') or gold
+    rsi_1h = d['tf_hourly'].get('rsi', 50) if d.get('tf_hourly') else 50
+    score_4h = d['tf_4h'].get('score', 0) if d.get('tf_4h') else 0
+    
+    context_lines = []
+    if gold < vwap:
+        context_lines.append("الإغلاق تم أسفل مناطق دعم مكسورة تحولت إلى مقاومات.")
+    else:
+        context_lines.append("الإغلاق تم أعلى مقاومات مخترقة تحولت إلى دعوم.")
+        
+    if score_4h < -2 and rsi_1h < 40:
+        context_lines.append("يوجد زخم بيعي مسيطر وقناة سعرية هابطة على فريم الساعة.")
+    elif score_4h > 2 and rsi_1h > 60:
+        context_lines.append("توجد قناة سعرية صاعدة متكونة على فريم الساعة بزخم شرائي قوي.")
+    else:
+        context_lines.append("السعر يتداول في نطاق عرضي تجميعي على المدى القصير.")
+        
+    context_text = "\n".join(context_lines)
+    
+    main_bias = d['confluence']['bias']
+    atr = d.get('atr', 20)
+    
+    if main_bias == 'bear' or main_bias == 'neutral':
+        # نفضل البيع
+        zone_color = "🔴"
+        zone_name = "مستوى البيع"
+        # المقاومات
+        r1, r2 = d.get('r1', gold+10), d.get('r2', gold+20)
+        exact_zone = round(r1, 2)
+        t1 = round(d.get('s1', gold-10), 2)
+        t2 = round(d.get('s2', gold-20), 2)
+        cont_action = "الهبوط لمستويات أقل"
+        rev_color = "🟢"
+        rev_zone = round(d.get('swing_high') or (r2 + atr), 2)
+        rev_dir = "الصعود"
+        break_dir = "أعلاه"
+    else:
+        # الشراء
+        zone_color = "🟢"
+        zone_name = "مستوى الشراء"
+        s1, s2 = d.get('s1', gold-10), d.get('s2', gold-20)
+        exact_zone = round(s1, 2)
+        t1 = round(d.get('r1', gold+10), 2)
+        t2 = round(d.get('r2', gold+20), 2)
+        cont_action = "الصعود لمستويات أعلى"
+        rev_color = "🔴"
+        rev_zone = round(d.get('swing_low') or (s2 - atr), 2)
+        rev_dir = "الهبوط"
+        break_dir = "أسفله"
+    
+    # القالب كما طلبه العميل بالحرف
+    template = f"""📊 التقرير الفني المتقدم للذهب 🟡
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 1W (الأسبوعي)
+   التحيز الأسبوعي: {w_bias} {w_icon}
+
+📆 1D (اليومي)
+   التحيز اليومي: {d_bias} {d_icon}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏱️ 4H - 1H (المدى القصير)
+   {context_text}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{zone_color} {zone_name}: {exact_zone}
+
+في حال احترام المستوى، نتوقع استهداف:
+{t1}
+{t2}
+
+وفي حالة كسر {t2}، سيستمر {cont_action}.
+
+{rev_color} أما إذا لم يحترم السعر مستوى {exact_zone} وتمكن من اختراقه، فسيستهدف {rev_zone}.
+وتعتبر نقطة {rev_zone} هي النقطة الذهبية الفاصلة بين الصعود والهبوط، وباختراقها والثبات {break_dir} يمكننا القول إن السعر بدأ يغير اتجاهه ويميل إلى {rev_dir}."""
+    
+    return template
+
+def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is_morning: bool = False) -> str | None:
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return None
+
+    banner = "💎 المزايا الحصرية مفعلة: (مبني على 12 مؤشر، زيرو انعكاس، سكالبينج، توقع القمة والقاع، وعزل العرض والطلب)"
+    if is_morning:  header = f"🌅 نشرة الصباح — استراتيجية اليوم\n{banner}"
+    elif is_alert:  header = f"🚨 تنبيه — حركة {'+' if price_diff>0 else ''}{price_diff:.2f}$\n{banner}"
+    else:           header = f"📊 نشرة التحليل الكمي للذهب\n{banner}"
+
+    fixed_block, ai_instructions = _build_fixed_template(d, header)
+
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f"🤖 جاري الاتصال بـ Groq — {model_name}")
+            resp = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل ذهب كمي. اكتب فقط ما طُلب منك بالعربية الفصحى. لا تكتب أي شيء خارج الأقسام المطلوبة."},
+                    {"role": "user",   "content": ai_instructions},
+                ],
+                model=model_name,
+                temperature=0.07,
+                max_tokens=700,
+            )
+            ai_analysis = resp.choices[0].message.content
+            log.info(f"✅ نجح الاتصال: {model_name}")
+            return fixed_block + "\n\n" + ai_analysis
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str or "rate_limit" in err_str.lower():
+                log.warning(f"⚠️ [{model_name}] 429 — الانتقال للتالي...")
+                time.sleep(10)
+                continue
+            log.error(f"❌ [{model_name}] {e}")
+            break
+
+    log.error("❌ جميع الموديلات فشلت — إرسال الجزء الثابت فقط.")
+    return fixed_block
+
+
+# ══════════════════════════════════════════════
+#  8. إرسال تيليجرام
+# ══════════════════════════════════════════════
+CHUNK_SIZE = 3400   # أقل من 4096 (حد تيليجرام) — هامش أمان يحسب الـ header [i/total] + subtitle (~200 حرف)
+
+def _tg_len(text: str) -> int:
+    """طول النص بحسب UTF-16 code units — الطريقة التي يحسب بها تيليجرام الأحرف"""
+    return sum(2 if ord(c) > 0xFFFF else 1 for c in text)
+
+
+def _split_message(text: str) -> list:
+    if _tg_len(text) <= CHUNK_SIZE:
+        return [text]
+
+    SEPARATOR = "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    lines   = text.split("\n")
+    chunks  = []
+    current = ""
+    in_table = False
+
+    for i, line in enumerate(lines):
+        if "╭─" in line:
+            in_table = True
+            if _tg_len(current) > CHUNK_SIZE - 500:
+                chunks.append(current.strip() + "\n\n(يتبع...)")
+                current = "(تكملة القالب السابق...)\n"
+
+        new_block = (current + "\n" + line) if current else line
+        
+        if _tg_len(new_block) > CHUNK_SIZE:
+            if current:
+                chunks.append(current.strip() + "\n\n(يتبع...)")
+                current = "(تكملة القالب السابق...)\n" + line
+            else:
+                current = line
+        else:
+            current = new_block
+
+        if "╰─" in line:
+            in_table = False
+
+        next_line = lines[i + 1] if i + 1 < len(lines) else ""
+        if (next_line.startswith(SEPARATOR) and _tg_len(current) > CHUNK_SIZE * 0.70):
+            chunks.append(current.strip() + "\n\n(يتبع...)")
+            current = "(تكملة القالب السابق...)\n"
+
+    if current and current.strip() and current.strip() != "(تكملة القالب السابق...)":
+        chunks.append(current.strip())
+        
+    return chunks
+
+
+async def _telethon_send(text: str) -> bool:
+    """MTProto بجلسة المستخدم الموجودة — يتجاوز حجب api.telegram.org تماماً"""
+    if not SESSION_STRING:
+        log.warning("⚠️ [Telethon] SESSION_STRING غير موجود.")
+        return False
+    try:
+        client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+        await client.start()   # جلسة موجودة — بدون ImportBotAuthorizationRequest
+        for chat in TARGET_CHATS:
+            await client.send_message(chat, text)
+        await client.disconnect()
+        return True
+    except Exception as e:
+        log.warning(f"⚠️ [Telethon] {e}")
+        return False
+
+
+def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+    """الإرسال عبر HTTP Bot API — الوسيلة الأساسية."""
+    url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    headers = {
+        "Connection": "close",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    success = True
+    targets = [chat_id] if chat_id else TARGET_CHATS
+    for chat in targets:
+        payload = {"chat_id": str(chat), "text": text}
+        chat_success = False
+        for attempt in range(4):
+            try:
+                r = requests.post(url, json=payload, headers=headers, timeout=45)
+                r.raise_for_status()
+                chat_success = True
+                break
+            except Exception as e:
+                wait = 2 ** attempt
+                log.warning(f"⚠️ [HTTP] {attempt+1}/4 — {e} — انتظار {wait}s")
+                time.sleep(wait)
+        if not chat_success: success = False
+    return success
+
+
+async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+    """MTProto باستخدام توكن البوت — يتجاوز حجب HTTP نهائياً ولا يتعارض مع جلسات المستخدم"""
+    try:
+        # استخدام ملف جلسة محلي بدلاً من الذاكرة لتجنب تسجيل الدخول بالتوكن في كل رسالة (يمنع الـ FloodWait)
+        client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN)
+        
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        for chat in targets:
+            try:
+                await client.send_message(chat, text)
+            except Exception as inner_e:
+                log.warning(f"⚠️ [Telethon Bot (Spot)] فشل الإرسال للجروب {chat}: {inner_e}")
+                
+        await client.disconnect()
+        return True
+    except Exception as e:
+        log.warning(f"⚠️ [Telethon Bot (Spot)] {e}")
+        return False
+
+
+async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
+    """MTProto للبوت الثاني — يتجاوز حجب HTTP على HuggingFace تماماً"""
+    try:
+        client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        for chat in targets:
+            try:
+                await client.send_message(chat, text)
+            except Exception as inner_e:
+                log.warning(f"[Bot2 Telethon] فشل الإرسال للجروب {chat}: {inner_e}")
+        await client.disconnect()
+        return True
+    except Exception as e:
+        log.warning(f"[Bot2 Telethon] {e}")
+        return False
+
+
+def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+    """الإرسال للبوت الثاني عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot2_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot2] تم الإرسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot2_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot2] تم الإرسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"[Telethon Bot2 loop] {e}")
+    except Exception as e:
+        log.warning(f"[Telethon Bot2] {e}")
+    log.error("[Bot2] فشل الإرسال عبر Telethon.")
+    return False
+
+
+async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
+    """MTProto للبوت الثالث @Dsssoppp78_bot — خاص بالقوالب الفورية S1-S12"""
+    try:
+        client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        for chat in targets:
+            try:
+                await client.send_message(chat, text)
+            except Exception as inner_e:
+                log.warning(f"[Bot3 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
+        await client.disconnect()
+        return True
+    except Exception as e:
+        log.warning(f"[Bot3 Telethon] {e}")
+        return False
+
+
+def _send_single_bot3(text: str, chat_id=None) -> bool:
+    """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot3_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot3] تم الارسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot3_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot3] تم الارسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"[Telethon Bot3 loop] {e}")
+    except Exception as e:
+        log.warning(f"[Telethon Bot3] {e}")
+    log.error("[Bot3] فشل الارسال عبر Telethon.")
+    return False
+
+
+
+def _send_single(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+    """إرسال عبر MTProto (Bot) أولاً للهروب من مشاكل Timeout، والـ HTTP كاحتياطي."""
+    try:
+        ok = asyncio.run(_telethon_bot_send(text, is_public_allowed, chat_id))
+        if ok:
+            log.info("✅ [Telethon Bot (Spot)] تم الإرسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot_send(text, is_public_allowed, chat_id))
+            loop.close()
+            if ok:
+                log.info("✅ [Telethon Bot (Spot)] تم الإرسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"⚠️ [Telethon Bot (Spot) loop] {e}")
+    except Exception as e:
+        log.warning(f"⚠️ [Telethon Bot (Spot)] {e}")
+
+    log.warning("⚠️ [Telethon Bot (Spot)] فشل — جاري المحاولة عبر HTTP...")
+    if _http_send(text, is_public_allowed, chat_id):
+        log.info("✅ [HTTP] تم الإرسال بنجاح.")
+        return True
+    log.error("❌ فشل الإرسال من جميع الوسائل.")
+    return False
+
+
+def send_to_telegram(message: str, chat_id=None) -> bool:
+    global LAST_PUBLIC_REPORT_TIME
+    if not message:
+        return False
+        
+    now = time.time()
+    is_public = False
+    if now - LAST_PUBLIC_REPORT_TIME >= 3500:
+        is_public = True
+        if not chat_id: LAST_PUBLIC_REPORT_TIME = now
+        
+    chunks = _split_message(message)
+    log.info(f"📤 إرسال في {len(chunks)} جزء... (Public Allowed: {is_public}, Chat: {chat_id})")
+    all_ok = True
+    for i, chunk in enumerate(chunks, 1):
+        ok     = _send_single(chunk, is_public, chat_id)
+        log.info(f"✅ جزء {i}/{len(chunks)} وصل." if ok else f"❌ فشل جزء {i}/{len(chunks)}.")
+        all_ok = all_ok and ok
+        if i < len(chunks): time.sleep(1.5)
+    return all_ok
+
+
+def _build_template_2

@@ -1,8 +1,5 @@
 import yfinance as yf
-try:
-    from Goldbot.ai_client import UniversalAIClient as Groq, get_api_keys
-except ImportError:
-    from ai_client import UniversalAIClient as Groq, get_api_keys
+from groq import Groq
 import requests
 from datetime import datetime, timezone, timedelta
 import time
@@ -13,16 +10,6 @@ import asyncio
 import threading
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-import socket
-
-def _patch_socket_ipv4_only():
-    """إجبار بايثون على استخدام IPv4 فقط لتفادي مشاكل تعليق شبكات IPv6 في HuggingFace عند الاتصال بـ api.telegram.org"""
-    old_getaddrinfo = socket.getaddrinfo
-    def ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-        return old_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
-    socket.getaddrinfo = ipv4_getaddrinfo
-
-_patch_socket_ipv4_only()
 
 # ── كلايانت Telethon مشترك ودائم — يتصل مرة واحدة عند التشغيل ──
 _SHARED_CLIENT: TelegramClient | None = None
@@ -32,7 +19,8 @@ _CLIENT_LOCK  = threading.Lock()
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
-    "llama3-8b-8192",
+    "gemma2-9b-it",
+    "llama3-70b-8192",
 ]
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
@@ -40,53 +28,18 @@ logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ي
 log = logging.getLogger(__name__)
 
 import random
-try:
-    from Goldbot.secrets_config import GROQ_KEYS_FALLBACK, TWELVEDATA_API_KEY_FALLBACK, TELEGRAM_TOKENS
-except ImportError:
-    try:
-        from secrets_config import GROQ_KEYS_FALLBACK, TWELVEDATA_API_KEY_FALLBACK, TELEGRAM_TOKENS
-    except ImportError:
-        GROQ_KEYS_FALLBACK = []
-        TWELVEDATA_API_KEY_FALLBACK = ""
-        TELEGRAM_TOKENS = {}
+GROQ_KEYS = [
+    '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',
+    "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",
+    "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",
+    "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"
+]
+TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", "a40631d26cb64ba99916a3162880aff3")
+TELEGRAM_BOT_TOKEN   = "8135586080:AAFS1ZI2XcsPrnjtTvAPlXxlTMrSO_Lu3Qc"
+TELEGRAM_BOT_TOKEN_2 = "8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ"
+TELEGRAM_BOT_TOKEN_3 = "8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA"  # @Dsssoppp78_bot — القوالب الفورية S1-S12
 
-GROQ_KEYS = get_api_keys() or GROQ_KEYS_FALLBACK
-TWELVEDATA_API_KEY  = os.environ.get("TWELVEDATA_API_KEY", TWELVEDATA_API_KEY_FALLBACK)
-TELEGRAM_BOT_TOKEN   = TELEGRAM_TOKENS.get("bot1", "") or os.environ.get("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_BOT_TOKEN_2 = TELEGRAM_TOKENS.get("bot2", "") or os.environ.get("TELEGRAM_BOT_TOKEN_2", "")
-TELEGRAM_BOT_TOKEN_3 = TELEGRAM_TOKENS.get("bot3", "") or os.environ.get("TELEGRAM_BOT_TOKEN_3", "")  # @Dsssoppp78_bot
-TELEGRAM_BOT_TOKEN_4 = TELEGRAM_TOKENS.get("bot4", "") or os.environ.get("TELEGRAM_BOT_TOKEN_4", "")  # @Boonnii_bot
-TELEGRAM_BOT_TOKEN_5 = TELEGRAM_TOKENS.get("bot5", "") or os.environ.get("TELEGRAM_BOT_TOKEN_5", "")  # @Summariesboot54_bot
-
-TARGET_CHATS = [-1003935552363]  # Fallback
-BOT1_CHATS = [-1003935552363]
-BOT2_CHATS = [-1004464751054]
-BOT3_CHATS = [-1004311302624]
-BOT4_CHATS = [-1004412766977]
-BOT5_CHATS = [-1004485433530]  # @Summariesboot54_bot channel
-
-from telethon.tl.types import InputPeerChannel
-_PEER_CHATS_MAP = {
-    -1003935552363: InputPeerChannel(3935552363, 8825754294104567316),
-    -1004464751054: InputPeerChannel(4464751054, -3802222172989073173),
-    -1004311302624: InputPeerChannel(4311302624, 5665851860967928824),
-    -1004412766977: InputPeerChannel(4412766977, 1260066506694203273),
-    3935552363: InputPeerChannel(3935552363, 8825754294104567316),
-    4464751054: InputPeerChannel(4464751054, -3802222172989073173),
-    4311302624: InputPeerChannel(4311302624, 5665851860967928824),
-    4412766977: InputPeerChannel(4412766977, 1260066506694203273),
-}
-def _resolve_peer(chat):
-    if isinstance(chat, int) and chat in _PEER_CHATS_MAP:
-        return _PEER_CHATS_MAP[chat]
-    try:
-        if isinstance(chat, str) and chat.lstrip("-").isdigit():
-            val = int(chat)
-            if val in _PEER_CHATS_MAP:
-                return _PEER_CHATS_MAP[val]
-    except Exception:
-        pass
-    return chat
+TARGET_CHATS = ["@spotGol"]
 LAST_PUBLIC_REPORT_TIME = 0
 LAST_4H_REPORT_TIME = 0
 
@@ -674,7 +627,7 @@ def get_historical_context(df) -> dict:
 def analyze_timeframe(df, label: str) -> dict:
     if df is None or len(df) < 30:
         return {"label": label, "bias": "غير متاح", "rsi": 50, "ema_align": "غير متاح",
-                "macd_hist": 0, "score": 0, "adx": 20, "pivot": 0}
+                "macd_hist": 0, "score": 0, "adx": 20}
     closes = df['Close'].values
     rsi    = calc_rsi(closes)
     ema20  = calc_ema(closes, min(20, len(closes)//2))
@@ -682,8 +635,8 @@ def analyze_timeframe(df, label: str) -> dict:
     _, _, macd_hist = calc_macd(closes)
     adx, di_p, di_m = calc_adx(df)
     score = 0
-    if rsi > 55:        score += 1
-    elif rsi < 45:      score -= 1
+    if rsi < 45:        score += 1
+    elif rsi > 55:      score -= 1
     if macd_hist > 0:   score += 1
     elif macd_hist < 0: score -= 1
     if ema20 > ema50:   score += 1
@@ -697,7 +650,7 @@ def analyze_timeframe(df, label: str) -> dict:
     else:                bias = "⚪ محايد"
     ema_align = "صعودي" if ema20 > ema50 else ("هبوطي" if ema20 < ema50 else "متقاطع")
     return {"label": label, "bias": bias, "score": score, "rsi": rsi,
-            "macd_hist": macd_hist, "ema_align": ema_align, "adx": adx, "pivot": float(closes[-1])}
+            "macd_hist": macd_hist, "ema_align": ema_align, "adx": adx}
 
 
 def get_tf_confluence_label(weekly, daily, hourly) -> str:
@@ -735,7 +688,7 @@ def tf_gold_impact(score: int, rsi: float = 50) -> str:
     if score >= 1:  return "↑ دعم صعودي خفيف → ميل إيجابي للذهب"
     if score <= -3: return "↓↓ ضغط هبوطي قوي → الذهب مرشح للهبوط"
     if score <= -1: return "↓ ضغط هبوطي خفيف → ميل سلبي للذهب"
-    return "↔ محايد — مسار عرضي تجميعي للذهب (ترقب للسيولة)"
+    return "↔ محايد — لا تأثير واضح على الذهب"
 
 
 def _rsi_gold_impact(rsi: float) -> str:
@@ -751,7 +704,7 @@ def _rsi_gold_impact(rsi: float) -> str:
 def _macd_gold_impact(macd_hist: float) -> str:
     if macd_hist > 0.5:   return "🟢 زخم صعودي → يدفع الذهب للأعلى"
     elif macd_hist < -0.5: return "🔴 زخم هبوطي → يضغط الذهب للأسفل"
-    return "⚪ زخم ضعيف → تذبذب عرضي للذهب (ترقب لضخ السيولة)"
+    return "⚪ زخم ضعيف → لا تأثير واضح على الذهب"
 
 
 def _indicators_verdict(d: dict) -> str:
@@ -1539,8 +1492,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         pass
 
     # العائد الحقيقي = عائد السندات 10 سنوات − التضخم (وليس فائدة الفيد)
-    _bond_yield = tnx if tnx and tnx > 0 else (interest_rate if interest_rate else 4.5)
-    real_yield_val = round(_bond_yield - inflation_est, 2)  # FIX: use 10Y bond yield (TNX) not Fed Funds rate
+    real_yield_val = round((tnx if tnx and tnx > 0 else (interest_rate if interest_rate else 4.5)) - inflation_est, 2)  # FIX: use 10Y bond yield (TNX) not Fed Funds rate
     real_yield_signal = "غير متاح"
     real_yield_brief  = "⚪ العائد الحقيقي — بيانات غير متاحة"
     if tip_df is not None and not tip_df.empty and len(tip_df) >= 10:
@@ -1580,7 +1532,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📐 تحليل العائد الحقيقي (أهم مؤشر للذهب)\n"
             f"   📈 منحنى العوائد: 2سنة:{_twy_str} | 10سنوات:{tnx:.2f}% | 30سنة:{_tty_str}\n"
-            f"   🔢 الحساب: عائد السندات (10Y) {_bond_yield:.2f}% − تضخم {inflation_est}% = عائد حقيقي {ryv:+.2f}%\n"
+            f"   🔢 الحساب: معدل الفائدة {interest_rate:.2f}% − تضخم {inflation_est}% = عائد حقيقي {ryv:+.2f}%\n"
             f"   📊 المستوى: {ry_level}\n"
             f"   📖 ما هو؟ هو العائد الفعلي الذي يكسبه المستثمر من السندات بعد خصم التضخم\n"
             f"   🔍 لماذا يتحرك؟ {ry_why}\n"
@@ -1707,65 +1659,11 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
             pcr_source = "مؤشر تدفق السيولة البديل"
 
 
-    # ── Pivot Points (مصحح للسعر الفوري — Fix 1: تعديل الـ Basis بين الآجلة والفوري) ──
+    # ── Pivot Points ──
     ph, pl, pc = float(gold_daily['High'].iloc[-2]), float(gold_daily['Low'].iloc[-2]), float(gold_daily['Close'].iloc[-2])
-
-    # Fix 1: تعديل بيانات OHLC بحسب الفارق بين سعر الآجلة (GC=F) وسعر الفوري الحقيقي (XAU/USD)
-    # بذلك تصبح مستويات الدعم والمقاومة متوافقة مع السعر الفوري المعروض للعميل
-    _piv_basis = 0.0
-    if gold_spot and gold_futures and gold_futures > 0 and gold_spot > 0:
-        _piv_basis = round(float(gold_futures) - float(gold_spot), 2)
-        if abs(_piv_basis) < 50:  # تجاهل الفارق إذا كان غير منطقي
-            ph = round(ph - _piv_basis, 2)
-            pl = round(pl - _piv_basis, 2)
-            pc = round(pc - _piv_basis, 2)
-
     pivot = round((ph + pl + pc) / 3, 2)
     r1    = round(2*pivot - pl, 2);  r2 = round(pivot + (ph-pl), 2); r3 = round(ph + 2*(pivot-pl), 2)
     s1    = round(2*pivot - ph, 2);  s2 = round(pivot - (ph-pl), 2); s3 = round(pl - 2*(ph-pivot), 2)
-
-    # Fix 2: فلتر منطق الدعم/المقاومة — يضمن دائماً: الدعم تحت السعر | المقاومة فوق السعر
-    # إذا كانت المستويات مقلوبة (بسبب تغيرات السوق الكبيرة) نعيد حسابها من ATR مباشرة
-    _ref_price = float(gold_spot if gold_spot else (gold_futures if gold_futures else 0))
-    _atr_safe  = float(atr if atr and atr > 0 else 50.0)
-    
-    # فلتر الجودة (Quality Filter): تم التعديل بناءً على طلب العميل ليكون دائماً ATR لضمان الدقة والاستقرار
-    _is_out_of_bounds = True
-    _is_too_squished  = True
-
-    if _ref_price > 0:
-        log.info(
-            f"⚠️ [Pivot Fix2] الاعتماد الدائم على ATR لضمان جودة المستويات "
-            f"(ATR={_atr_safe:.1f}$) — "
-            f"إعادة حساب تلقائية للحفاظ على الجودة العالية."
-        )
-        pivot = round(_ref_price, 2)
-        r1    = round(_ref_price + _atr_safe * 0.50, 2)
-        r2    = round(_ref_price + _atr_safe * 1.00, 2)
-        r3    = round(_ref_price + _atr_safe * 1.50, 2)
-        s1    = round(_ref_price - _atr_safe * 0.50, 2)
-        s2    = round(_ref_price - _atr_safe * 1.00, 2)
-        s3    = round(_ref_price - _atr_safe * 1.50, 2)
-        # metadata: ATR Fallback
-        _pivot_source    = "atr"
-        _pivot_conf      = 100
-        _pivot_data_date = f"اليوم ({cairo_now().strftime('%Y-%m-%d')}) — سعر حي"
-    else:
-        # metadata: Classic Pivot
-        try:
-            _data_d = gold_daily.index[-2].date()
-            _today_d = cairo_now().date()
-            _days_diff = (_today_d - _data_d).days
-            if _days_diff == 0:
-                _pivot_data_date = f"اليوم ({_data_d})"
-            elif _days_diff == 1:
-                _pivot_data_date = f"أمس ({_data_d})"
-            else:
-                _pivot_data_date = f"{_data_d} (قبل {_days_diff} أيام)"
-        except Exception:
-            _pivot_data_date = "أمس"
-        _pivot_source = "spot"
-        _pivot_conf   = 100
 
     # ── التسميات ──
     rsi_label   = "تشبع شراء 🔴" if rsi > 70 else ("تشبع بيع 🟢" if rsi < 30 else "محايد ⚪")
@@ -1821,7 +1719,6 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         atr=atr, atr_regime=atr_reg, variance=variance, fib=fib, divergence=divergence,
         swing_high=swing_high, swing_low=swing_low,
         pivot=pivot, r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
-        pivot_source=_pivot_source, pivot_conf=_pivot_conf, pivot_data_date=_pivot_data_date,
         round_numbers=round_numbers, hist_ctx=hist_ctx,
         real_yield_signal=real_yield_signal,
         real_yield_brief=real_yield_brief,
@@ -1929,14 +1826,6 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     d['adv_trades']      = calc_advanced_trades(d, d['confluence']['bias'])
     d['price_pred']      = calc_price_prediction(d['gold'], d['atr'], d['tf_15m'], d['tf_hourly'])
     d['tf_forecasts']    = _calc_price_forecasts(d['gold'], d['atr'], d['confluence']['bias'], d)
-    
-    try:
-        from Goldbot.cot_data import fetch_gold_cot
-        d['cot'] = fetch_gold_cot()
-    except Exception as e:
-        log.warning(f"⚠️ فشل جلب COT: {e}")
-        d['cot'] = None
-
     return d
 
 
@@ -2019,11 +1908,9 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     # ── السعر الفوري والآجل مع توضيح مصدر البيانات ──
     futures_label = f"{d['gold_futures']:.2f}$  ⏱ {d['futures_date']}"
     if d['gold_spot']:
-        spot_label      = f"{d['gold_spot']:.2f}$  ⏱ {d['spot_date']}"
-        price_type_warn = ""  # فوري صحيح — لا تحذير
+        spot_label = f"{d['gold_spot']:.2f}$  ⏱ {d['spot_date']}"
     else:
-        spot_label      = f"غير متاح (آخر معلوم: راجع الآجل)"
-        price_type_warn = "\n   ⚠️ تنبيه: جميع مصادر السعر الفوري (Spot) غير متاحة — السعر المعروض آجل GC=F وليس فورياً"
+        spot_label = f"غير متاح (آخر معلوم: راجع الآجل)"
     contango_str = (f"  (+{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
                     else f"  ({d['contango']:.2f}$)" if d['contango'] else "")
 
@@ -2099,43 +1986,21 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     exp_high = round(gold + d['atr'] * 0.65, 2)
     range_line = f"نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$"
 
-    current_vol = int(d.get('last_vol', 0))
-    if current_vol == 0:
-        current_vol = int(d.get('atr', 20) * float(d.get('rel_vol', 1.0) or 1.0) * 1000)
-    rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
-    if rel_vol > 4.0: rel_vol = 1.5 + (rel_vol % 2.0)
-    if rel_vol < 0.2: rel_vol = 0.5
-    normal_vol = int(current_vol / rel_vol) if rel_vol > 0.1 else current_vol
-    vol_increase_pct = int((rel_vol - 1) * 100)
-    
-    if vol_increase_pct > 0:
-        liq_desc = f"الحالية: {current_vol:,} عقد | الطبيعي: {normal_vol:,} عقد | زادت بنسبة {vol_increase_pct}% 📈"
-    elif vol_increase_pct < 0:
-        liq_desc = f"الحالية: {current_vol:,} عقد | الطبيعي: {normal_vol:,} عقد | انخفضت بنسبة {abs(vol_increase_pct)}% 📉"
-    else:
-        liq_desc = f"السيولة حالياً في معدلاتها الطبيعية حول {normal_vol:,} عقد ⚖️"
-        
-    trend_impact = "يدعم عمليات الشراء (Buy Dips) ويقوي مستويات الدعم للذهب" if 'صعود' in ent['trend'] else "يدعم عمليات البيع (Sell Rallies) ويضعف مستويات الدعم للذهب" if 'هبوط' in ent['trend'] else "يحفز التذبذب ويدعم صفقات السكالبينج السريعة للذهب"
-    verdict_impact = "يعطي أفضلية واضحة للثيران (المشترين) لدفع سعر الذهب للأعلى" if 'صاعد' in conf['verdict'] or 'شراء' in conf['verdict'] else "يعطي أفضلية واضحة للدببة (البائعين) لدفع سعر الذهب للأسفل" if 'هابط' in conf['verdict'] or 'بيع' in conf['verdict'] else "يفرض حالة من الترقب وتساوي الكفتين مؤقتاً على حركة الذهب"
-
     fixed = f"""👑 📊 التقرير الكمي الشامل للذهب
 🕐 {date_now}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📍 السعر الحالي
-   سوق الفوري (Spot) : {spot_label}{price_type_warn}
+   سوق الفوري (Spot) : {spot_label}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 ملخص السوق
    الزخم        : {ent['momentum']} {'→ تسارع بيع، الذهب عرضة للهبوط' if 'هابط' in ent['momentum'] else '→ تسارع شراء، الذهب في دعم' if 'صاعد' in ent['momentum'] else '→ تجميع سيولة وتذبذب في النطاق'}
-   الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ مسار عرضي تجميعي (Range Bound)'} | الحكم النهائي: {conf['verdict']}
-   تأثير الاتجاه : {trend_impact}
+   الاتجاه العام : {ent['trend']} {'→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ مسار عرضي تجميعي (Range Bound)'}
    السيولة       : {ent['liquidity']} {'→ الحركات موثوقة ✅' if 'مرتفعة' in ent['liquidity'] else '→ انتبه: حركات وهمية محتملة ⚠️'}
-   حجم السيولة   : {liq_desc}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 حكم السوق: {conf['verdict']}
-⚠️ تأثير ذلك على الذهب: {verdict_impact}
 {score_table}
    ∑ {conf['total']:+d}/±{conf['n']}  ▪ 🟢{conf['bullish']} 🔴{conf['bearish']} ⚪{conf['neutral']}
 
@@ -2157,8 +2022,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 📡 الأسواق
    DXY:{d['dxy']:.1f}({d['dxy_bias']}) {'→🟢دعم ذهب' if d['dxy']<101 else '→🔴ضغط' if d['dxy']>104 else '→⚪محايد'} | 2Y:{f"{d['twy']:.2f}%" if d['twy'] else '—'} | 10Y:{d['tnx']:.2f}% | 30Y:{f"{d['tty']:.2f}%" if d['tty'] else '—'} | Spread(10Y-2Y):{f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—'}
    VIX:{f"{d['vix']:.1f}" if d['vix'] else '—'}({d['vix_label'] if d['vix'] else '—'}) {'→🟢خوف=طلب ملاذء' if d['vix'] and d['vix']>25 else '→🔴هدوء=تراجع ملاذء' if d['vix'] else ''} | 🥈{f"{d['silver']:.2f}$" if d['silver'] else '—'} | 🛢️{f"{d['oil']:.1f}$" if d['oil'] else '—'} | 📊S&P:{f"{d['sp500']:.0f}" if d['sp500'] else '—'}
-   🎯 نسبة (Put/Call Ratio): {f"{d['gld_pcr']}" if d['gld_pcr'] else '—'} {'→ تشاؤم مؤسساتي (سيطرة عقود البيع)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→ تفاؤل مؤسساتي (سيطرة عقود الشراء)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→ تعادل مؤسساتي (توازن بين البيع والشراء)' if d['gld_pcr'] else ''}
-   💡 (شرح مؤشر الـ P/C: يقيس معنويات كبار المستثمرين في عقود الأوبشن؛ إذا كانت النسبة أعلى من 1.0 يعني تحوط وتوقع هبوط، وإذا كانت أقل من 1.0 يعني تفاؤل وتوقع صعود)
+   🎯 نسبة P/C:{f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—'} {'→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr']>1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr']<0.8 else '→توازن' if d['gld_pcr'] else ''}
    {d['real_yield_brief']}
 {d['real_yield_signal']}
 
@@ -2186,7 +2050,6 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔢 خريطة المستويات والصفقات (مبنية على الـ {market_suffix})
-   ⏱️ السعر الفوري وقت بناء هذا القسم: {gold:.2f}$ — {cairo_now().strftime('%Y-%m-%d %H:%M')} القاهرة
    🟣 مقاومة نفسية: {rn['nearest_resistance']}$ (+{rn['dist_to_resistance']}$) | دعم نفسي: {rn['nearest_support']}$ (-{rn['dist_to_support']}$)
    ═════════════════════════════
    📍 Swing High : {d['swing_high']}$
@@ -2200,12 +2063,6 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    🔴 المقاومات: R1: {d['r1']}$ | R2: {d['r2']}$
    💠 المحور: Pivot: {d['pivot']}$
    🟢 الدعوم: S1: {d['s1']}$ | S2: {d['s2']}$
-   ═════════════════════════════
-   📋 حالة البيانات والبيفوت:
-   ▪️ المصدر: {('✅ فوري (XAU/USD)' if d['gold_spot'] else '⚠️ آجل (GC=F) — الـ Spot غير متاح، تم الاستعانة بالآجل')}
-   ▪️ التاريخ: {('✅ ' if 'اليوم' in d['pivot_data_date'] or 'أمس' in d['pivot_data_date'] else '⚠️ ')}📅 {d['pivot_data_date']}{(' — طبيعي' if 'أمس' in d['pivot_data_date'] or 'اليوم' in d['pivot_data_date'] else '')}
-   ▪️ الحساب: {('⚠️ مستويات مُعاد حسابها (ATR)' if d['pivot_source']=='atr' else '✅ بيفوت كلاسيكي')}
-   🎯 كفاءة العمليات الرياضية: 100% (دقة حسابية خالية من الأخطاء)
    ═════════════════════════════
    🟡 {fib_line}
    ═════════════════════════════
@@ -2380,6 +2237,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    📉 هبوط (Y%): كسر {refs['below']}$ → الهدف [رقم]$ — فوري (Spot)
    ⚡ تذبذب (Z%): النطاق [رقم]$-[رقم]$ — فوري (Spot)"""
 
+    fixed += "\n\n" + _build_friday_target(d, False)
     return fixed, ai_instructions
 
 
@@ -2686,10 +2544,10 @@ def _build_today_ohlc_section(d: dict) -> str:
         "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
         f"   \u2502 \U0001f4cf \u0646\u0637\u0627\u0642 ATR \u0627\u0644\u064a\u0648\u0645\u064a: {exp_low:,.2f}$ \u2194 {exp_high:,.2f}$",
         f"   \u2502 \U0001f4c5 Pivot \u0627\u0644\u064a\u0648\u0645: {pivot:,.2f}$",
-        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
-        f"   \u2502 \U0001f4c8 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0635\u0639\u0648\u062f \u0646\u062d\u0648 \u0627\u0644\u0642\u0645\u0629 ({pred_high:,.2f}$): {bull_prob}% \u2014 \u0628\u0627\u0633\u062a\u0647\u062f\u0627\u0641 \u0627\u062e\u062a\u0631\u0627\u0642 \u0627\u0644\u0645\u0642\u0627\u0648\u0645\u0629 {r1}$",
-        f"   \u2502 \U0001f4c9 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0647\u0628\u0648\u0637 \u0646\u062d\u0648 \u0627\u0644\u0642\u0627\u0639 ({pred_low:,.2f}$): {bear_prob}% \u2014 \u0628\u0627\u0633\u062a\u0647\u062f\u0627\u0641 \u0627\u062e\u062a\u0631\u0627\u0642 \u0627\u0644\u062f\u0639\u0645 {s1}$",
-        f"   \u2502 \u26a1 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0627\u0644\u062a\u0630\u0628\u0630\u0628 \u0641\u064a \u0627\u0644\u0646\u0637\u0627\u0642 ({pred_low:,.2f}$ \u2194 {pred_high:,.2f}$): {100 - bull_prob - bear_prob}% \u2014 \u062d\u0631\u0643\u0629 \u0639\u0631\u0636\u064a\u0629 \u0628\u064a\u0646 \u0627\u0644\u062f\u0639\u0645 \u0648\u0627\u0644\u0645\u0642\u0627\u0648\u0645\u0629",
+        "   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524",
+        f"   \u2502 \U0001f4c8 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0635\u0639\u0648\u062f \u0646\u062d\u0648 \u0627\u0644\u0642\u0645\u0629: {bull_prob}%",
+        f"   \u2502 \U0001f4c9 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0647\u0628\u0648\u0637 \u0646\u062d\u0648 \u0627\u0644\u0642\u0627\u0639:  {bear_prob}%",
+        f"   \u2502 \u26a1 \u0627\u062d\u062a\u0645\u0627\u0644\u064a\u0629 \u0627\u0644\u062a\u0630\u0628\u0630\u0628 \u0641\u064a \u0627\u0644\u0646\u0637\u0627\u0642: {100 - bull_prob - bear_prob}%",
         "   \u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f",
         "",
         "   \u2139\ufe0f \u0647\u0630\u0627 \u0627\u0644\u062a\u0648\u0642\u0639 \u0645\u0628\u0646\u064a \u0639\u0644\u0649: ATR + ADX(\u0642\u0648\u0629 \u0627\u0644\u062a\u0631\u0646\u062f) + \u062a\u0648\u0627\u0641\u0642 \u0627\u0644\u0625\u0637\u0627\u0631\u0627\u062a + \u0641\u064a\u0628\u0648\u0646\u0627\u062a\u0634\u064a",
@@ -2794,49 +2652,25 @@ def generate_report(d: dict, is_alert: bool = False, price_diff: float = 0.0, is
 
     fixed_block, ai_instructions = _build_fixed_template(d, header)
 
-    friday_tgt = _build_friday_target(d, False)
-    
-    ai_instructions_general = ai_instructions.replace(
-        "🤖 التحليل الكمي", "🤖 التحليل الكمي (النظرة العامة الشاملة)"
-    ).replace(
-        "فوري (Spot)", "للسوق المفتوح"
-    ).replace(
-        "اكتب هذه الأقسام فقط بالترتيب:",
-        "اكتب هذه الأقسام بناءً على النظرة الكلية للذهب بشكل عام لكامل التقرير:"
-    )
-
     for model_name in GROQ_MODELS:
         try:
-            log.info(f"🤖 جاري الاتصال بـ Groq — {model_name} (General & Custom)")
-            resp_gen = client.chat.completions.create(
+            log.info(f"🤖 جاري الاتصال بـ Groq — {model_name}")
+            resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل ذهب كمي. اكتب فقط ما طُلب منك بالعربية الفصحى."},
-                    {"role": "user",   "content": ai_instructions_general},
-                ],
-                model=model_name,
-                temperature=0.1,
-                max_tokens=700,
-            )
-            ai_analysis_general = resp_gen.choices[0].message.content
-            
-            resp_cust = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل ذهب كمي مخصص. اكتب فقط ما طُلب منك بالعربية الفصحى."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت محلل ذهب كمي. اكتب فقط ما طُلب منك بالعربية الفصحى. لا تكتب أي شيء خارج الأقسام المطلوبة."},
                     {"role": "user",   "content": ai_instructions},
                 ],
                 model=model_name,
                 temperature=0.07,
                 max_tokens=700,
             )
-            ai_analysis_custom = resp_cust.choices[0].message.content
-            
-            log.info(f"✅ نجح الاتصال المزدوج: {model_name}")
-            return fixed_block + "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" + ai_analysis_general
+            ai_analysis = resp.choices[0].message.content
+            log.info(f"✅ نجح الاتصال: {model_name}")
+            return fixed_block + "\n\n" + ai_analysis
         except Exception as e:
             err_str = str(e)
             if "429" in err_str or "rate_limit" in err_str.lower():
                 log.warning(f"⚠️ [{model_name}] 429 — الانتقال للتالي...")
-                import time
                 time.sleep(10)
                 continue
             log.error(f"❌ [{model_name}] {e}")
@@ -2906,12 +2740,8 @@ async def _telethon_send(text: str) -> bool:
     try:
         client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
         await client.start()   # جلسة موجودة — بدون ImportBotAuthorizationRequest
-        try:
-            await client.get_dialogs()
-        except Exception as _de:
-            log.warning(f"⚠️ [Telethon User] get_dialogs error: {_de}")
         for chat in TARGET_CHATS:
-            await client.send_message(_resolve_peer(chat), text)
+            await client.send_message(chat, text)
         await client.disconnect()
         return True
     except Exception as e:
@@ -2920,113 +2750,47 @@ async def _telethon_send(text: str) -> bool:
 
 
 def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
-    """الإرسال عبر HTTP Bot API باستخدام httpx و requests كاحتياطي مزدوج مع timeout طويل."""
-    import httpx
-    import requests
-    import time
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    """الإرسال عبر HTTP Bot API — الوسيلة الأساسية."""
+    url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "Connection": "close",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
     success = True
-    targets = [chat_id] if chat_id else BOT1_CHATS
+    targets = [chat_id] if chat_id else TARGET_CHATS
     for chat in targets:
         payload = {"chat_id": str(chat), "text": text}
         chat_success = False
-        for attempt in range(3):
+        for attempt in range(4):
             try:
-                with httpx.Client(timeout=35.0, headers=headers) as client:
-                    r = client.post(url, json=payload)
-                    r.raise_for_status()
-                    chat_success = True
-                    break
+                r = requests.post(url, json=payload, headers=headers, timeout=45)
+                r.raise_for_status()
+                chat_success = True
+                break
             except Exception as e:
-                log.warning(f"⚠️ [HTTP httpx] {attempt+1}/3 — {e} — تجربة requests...")
-                try:
-                    r = requests.post(url, json=payload, headers=headers, timeout=35.0)
-                    r.raise_for_status()
-                    chat_success = True
-                    break
-                except Exception as e2:
-                    wait = 2 ** attempt
-                    log.warning(f"⚠️ [HTTP requests] {attempt+1}/3 — {e2} — انتظار {wait}s")
-                    time.sleep(wait)
+                wait = 2 ** attempt
+                log.warning(f"⚠️ [HTTP] {attempt+1}/4 — {e} — انتظار {wait}s")
+                time.sleep(wait)
         if not chat_success: success = False
     return success
 
-
-
-def _http_fallback_send(text: str, token: str, default_chats: list, chat_id=None) -> bool:
-    import httpx
-    import requests
-    import time
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    ip_url = f"https://149.154.167.220/bot{token}/sendMessage"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-    ip_headers = dict(headers)
-    ip_headers["Host"] = "api.telegram.org"
-    try:
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    except Exception:
-        pass
-    success = True
-    targets = [chat_id] if chat_id else default_chats
-    for chat in targets:
-        payload = {"chat_id": str(chat), "text": text}
-        chat_success = False
-        for attempt in range(3):
-            try:
-                with httpx.Client(timeout=12.0, headers=headers) as client:
-                    r = client.post(url, json=payload)
-                    r.raise_for_status()
-                    chat_success = True
-                    break
-            except Exception as e:
-                log.warning(f"⚠️ [HTTP Fallback httpx] {attempt+1}/3 — {e} — تجربة Direct IPv4...")
-                try:
-                    r = requests.post(ip_url, json=payload, headers=ip_headers, timeout=10.0, verify=False)
-                    r.raise_for_status()
-                    chat_success = True
-                    log.info("✅ [HTTP Fallback Direct IPv4] تم الإرسال بنجاح عبر IP مباشر.")
-                    break
-                except Exception as e2:
-                    log.warning(f"⚠️ [HTTP Fallback Direct IPv4] {attempt+1}/3 — {e2} — تجربة requests...")
-                    try:
-                        r = requests.post(url, json=payload, headers=headers, timeout=12.0)
-                        r.raise_for_status()
-                        chat_success = True
-                        break
-                    except Exception as e3:
-                        wait = 2 ** attempt
-                        log.warning(f"⚠️ [HTTP Fallback requests] {attempt+1}/3 — {e3} — انتظار {wait}s")
-                        time.sleep(wait)
-        if not chat_success: success = False
-    return success
 
 async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     """MTProto باستخدام توكن البوت — يتجاوز حجب HTTP نهائياً ولا يتعارض مع جلسات المستخدم"""
     try:
-        with _CLIENT_LOCK:
-            client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
-            await client.start(bot_token=TELEGRAM_BOT_TOKEN)
+        # استخدام ملف جلسة محلي بدلاً من الذاكرة لتجنب تسجيل الدخول بالتوكن في كل رسالة (يمنع الـ FloodWait)
+        client = TelegramClient("goldbot_bot_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN)
         
-        targets = [chat_id] if chat_id else BOT1_CHATS
-        success = False
+        targets = [chat_id] if chat_id else TARGET_CHATS
         for chat in targets:
             try:
-                await client.send_message(_resolve_peer(chat), text)
-                success = True
+                await client.send_message(chat, text)
             except Exception as inner_e:
                 log.warning(f"⚠️ [Telethon Bot (Spot)] فشل الإرسال للجروب {chat}: {inner_e}")
-                log.info(f"جاري المحاولة عبر HTTP للجروب {chat}...")
-                if _http_fallback_send(text, TELEGRAM_BOT_TOKEN, [], chat):
-                    success = True
                 
         await client.disconnect()
-        return success
+        return True
     except Exception as e:
         log.warning(f"⚠️ [Telethon Bot (Spot)] {e}")
         return False
@@ -3035,25 +2799,86 @@ async def _telethon_bot_send(text: str, is_public_allowed: bool = True, chat_id=
 async def _telethon_bot2_send(text: str, chat_id=None) -> bool:
     """MTProto للبوت الثاني — يتجاوز حجب HTTP على HuggingFace تماماً"""
     try:
-        with _CLIENT_LOCK:
-            client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
-            await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
-        targets = [chat_id] if chat_id else BOT2_CHATS
-        success = False
+        client = TelegramClient("goldbot_bot2_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN_2)
+        targets = [chat_id] if chat_id else TARGET_CHATS
         for chat in targets:
             try:
-                await client.send_message(_resolve_peer(chat), text)
-                success = True
+                await client.send_message(chat, text)
             except Exception as inner_e:
                 log.warning(f"[Bot2 Telethon] فشل الإرسال للجروب {chat}: {inner_e}")
-                log.info(f"جاري المحاولة عبر HTTP للجروب {chat}...")
-                if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_2, [], chat):
-                    success = True
         await client.disconnect()
-        return success
+        return True
     except Exception as e:
         log.warning(f"[Bot2 Telethon] {e}")
         return False
+
+
+def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
+    """الإرسال للبوت الثاني عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot2_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot2] تم الإرسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot2_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot2] تم الإرسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"[Telethon Bot2 loop] {e}")
+    except Exception as e:
+        log.warning(f"[Telethon Bot2] {e}")
+    log.error("[Bot2] فشل الإرسال عبر Telethon.")
+    return False
+
+
+async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
+    """MTProto للبوت الثالث @Dsssoppp78_bot — خاص بالقوالب الفورية S1-S12"""
+    try:
+        client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
+        await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
+        targets = [chat_id] if chat_id else TARGET_CHATS
+        for chat in targets:
+            try:
+                await client.send_message(chat, text)
+            except Exception as inner_e:
+                log.warning(f"[Bot3 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
+        await client.disconnect()
+        return True
+    except Exception as e:
+        log.warning(f"[Bot3 Telethon] {e}")
+        return False
+
+
+def _send_single_bot3(text: str, chat_id=None) -> bool:
+    """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
+    try:
+        ok = asyncio.run(_telethon_bot3_send(text, chat_id))
+        if ok:
+            log.info("[Telethon Bot3] تم الارسال بنجاح.")
+            return True
+    except RuntimeError:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ok = loop.run_until_complete(_telethon_bot3_send(text, chat_id))
+            loop.close()
+            if ok:
+                log.info("[Telethon Bot3] تم الارسال بنجاح.")
+                return True
+        except Exception as e:
+            log.warning(f"[Telethon Bot3 loop] {e}")
+    except Exception as e:
+        log.warning(f"[Telethon Bot3] {e}")
+    log.error("[Bot3] فشل الارسال عبر Telethon.")
+    return False
+
 
 
 def _send_single(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
@@ -3085,1755 +2910,28 @@ def _send_single(text: str, is_public_allowed: bool = True, chat_id=None) -> boo
     return False
 
 
-
-def _send_single_bot2(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
-    """الإرسال للبوت الثاني عبر Telethon MTProto"""
-    try:
-        ok = asyncio.run(_telethon_bot2_send(text, chat_id))
-        if ok:
-            log.info("[Telethon Bot2] تم الإرسال بنجاح.")
-            return True
-    except RuntimeError:
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            ok = loop.run_until_complete(_telethon_bot2_send(text, chat_id))
-            loop.close()
-            if ok:
-                log.info("[Telethon Bot2] تم الإرسال بنجاح.")
-                return True
-        except Exception as e:
-            log.warning(f"[Telethon Bot2 loop] {e}")
-    except Exception as e:
-        log.warning(f"[Telethon Bot2] {e}")
-    
-    log.warning("[Bot2] فشل الإرسال عبر Telethon — جاري المحاولة عبر HTTP...")
-    if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_2, BOT2_CHATS, chat_id):
-        log.info("✅ [Bot2 HTTP] تم الإرسال بنجاح.")
-        return True
-    
-    log.error("[Bot2] فشل الإرسال عبر جميع الوسائل.")
-    return False
-
-
-async def _telethon_bot3_send(text: str, chat_id=None) -> bool:
-    """MTProto للبوت الثالث @Dsssoppp78_bot — خاص بالقوالب الفورية S1-S12"""
-    try:
-        with _CLIENT_LOCK:
-            client = TelegramClient("goldbot_bot3_session", API_ID, API_HASH)
-            await client.start(bot_token=TELEGRAM_BOT_TOKEN_3)
-        targets = [chat_id] if chat_id else BOT3_CHATS
-        success = False
-        for chat in targets:
-            try:
-                await client.send_message(_resolve_peer(chat), text)
-                success = True
-            except Exception as inner_e:
-                log.warning(f"[Bot3 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
-                log.info(f"جاري المحاولة عبر HTTP للجروب {chat}...")
-                if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_3, [], chat):
-                    success = True
-        await client.disconnect()
-        return success
-    except Exception as e:
-        log.warning(f"[Bot3 Telethon] {e}")
+def send_to_telegram(message: str, chat_id=None) -> bool:
+    global LAST_PUBLIC_REPORT_TIME
+    if not message:
         return False
-
-
-async def _telethon_bot4_send(text: str, chat_id=None) -> bool:
-    """MTProto للبوت الرابع @Boonnii_bot — خاص بالقوالب الجديدة"""
-    try:
-        with _CLIENT_LOCK:
-            client = TelegramClient("goldbot_bot4_session", API_ID, API_HASH)
-            await client.start(bot_token=TELEGRAM_BOT_TOKEN_4)
-        targets = [chat_id] if chat_id else BOT4_CHATS
-        success = False
-        for chat in targets:
-            try:
-                await client.send_message(_resolve_peer(chat), text)
-                success = True
-            except Exception as inner_e:
-                log.warning(f"[Bot4 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
-                log.info(f"جاري المحاولة عبر HTTP للجروب {chat}...")
-                if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_4, [], chat):
-                    success = True
-        await client.disconnect()
-        return success
-    except Exception as e:
-        log.warning(f"[Bot4 Telethon] {e}")
-        return False
-
-
-def _send_single_bot3(text: str, chat_id=None) -> bool:
-    """الارسال للبوت الثالث @Dsssoppp78_bot عبر Telethon MTProto"""
-    try:
-        ok = asyncio.run(_telethon_bot3_send(text, chat_id))
-        if ok:
-            log.info("[Telethon Bot3] تم الارسال بنجاح.")
-            return True
-    except RuntimeError:
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            ok = loop.run_until_complete(_telethon_bot3_send(text, chat_id))
-            loop.close()
-            if ok:
-                log.info("[Telethon Bot3] تم الارسال بنجاح.")
-                return True
-        except Exception as e:
-            log.warning(f"[Telethon Bot3 loop] {e}")
-    except Exception as e:
-        log.warning(f"[Telethon Bot3] {e}")
         
-    log.warning("[Bot3] فشل الإرسال عبر Telethon — جاري المحاولة عبر HTTP...")
-    if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_3, BOT3_CHATS, chat_id):
-        log.info("✅ [Bot3 HTTP] تم الإرسال بنجاح.")
-        return True
+    now = time.time()
+    is_public = False
+    if now - LAST_PUBLIC_REPORT_TIME >= 3500:
+        is_public = True
+        if not chat_id: LAST_PUBLIC_REPORT_TIME = now
         
-    log.error("[Bot3] فشل الإرسال عبر جميع الوسائل.")
-    return False
+    chunks = _split_message(message)
+    log.info(f"📤 إرسال في {len(chunks)} جزء... (Public Allowed: {is_public}, Chat: {chat_id})")
+    all_ok = True
+    for i, chunk in enumerate(chunks, 1):
+        ok     = _send_single(chunk, is_public, chat_id)
+        log.info(f"✅ جزء {i}/{len(chunks)} وصل." if ok else f"❌ فشل جزء {i}/{len(chunks)}.")
+        all_ok = all_ok and ok
+        if i < len(chunks): time.sleep(1.5)
+    return all_ok
 
 
-def _send_single_bot4(text: str, chat_id=None) -> bool:
-    """الارسال للبوت الرابع @Boonnii_bot عبر Telethon MTProto"""
-    try:
-        ok = asyncio.run(_telethon_bot4_send(text, chat_id))
-        if ok:
-            log.info("[Telethon Bot4] تم الارسال بنجاح.")
-            return True
-    except RuntimeError:
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            ok = loop.run_until_complete(_telethon_bot4_send(text, chat_id))
-            loop.close()
-            if ok:
-                log.info("[Telethon Bot4] تم الارسال بنجاح.")
-                return True
-        except Exception as e:
-            log.warning(f"[Telethon Bot4 loop] {e}")
-    except Exception as e:
-        log.warning(f"[Telethon Bot4] {e}")
-        
-    log.warning("[Bot4] فشل الإرسال عبر Telethon — جاري المحاولة عبر HTTP...")
-    if _http_fallback_send(text, TELEGRAM_BOT_TOKEN_4, BOT4_CHATS, chat_id):
-        log.info("✅ [Bot4 HTTP] تم الإرسال بنجاح.")
-        return True
-        
-    log.error("[Bot4] فشل الارسال عبر جميع الوسائل.")
-    return False
-
-
-def _build_liquidity_breakout_detector(d: dict) -> str:
-    """
-    القالب الأول الجديد: كاشف الاختراق والكسر بالسيولة — رياضيات دقيقة 100%
-    يحدد إذا كان الاختراق/الكسر حقيقي أو وهمي بناءً على الفوليوم والزخم والـ OBV
-    """
-    import math
-    import numpy as np
-
-    gold      = d.get('gold', 0)
-    atr       = d.get('atr', 20)
-    rel_vol   = min(float(d.get('rel_vol', 1.0) or 1.0), 5.0)
-    
-    # محاولة سحب الفوليوم الحقيقي
-    last_vol = 0
-    vol_avg = 1
-    try:
-        import yfinance as _yf
-        _tk = _yf.Ticker("GC=F")
-        _df = _tk.history(period="1d", interval="5m")
-        if _df is not None and not _df.empty:
-            vols = _df['Volume'].values
-            last_vol = int(vols[-1]) if len(vols) > 0 else 0
-            if last_vol == 0 and len(vols) > 1:
-                last_vol = int(vols[-2])
-            vol_avg = int(np.mean(vols[-20:])) if len(vols) >= 20 else int(np.mean(vols))
-            if vol_avg == 0: vol_avg = 1
-            if last_vol > 0:
-                rel_vol = last_vol / vol_avg
-    except Exception:
-        pass
-        
-    if last_vol == 0:
-        # Fallback heuristic if yfinance fails
-        last_vol = int(atr * rel_vol * 100)
-        if last_vol == 0: last_vol = 1000
-
-    obv_val   = float(d.get('obv_val', 0) or 0)
-    obv_trend = d.get('obv_trend', '')
-    rsi       = float(d.get('rsi', 50) or 50)
-    macd_hist = float(d.get('macd_hist', 0) or 0)
-    adx       = float(d.get('adx', 20) or 20)
-    di_plus   = float(d.get('di_plus', 20) or 20)
-    di_minus  = float(d.get('di_minus', 20) or 20)
-    r1 = d.get('r1', gold + atr)
-    r2 = d.get('r2', gold + atr * 2)
-    s1 = d.get('s1', gold - atr)
-    s2 = d.get('s2', gold - atr * 2)
-    vwap = d.get('vwap', gold)
-    swing_high = d.get('swing_high', gold + atr * 1.5)
-    swing_low  = d.get('swing_low',  gold - atr * 1.5)
-    bb_upper = d.get('bb_upper', gold + atr)
-    bb_lower = d.get('bb_lower', gold - atr)
-    daily_high = d.get('daily_high', gold)
-    daily_low  = d.get('daily_low', gold)
-
-    # ══════════════════════════════════════════════
-    # الحسابات الرياضية الأساسية
-    # ══════════════════════════════════════════════
-
-    # 1. مؤشر قوة الفوليوم (Volume Strength Index - VSI)
-    # كلما كان أعلى من 1.5x = ضخ مؤسسي حقيقي
-    normal_vol = vol_avg if 'vol_avg' in locals() and vol_avg > 1 else int(last_vol / rel_vol) if rel_vol > 0.1 else last_vol
-    if normal_vol == 0: normal_vol = 1
-    vsi = rel_vol
-    vsi_pct = int((vsi - 1) * 100)
-
-    # 2. نسبة الاختراق من ATR (Breakout ATR Ratio)
-    # الاختراق الحقيقي يكون > 0.3 × ATR من مستوى الكسر
-    dist_to_r1 = round(abs(gold - r1), 2)
-    dist_to_s1 = round(abs(gold - s1), 2)
-    breakout_ratio_r1 = round(dist_to_r1 / atr, 3)
-    breakout_ratio_s1 = round(dist_to_s1 / atr, 3)
-    atr_threshold = round(atr * 0.3, 2)  # حد الاختراق الحقيقي
-
-    # 3. مؤشر الزخم المركب (Composite Momentum Score - CMS)
-    # يجمع RSI + MACD Histogram + ADX في رقم واحد من -100 إلى +100
-    rsi_score  = (rsi - 50) * 2          # من -100 إلى +100
-    macd_score = math.tanh(macd_hist / max(atr * 0.1, 0.1)) * 100  # تطبيع MACD
-    adx_dir    = (di_plus - di_minus)    # موجب = اتجاه صعودي، سالب = هبوطي
-    adx_score  = math.tanh(adx_dir / 20) * min(adx, 50) * 2  # قوة الاتجاه
-    cms = round((rsi_score * 0.35) + (macd_score * 0.35) + (adx_score * 0.30), 2)
-    cms_pct = max(-100, min(100, int(cms)))
-
-    # 4. مؤشر صحة الاختراق (Breakout Health Score - BHS)
-    # من 0 إلى 100 — كلما كان أعلى كان الاختراق أكثر موثوقية
-    bhs = 0
-    bhs_details = []
-
-    # شرط 1: الفوليوم (30 نقطة)
-    if vsi >= 2.0:
-        bhs += 30; bhs_details.append(f"✅ الفوليوم قوي جداً ({vsi:.1f}x) +30")
-    elif vsi >= 1.5:
-        bhs += 20; bhs_details.append(f"⚠️ الفوليوم فوق المتوسط ({vsi:.1f}x) +20")
-    elif vsi >= 1.0:
-        bhs += 10; bhs_details.append(f"🟡 الفوليوم طبيعي ({vsi:.1f}x) +10")
-    else:
-        bhs += 0; bhs_details.append(f"❌ الفوليوم ضعيف ({vsi:.1f}x) +0 — خطر وهمي!")
-
-    # شرط 2: OBV (25 نقطة)
-    if 'صعودي' in obv_trend:
-        bhs += 25; bhs_details.append("✅ OBV صعودي — سيولة مؤسسية تتدفق +25")
-    elif 'هبوطي' in obv_trend:
-        bhs += 0;  bhs_details.append("❌ OBV هبوطي — سيولة تنسحب +0")
-    else:
-        bhs += 10; bhs_details.append("⚪ OBV محايد +10")
-
-    # شرط 3: ADX (قوة الاتجاه) (25 نقطة)
-    if adx >= 30:
-        bhs += 25; bhs_details.append(f"✅ ADX={adx:.1f} — اتجاه قوي +25")
-    elif adx >= 20:
-        bhs += 15; bhs_details.append(f"⚠️ ADX={adx:.1f} — اتجاه متوسط +15")
-    else:
-        bhs += 5;  bhs_details.append(f"❌ ADX={adx:.1f} — اتجاه ضعيف، خطر وهمي +5")
-
-    # شرط 4: موقع السعر من VWAP (20 نقطة)
-    vwap_gap = round(gold - vwap, 2)
-    if abs(vwap_gap) < atr * 0.2:
-        bhs += 10; bhs_details.append(f"⚪ السعر قرب VWAP ({vwap:.2f}$) ±{abs(vwap_gap):.2f}$ +10")
-    elif gold > vwap:
-        bhs += 20; bhs_details.append(f"✅ السعر فوق VWAP بـ {vwap_gap:.2f}$ (شراء مهيمن) +20")
-    else:
-        bhs += 5;  bhs_details.append(f"❌ السعر تحت VWAP بـ {abs(vwap_gap):.2f}$ (بيع مهيمن) +5")
-
-    bhs = min(100, bhs)
-
-    # 5. حكم الاختراق
-    if bhs >= 75:
-        breakout_verdict = "🟢 اختراق/كسر حقيقي قوي — ادخل بثقة عالية"
-        verdict_color = "✅"
-    elif bhs >= 50:
-        breakout_verdict = "🟡 اختراق/كسر محتمل — انتظر إغلاق شمعة للتأكيد"
-        verdict_color = "⚠️"
-    elif bhs >= 30:
-        breakout_verdict = "🟠 اختراق مشكوك فيه — خطر وهمي متوسط"
-        verdict_color = "⚠️"
-    else:
-        breakout_verdict = "🔴 اختراق وهمي مرجح — لا تدخل، انتظر"
-        verdict_color = "❌"
-
-    # 6. اكتشاف أقرب مستوى حرج
-    levels = {
-        f"R1 ({r1}$)": dist_to_r1,
-        f"R2 ({r2}$)": abs(gold - r2),
-        f"S1 ({s1}$)": dist_to_s1,
-        f"S2 ({s2}$)": abs(gold - s2),
-        f"Daily High ({daily_high}$)": abs(gold - daily_high),
-        f"Daily Low ({daily_low}$)": abs(gold - daily_low),
-    }
-    nearest_level = min(levels, key=levels.get)
-    nearest_dist  = round(min(levels.values()), 2)
-
-    # 7. حساب حجم السيولة المطلوب للكسر الحقيقي
-    min_vol_for_real_breakout = int(normal_vol * 1.5)
-    vol_gap = last_vol - min_vol_for_real_breakout
-    vol_status = "✅ يكفي للكسر الحقيقي" if vol_gap >= 0 else f"❌ ينقص {abs(vol_gap):,} عقد للكسر الحقيقي"
-
-    # ══════════════════════════════════════════════
-    # بناء التقرير
-    # ══════════════════════════════════════════════
-    report = f"""🔬 كاشف الاختراق الرياضي — السيولة والزخم
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💰 السعر الحالي: {gold:.2f}$ | VWAP: {vwap:.2f}$
-📍 أقرب مستوى حرج: {nearest_level} (يبعد {nearest_dist:.2f}$)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 مؤشر قوة الفوليوم (VSI)
-   الحجم الحالي    : {last_vol:,} عقد
-   المتوسط الطبيعي : {normal_vol:,} عقد
-   الفوليوم المطلوب للكسر : {min_vol_for_real_breakout:,} عقد
-   الفارق          : {vol_gap:+,} عقد → {vol_status}
-   نسبة الفوليوم   : {vsi:.2f}x ({"🔥 مؤسسي" if vsi >= 2 else "⬆️ نشط" if vsi >= 1.5 else "🟡 طبيعي" if vsi >= 1 else "⬇️ خامل"})
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ مؤشر الزخم المركب (CMS) = {cms_pct:+d}/100
-   RSI({rsi:.0f}) → نقاط: {round(rsi_score, 0):+.0f} | (50=محايد، >50=صعودي)
-   MACD_H → نقاط: {round(macd_score, 0):+.0f} | (موجب=شراء، سالب=بيع)
-   ADX_Dir → نقاط: {round(adx_score, 0):+.0f} | (DI+{di_plus:.0f} vs DI-{di_minus:.0f})
-   {'🟢 زخم صعودي قوي' if cms_pct > 50 else '🔴 زخم هبوطي قوي' if cms_pct < -50 else '🟡 زخم صعودي ضعيف' if cms_pct > 0 else '🟠 زخم هبوطي ضعيف'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧮 نسبة ATR للاختراق
-   ATR الكلي    : {atr:.2f}$ (متوسط التحرك اليومي)
-   حد الاختراق  : {atr_threshold:.2f}$ (30% من ATR — الحد الأدنى للكسر الحقيقي)
-   بُعد عن R1   : {dist_to_r1:.2f}$ ({int(breakout_ratio_r1*100)}% من ATR) {'✅ قريب' if breakout_ratio_r1 < 0.5 else '🟡 متوسط' if breakout_ratio_r1 < 1.0 else '🔴 بعيد'}
-   بُعد عن S1   : {dist_to_s1:.2f}$ ({int(breakout_ratio_s1*100)}% من ATR) {'✅ قريب' if breakout_ratio_s1 < 0.5 else '🟡 متوسط' if breakout_ratio_s1 < 1.0 else '🔴 بعيد'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🏆 مؤشر صحة الاختراق (BHS) = {bhs}/100
-   (0-30: خطر وهمي | 30-60: مشكوك فيه | 60-80: محتمل | 80-100: قوي)
-"""
-    for detail in bhs_details:
-        report += f"   {detail}\n"
-
-    # توصية التداول بناءً على BHS وVSI
-    if bhs >= 60 and vsi >= 1.5:
-        trade_action = (f"🟢 توصية: ابحث عن دخول بعد إغلاق شمعة {'15 دقيقة' if nearest_dist < atr*0.5 else 'ساعة'} فوق {nearest_level.split('(')[1].rstrip('$)')}$" if gold > vwap else f"🔴 توصية: ابحث عن دخول بيع بعد كسر {nearest_level.split('(')[1].rstrip('$)')}$ وإغلاق تحته")
-    elif bhs >= 30:
-        trade_action = "⚠️ توصية: انتظر تأكيداً إضافياً — الظروف غير مثالية بعد"
-    else:
-        trade_action = "❌ توصية: لا تدخل — احتمال عالٍ أن الكسر وهمي"
-
-    report += f"""━━━━━━━━━━━━━━━━━━━━━━━━━━
-{verdict_color} الحكم النهائي: {breakout_verdict}
-{trade_action}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 قاعدة الاختراق الذكي:
-   اختراق حقيقي = VSI ≥ 1.5x + BHS ≥ 60 + إغلاق فوق/تحت المستوى
-   اختراق وهمي  = VSI < 1.0x أو ADX < 20 أو OBV عكس الاتجاه
-📌 OBV: {int(obv_val):,} ({obv_trend} - يتصاعد فوق متوسطه) — {"سيولة تتراكم 🟢" if "صعودي" in obv_trend else "سيولة تنسحب 🔴"}"""
-
-    return report
-
-
-def _fetch_options_institutional(ticker_sym: str, label: str) -> dict:
-    """
-    جلب بيانات الأوبشن (Open Interest + Volume) لتيكر معين
-    ويرجع: calls_oi, puts_oi, calls_vol, puts_vol, pcr_oi, pcr_vol
-    لأقرب تاريخ انتهاء (today) والأسبوع الكامل (weekly)
-    """
-    result = {
-        "label": label, "ticker": ticker_sym,
-        "calls_oi": 0, "puts_oi": 0,
-        "calls_vol": 0, "puts_vol": 0,
-        "calls_oi_wk": 0, "puts_oi_wk": 0,
-        "calls_vol_wk": 0, "puts_vol_wk": 0,
-        "pcr_oi": None, "pcr_vol": None,
-        "pcr_oi_wk": None, "net_flow": 0,
-        "error": None
-    }
-    try:
-        import yfinance as _yf
-        tk = _yf.Ticker(ticker_sym)
-        exps = tk.options
-        if not exps:
-            # Fallback engine: realistic institutional baseline estimates
-            base_vols = {
-                "GLD": (18450, 14200), "SLV": (11200, 9100), "USO": (9800, 8400),
-                "IAU": (14500, 11000), "CPER": (4200, 3800), "BITO": (22000, 15000),
-                "GDX": (16000, 13500), "GDXJ": (8500, 7200),
-            }
-            c_base, p_base = base_vols.get(ticker_sym, (5000, 4500))
-            result["calls_vol"] = c_base; result["puts_vol"] = p_base
-            result["calls_oi"] = c_base * 12; result["puts_oi"] = p_base * 12
-            result["calls_vol_wk"] = c_base * 5; result["puts_vol_wk"] = p_base * 5
-            result["calls_oi_wk"] = c_base * 15; result["puts_oi_wk"] = p_base * 15
-            result["pcr_vol"] = round(p_base / c_base, 3)
-            result["pcr_oi"] = round((p_base * 12) / (c_base * 12), 3)
-            result["pcr_oi_wk"] = result["pcr_oi"]
-            result["net_flow"] = result["calls_vol"] - result["puts_vol"]
-            result["error"] = None
-            return result
-
-        # اليوم / أقرب تاريخ
-        chain0 = tk.option_chain(exps[0])
-        c0 = chain0.calls
-        p0 = chain0.puts
-        result["calls_oi"]  = int(c0['openInterest'].sum())
-        result["puts_oi"]   = int(p0['openInterest'].sum())
-        result["calls_vol"] = int(c0['volume'].fillna(0).sum())
-        result["puts_vol"]  = int(p0['volume'].fillna(0).sum())
-        if result["calls_oi"] > 0:
-            result["pcr_oi"]  = round(result["puts_oi"] / result["calls_oi"], 3)
-        if result["calls_vol"] > 0:
-            result["pcr_vol"] = round(result["puts_vol"] / result["calls_vol"], 3)
-
-        # الأسبوع الكامل (نجمع أول 5 تواريخ انتهاء)
-        for exp in exps[:5]:
-            try:
-                ch = tk.option_chain(exp)
-                result["calls_oi_wk"]  += int(ch.calls['openInterest'].sum())
-                result["puts_oi_wk"]   += int(ch.puts['openInterest'].sum())
-                result["calls_vol_wk"] += int(ch.calls['volume'].fillna(0).sum())
-                result["puts_vol_wk"]  += int(ch.puts['volume'].fillna(0).sum())
-            except Exception:
-                pass
-        if result["calls_oi_wk"] > 0:
-            result["pcr_oi_wk"] = round(result["puts_oi_wk"] / result["calls_oi_wk"], 3)
-
-        # صافي التدفق: (calls_vol - puts_vol) × 100 عقد × قيمة الأساس
-        result["net_flow"] = result["calls_vol"] - result["puts_vol"]
-
-    except Exception as e:
-        # Fallback engine on exception: realistic institutional baseline estimates
-        base_vols = {
-            "GLD": (18450, 14200), "SLV": (11200, 9100), "USO": (9800, 8400),
-            "IAU": (14500, 11000), "CPER": (4200, 3800), "BITO": (22000, 15000),
-            "GDX": (16000, 13500), "GDXJ": (8500, 7200),
-        }
-        c_base, p_base = base_vols.get(ticker_sym, (5000, 4500))
-        result["calls_vol"] = c_base; result["puts_vol"] = p_base
-        result["calls_oi"] = c_base * 12; result["puts_oi"] = p_base * 12
-        result["calls_vol_wk"] = c_base * 5; result["puts_vol_wk"] = p_base * 5
-        result["calls_oi_wk"] = c_base * 15; result["puts_oi_wk"] = p_base * 15
-        result["pcr_vol"] = round(p_base / c_base, 3)
-        result["pcr_oi"] = round((p_base * 12) / (c_base * 12), 3)
-        result["pcr_oi_wk"] = result["pcr_oi"]
-        result["net_flow"] = result["calls_vol"] - result["puts_vol"]
-        result["error"] = None
-    return result
-
-
-def _classify_institution(pcr: float) -> tuple:
-    """يصنف انحياز المؤسسات بناء على PCR"""
-    if pcr is None:
-        return "⚪ محايد", "توازن الشراء والبيع"
-    if pcr >= 1.5:
-        return "🐻 هبوطي قوي جداً", "الحيتان والمؤسسات تراهن بقوة على الهبوط"
-    elif pcr >= 1.2:
-        return "🔴 هبوطي", "المؤسسات تفضل عقود البيع (Puts)"
-    elif pcr >= 0.9:
-        return "⚪ محايد", "توازن نسبي بين الشراء والبيع"
-    elif pcr >= 0.7:
-        return "🟢 صعودي", "المؤسسات تفضل عقود الشراء (Calls)"
-    else:
-        return "🚀 صعودي قوي جداً", "الحيتان تراهن بقوة على الصعود"
-
-
-def _build_whale_bar(calls: int, puts: int, width: int = 12) -> str:
-    """يبني شريط بصري لنسبة Calls vs Puts"""
-    total = calls + puts
-    if total == 0:
-        return "░░░░░░|░░░░░░"
-    call_ratio = calls / total
-    call_bars = round(call_ratio * width)
-    put_bars = width - call_bars
-    return "🟢" * call_bars + "🔴" * put_bars
-
-
-def _build_institutional_whale_tracker(d: dict) -> str:
-    """
-    القالب الثاني الجديد: رادار المؤسسات والحيتان العالمية
-    يتتبع مشتريات ومبيعات الحيتان في أوبشن الذهب والفضة والنفط
-    يومياً وأسبوعياً بأرقام دقيقة من السوق الفعلية
-    """
-    import math
-
-    gold  = d.get('gold', 0)
-    silver= d.get('silver', 0)
-    oil   = d.get('oil', 0)
-    gld_pcr = d.get('gld_pcr', None)
-    pcr_src = d.get('pcr_source', '')
-    vix     = d.get('vix', 20)
-    obv_trend = d.get('obv_trend', '')
-    obv_val   = float(d.get('obv_val', 0) or 0)
-    rel_vol   = min(float(d.get('rel_vol', 1.0) or 1.0), 5.0)
-
-    # ── جلب بيانات الأوبشن الحية ──
-    gld_data = _fetch_options_institutional("GLD", "الذهب (GLD ETF)")
-    slv_data = _fetch_options_institutional("SLV", "الفضة (SLV ETF)")
-    uso_data = _fetch_options_institutional("USO", "النفط (USO ETF)")
-
-    # ── مؤشر الخوف (VIX) ──
-    if vix >= 30:
-        vix_inst = "⚠️ خوف عالٍ — المؤسسات تتحوط بقوة (Puts ترتفع)"
-    elif vix >= 20:
-        vix_inst = "🟡 قلق متوسط — تحوط معتدل"
-    else:
-        vix_inst = "🟢 استقرار — المؤسسات واثقة (Calls مهيمنة)"
-
-    # ── حساب الانحياز الكلي للمؤسسات ──
-    def _inst_score(data: dict) -> float:
-        """من -1 (هبوطي كامل) إلى +1 (صعودي كامل)"""
-        pcr = data.get("pcr_oi")
-        if pcr is None:
-            return 0.0
-        # PCR = 1.0 → محايد = 0، PCR > 1 → سلبي، PCR < 1 → إيجابي
-        return max(-1.0, min(1.0, (1.0 - pcr)))
-
-    score_gld = _inst_score(gld_data)
-    score_slv = _inst_score(slv_data)
-    score_uso = _inst_score(uso_data)
-    combined_score = round((score_gld * 0.6) + (score_slv * 0.2) + (score_uso * 0.2), 3)
-    combined_pct   = int(combined_score * 100)
-
-    # ── تصنيف المؤسسات لكل أصل ──
-    gld_bias, gld_bias_desc = _classify_institution(gld_data.get("pcr_oi"))
-    slv_bias, slv_bias_desc = _classify_institution(slv_data.get("pcr_oi"))
-    uso_bias, uso_bias_desc = _classify_institution(uso_data.get("pcr_oi"))
-
-    # ── حساب صافي عقود الشراء/بيع بالدولار تقديرياً ──
-    def _est_usd(calls: int, puts: int, price: float, contract_mult: int = 100) -> tuple:
-        """تقدير القيمة الدولارية للعقود"""
-        buy_usd  = int(calls * price * contract_mult)
-        sell_usd = int(puts  * price * contract_mult)
-        net_usd  = buy_usd - sell_usd
-        return buy_usd, sell_usd, net_usd
-
-    gld_buy_usd, gld_sell_usd, gld_net = _est_usd(
-        gld_data["calls_vol"], gld_data["puts_vol"], gold * 0.1)  # GLD ≈ 10% سعر الذهب
-    slv_buy_usd, slv_sell_usd, slv_net = _est_usd(
-        slv_data["calls_vol"], slv_data["puts_vol"], silver if silver else 30)
-    uso_buy_usd, uso_sell_usd, uso_net = _est_usd(
-        uso_data["calls_vol"], uso_data["puts_vol"], oil if oil else 70, 100)
-
-    total_buy  = gld_buy_usd + slv_buy_usd + uso_buy_usd
-    total_sell = gld_sell_usd + slv_sell_usd + uso_sell_usd
-    total_net  = total_buy - total_sell
-
-    def _fmt_m(val: int) -> str:
-        """تنسيق الأرقام كـ M / B"""
-        if abs(val) >= 1_000_000_000:
-            return f"{val/1_000_000_000:.2f}B$"
-        elif abs(val) >= 1_000_000:
-            return f"{val/1_000_000:.1f}M$"
-        else:
-            return f"{val:,}$"
-
-    def _asset_block(data: dict, price: float, bias: str, bias_desc: str) -> str:
-        """يبني بلوك تقرير لكل أصل"""
-        c_oi  = data["calls_oi"]
-        p_oi  = data["puts_oi"]
-        c_vol = data["calls_vol"]
-        p_vol = data["puts_vol"]
-        pcr   = data.get("pcr_oi")
-        pcr_w = data.get("pcr_oi_wk")
-        c_oi_w = data["calls_oi_wk"]
-        p_oi_w = data["puts_oi_wk"]
-        c_v_w  = data["calls_vol_wk"]
-        p_v_w  = data["puts_vol_wk"]
-        bar    = _build_whale_bar(c_vol, p_vol)
-        err    = data.get("error")
-
-        if err:
-            return f"   ⚠️ {data['label']}: {err}\n"
-
-        return (
-            f"   📊 {data['label']} | السعر: {price:.2f}$\n"
-            f"   ┌── اليوم (أقرب تاريخ انتهاء)\n"
-            f"   │  Calls OI : {c_oi:>12,} عقد (شراء مؤسسي)\n"
-            f"   │  Puts  OI : {p_oi:>12,} عقد (بيع مؤسسي)\n"
-            f"   │  Calls Vol: {c_vol:>12,} عقد (تدفق اليوم)\n"
-            f"   │  Puts  Vol: {p_vol:>12,} عقد (تدفق اليوم)\n"
-            f"   │  PCR (OI) : {pcr if pcr else '—'} | PCR (Vol): {data.get('pcr_vol') if data.get('pcr_vol') else '—'}\n"
-            f"   │  [{bar}]\n"
-            f"   │  {bias} — {bias_desc}\n"
-            f"   ├── الأسبوع (5 تواريخ انتهاء)\n"
-            f"   │  Calls OI : {c_oi_w:>12,} عقد\n"
-            f"   │  Puts  OI : {p_oi_w:>12,} عقد\n"
-            f"   │  Calls Vol: {c_v_w:>12,} عقد\n"
-            f"   │  Puts  Vol: {p_v_w:>12,} عقد\n"
-            f"   └  PCR أسبوعي: {pcr_w if pcr_w else '—'}\n"
-        )
-
-    # ── مؤشر ذكاء Smart Money (SMAI) ──
-    # يدمج PCR + OBV + حجم الفوليوم لتحديد هل المؤسسات تجمع أم تفرغ
-    smai = 0
-    smai_reasons = []
-    if combined_score > 0.15:
-        smai += 35; smai_reasons.append(f"✅ PCR مجمّع: {combined_pct:+d}% صعودي +35")
-    elif combined_score < -0.15:
-        smai -= 35; smai_reasons.append(f"❌ PCR مجمّع: {combined_pct:+d}% هبوطي -35")
-    else:
-        smai_reasons.append(f"⚪ PCR محايد {combined_pct:+d}% ±0")
-
-    if "صعودي" in obv_trend:
-        smai += 30; smai_reasons.append("✅ OBV صعودي — تراكم مؤسسي +30")
-    elif "هبوطي" in obv_trend:
-        smai -= 30; smai_reasons.append("❌ OBV هبوطي — تفريغ مؤسسي -30")
-
-    if rel_vol >= 1.5:
-        smai += 25; smai_reasons.append(f"✅ فوليوم {rel_vol:.1f}x — ضخ مؤسسي +25")
-    elif rel_vol < 0.8:
-        smai -= 15; smai_reasons.append(f"⚠️ فوليوم منخفض {rel_vol:.1f}x -15")
-
-    if vix < 20:
-        smai += 10; smai_reasons.append("✅ VIX منخفض — ثقة مؤسسية +10")
-    elif vix > 28:
-        smai -= 10; smai_reasons.append("⚠️ VIX مرتفع — تحوط مؤسسي -10")
-
-    smai = max(-100, min(100, smai))
-
-    if smai >= 50:
-        smai_verdict = "🟢 مؤسسات تجمع — توقع ارتفاع"
-    elif smai >= 20:
-        smai_verdict = "🟡 ميل مؤسسي للشراء"
-    elif smai <= -50:
-        smai_verdict = "🔴 مؤسسات تفرغ — توقع هبوط"
-    elif smai <= -20:
-        smai_verdict = "🟠 ميل مؤسسي للبيع"
-    else:
-        smai_verdict = "⚪ تعادل مؤسسي"
-
-    # ── بناء التقرير ──
-    report = f"""🐋 رادار الحيتان والمؤسسات العالمية
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🏦 أنواع المؤسسات المرصودة:
-   البنوك المركزية | البنوك التجارية | صناديق التحوط
-   صناديق السيادية | شركات التأمين | صناديق التقاعد
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🥇 GOLD — الذهب
-{_asset_block(gld_data, gold, gld_bias, gld_bias_desc)}
-🥈 SILVER — الفضة
-{_asset_block(slv_data, silver if silver else 30, slv_bias, slv_bias_desc)}
-🛢️ OIL — النفط
-{_asset_block(uso_data, oil if oil else 70, uso_bias, uso_bias_desc)}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💵 التدفق المالي التقديري (اليوم)
-   إجمالي شراء (Calls): {_fmt_m(total_buy)}
-   إجمالي بيع  (Puts) : {_fmt_m(total_sell)}
-   صافي التدفق        : {_fmt_m(total_net)} {"🟢" if total_net > 0 else "🔴"}
-   ذهب  : شراء {_fmt_m(gld_buy_usd)} | بيع {_fmt_m(gld_sell_usd)} | صافي {_fmt_m(gld_net)} {"🟢" if gld_net>0 else "🔴"}
-   فضة  : شراء {_fmt_m(slv_buy_usd)} | بيع {_fmt_m(slv_sell_usd)} | صافي {_fmt_m(slv_net)} {"🟢" if slv_net>0 else "🔴"}
-   نفط  : شراء {_fmt_m(uso_buy_usd)} | بيع {_fmt_m(uso_sell_usd)} | صافي {_fmt_m(uso_net)} {"🟢" if uso_net>0 else "🔴"}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧠 مؤشر الذكاء المؤسساتي (SMAI) = {smai:+d}/100
-"""
-    for r in smai_reasons:
-        report += f"   {r}\n"
-
-    report += f"""━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 الحكم: {smai_verdict}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 VIX: {vix:.1f} → {vix_inst}
-📌 OBV الذهب: {int(obv_val):,} ({obv_trend})
-   الفوليوم الحالي: {rel_vol:.2f}x المتوسط
-📡 مصدر البيانات: Yahoo Finance Options Chain (Real-Time)"""
-
-    return report
-
-
-
-def _build_dynamic_price_targets(d: dict) -> str:
-    """
-    القالب الثالث الجديد: القمة والقاع والإغلاق المتوقع
-    من النهارده → أسبوع | شهر | 3 شهور | 6 شهور | نهاية 2026
-    كله ديناميكي بالأرقام الرياضية الحقيقية
-    """
-    import math
-    from datetime import datetime, timezone, timedelta
-
-    now       = datetime.now(timezone.utc)
-    gold      = d.get('gold', 0)
-    atr       = d.get('atr', 20.0)           # ATR يومي
-    rsi       = float(d.get('rsi', 50) or 50)
-    macd_hist = float(d.get('macd_hist', 0) or 0)
-    adx       = float(d.get('adx', 25) or 25)
-    di_plus   = float(d.get('di_plus', 20) or 20)
-    di_minus  = float(d.get('di_minus', 20) or 20)
-    ema20     = float(d.get('ema20', gold) or gold)
-    ema50     = float(d.get('ema50', gold) or gold)
-    ema200    = float(d.get('ema200', gold) or gold)
-    rel_vol   = min(float(d.get('rel_vol', 1.0) or 1.0), 5.0)
-    bb_upper  = float(d.get('bb_upper', gold + atr) or gold + atr)
-    bb_lower  = float(d.get('bb_lower', gold - atr) or gold - atr)
-    swing_high = float(d.get('swing_high', gold + atr * 2) or gold + atr * 2)
-    swing_low  = float(d.get('swing_low',  gold - atr * 2) or gold - atr * 2)
-    obv_trend  = d.get('obv_trend', '')
-    bias_str   = d.get('bias', 'neutral') if d.get('bias') else 'neutral'
-
-    # ── الأيام المتبقية لكل أفق زمني (من اليوم) ──
-    targets_info = [
-        ("1W",  "أسبوع",    7,   "📆"),
-        ("1M",  "شهر",      30,  "🗓️"),
-        ("3M",  "3 شهور",   91,  "📅"),
-        ("6M",  "6 شهور",   182, "🗓️"),
-        ("EOY", "نهاية 2026", (datetime(2026, 12, 31, tzinfo=timezone.utc) - now).days, "🎯"),
-    ]
-
-    # ── مؤشر الاتجاه المركب (TBI: Trend Bias Index) من -1 إلى +1 ──
-    rsi_bias   = (rsi - 50) / 50          # -1 → +1
-    macd_bias  = math.tanh(macd_hist / max(atr * 0.5, 1))
-    adx_dir    = (di_plus - di_minus) / max(adx, 1)
-    ema_bias   = 1 if gold > ema50 > ema200 else (-1 if gold < ema50 < ema200 else 0)
-    obv_bias   = 0.3 if 'صعودي' in obv_trend else (-0.3 if 'هبوطي' in obv_trend else 0)
-    vol_boost  = min(rel_vol / 1.5, 1.5)  # تأثير الفوليوم
-
-    tbi = round(
-        (rsi_bias * 0.25) +
-        (macd_bias * 0.25) +
-        (adx_dir * 0.20) +
-        (ema_bias * 0.20) +
-        (obv_bias * 0.10),
-        4
-    )
-    tbi_pct = int(tbi * 100)
-
-    # ── دالة توقع القمة والقاع والإغلاق لعدد أيام معين ──
-    def _project(days: int) -> dict:
-        """
-        توقع الأسعار بناء على:
-        1. ATR × √days × معامل التقلب (Volatility Scaling)
-        2. الاتجاه المركب TBI
-        3. حواجز فيبوناتشي الطبيعية
-        """
-        if days <= 0:
-            return {"high": gold, "low": gold, "close": gold, "range": 0}
-
-        # تحجيم ATR لعدد الأيام (قانون الجذر التربيعي للزمن)
-        atr_scaled = atr * math.sqrt(days)
-
-        # معامل التقلب مع الفوليوم (مقيّد لتجنب القيم الشاذة)
-        vol_factor = min(2.5, max(0.5, 1.0 + (rel_vol - 1.0) * 0.15))
-
-        # نطاق التحرك الكلي (مقيد بحد أقصى منطقي لحركة السعر الفوري)
-        max_range_pct = min(0.18, 0.02 + (days * 0.0008))
-        total_range = min(atr_scaled * vol_factor, gold * max_range_pct)
-
-        # توزيع الصعود/الهبوط بناءً على TBI
-        # TBI = +1 → 80% صعود | TBI = -1 → 20% صعود فقط
-        up_pct   = 0.5 + (tbi * 0.3)   # من 20% إلى 80%
-        down_pct = 1 - up_pct
-
-        high_target  = round(gold + total_range * up_pct,   2)
-        low_target   = max(gold * 0.2, round(gold - total_range * down_pct, 2))
-        close_target = round(gold + (high_target - low_target) * tbi * 0.4, 2)
-
-        # تقييد الإغلاق بين القمة والقاع
-        close_target = max(low_target, min(high_target, close_target))
-
-        # مستوى الثقة (كلما طال الأفق، قلّت الثقة)
-        confidence = max(20, round(90 - days * 0.3))
-
-        return {
-            "high":  high_target,
-            "low":   low_target,
-            "close": close_target,
-            "range": round(total_range, 2),
-            "conf":  confidence,
-            "chg_high":  round((high_target  / gold - 1) * 100, 2),
-            "chg_low":   round((low_target   / gold - 1) * 100, 2),
-            "chg_close": round((close_target / gold - 1) * 100, 2),
-        }
-
-    # ── جلب بيانات العام الحالي من yfinance (YTD High/Low/Close) ──
-    ytd_high  = gold
-    ytd_low   = gold
-    ytd_open  = gold
-    ytd_close = gold
-    ytd_chg   = 0.0
-    try:
-        import yfinance as _yf
-        _tk = _yf.Ticker("GC=F")
-        _df = _tk.history(start="2026-01-01", interval="1d")
-        if _df is not None and not _df.empty:
-            ytd_high  = round(float(_df['High'].max()), 2)
-            ytd_low   = round(float(_df['Low'].min()), 2)
-            ytd_open  = round(float(_df['Open'].iloc[0]), 2)
-            ytd_close = round(float(_df['Close'].iloc[-1]), 2)
-            # Sanity check against current spot price to prevent fake spikes (e.g. 5586$)
-            if ytd_high > gold * 1.3 or ytd_high < gold:
-                ytd_high = round(gold + atr * 4.0, 2)
-            if ytd_low < gold * 0.7 or ytd_low > gold:
-                ytd_low = round(gold - atr * 4.0, 2)
-            ytd_chg   = round((ytd_close / ytd_open - 1) * 100, 2)
-    except Exception:
-        pass
-
-    # ── بناء التقرير ──
-    eoy_days = (datetime(2026, 12, 31, tzinfo=timezone.utc) - now).days
-    report = f"""🎯 القمة والإغلاق الزمني الديناميكي — Gold
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📅 التاريخ اليوم : {now.strftime('%Y-%m-%d')}
-💰 السعر الحالي : {gold:.2f}$
-📊 مؤشر الاتجاه (TBI): {tbi_pct:+d}% ({'🟢 صعودي' if tbi > 0.1 else '🔴 هبوطي' if tbi < -0.1 else '⚪ محايد'})
-   RSI({rsi:.0f}→{round(rsi_bias*100):+d}) | MACD({round(macd_bias*100):+d}) | ADX_Dir({round(adx_dir*100):+d}) | EMA({ema_bias:+d}) | OBV({round(obv_bias*100):+d})
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📈 اليوم 2026 — أداء العام (من 1 يناير)
-   ↑ أعلى سعر YTD : {ytd_high:.2f}$ ({round((ytd_high/ytd_open-1)*100, 2):+.2f}% من الفتح)
-   ↓ أدنى سعر YTD : {ytd_low:.2f}$  ({round((ytd_low /ytd_open-1)*100, 2):+.2f}% من الفتح)
-   📌 فتح العام    : {ytd_open:.2f}$
-   📌 آخر إغلاق   : {ytd_close:.2f}$ ({ytd_chg:+.2f}% من بداية العام)
-   📏 نطاق العام  : {round(ytd_high - ytd_low, 2):.2f}$
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔮 التوقعات من النهارده ({now.strftime('%d %b %Y')})
-"""
-    for code, label, days, icon in targets_info:
-        if days <= 0:
-            continue
-        p = _project(days)
-        target_date = (now + timedelta(days=days)).strftime('%d %b %Y')
-        report += f"""
-{icon} {label} ({days} يوم) — حتى {target_date}
-   ↑ أعلى متوقع   : {p['high']:.2f}$  ({p['chg_high']:+.2f}%)
-   ↔ إغلاق متوقع  : {p['close']:.2f}$ ({p['chg_close']:+.2f}%)
-   ↓ أدنى متوقع   : {p['low']:.2f}$  ({p['chg_low']:+.2f}%)
-   📏 النطاق الكلي : {p['range']:.2f}$ | ثقة: {p['conf']}%
-"""
-
-    # ── إجمالي نهاية العام 2026 ──
-    p_eoy = _project(max(1, eoy_days))
-    report += f"""━━━━━━━━━━━━━━━━━━━━━━━━━━
-🏆 ملخص نهاية 2026 (31 ديسمبر)
-   متبقي          : {eoy_days} يوم
-   ↑ القمة المتوقعة: {p_eoy['high']:.2f}$  ({p_eoy['chg_high']:+.2f}%)
-   ↔ الإغلاق المتوقع: {p_eoy['close']:.2f}$ ({p_eoy['chg_close']:+.2f}%)
-   ↓ القاع المتوقع : {p_eoy['low']:.2f}$  ({p_eoy['chg_low']:+.2f}%)
-   📏 النطاق الكلي : {p_eoy['range']:.2f}$
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📐 الحسابات الرياضية المستخدمة:
-   ATR يومي       : {atr:.2f}$
-   ATR مقياس √t  : ATR × √أيام × معامل تقلب الفوليوم
-   توزيع Up/Down  : 50% ± (TBI × 30%)
-   إغلاق = سعر + (نطاق × TBI × 40%)
-   ملاحظة: التوقعات احتمالية ومبنية على الزخم الحالي"""
-
-    return report
-
-
-def _build_live_liquidity_spike(d: dict) -> str:
-    """
-    القالب الرابع الجديد: كاشف السيولة الحية والمفاجئة
-    يرصد الحجم الحالي ويحدد إذا كان فيه دخول سيولة مفاجئ
-    بالأرقام الدقيقة والمؤشرات الرياضية الحية
-    """
-    import math
-    from datetime import datetime, timezone
-
-    now       = datetime.now(timezone.utc)
-    gold      = d.get('gold', 0)
-    atr       = float(d.get('atr', 20) or 20)
-    rel_vol   = min(float(d.get('rel_vol', 1.0) or 1.0), 5.0)
-    obv_val   = float(d.get('obv_val', 0) or 0)
-    obv_trend = d.get('obv_trend', '')
-    vwap      = float(d.get('vwap', gold) or gold)
-    rsi       = float(d.get('rsi', 50) or 50)
-    macd_hist = float(d.get('macd_hist', 0) or 0)
-    bb_upper  = float(d.get('bb_upper', gold + atr) or gold + atr)
-    bb_lower  = float(d.get('bb_lower', gold - atr) or gold - atr)
-    bb_mid    = float(d.get('bb_mid', gold) or gold)
-    adx       = float(d.get('adx', 20) or 20)
-    cci       = float(d.get('cci', 0) or 0)
-    di_plus   = float(d.get('di_plus', 20) or 20)
-    di_minus  = float(d.get('di_minus', 20) or 20)
-
-    # ── جلب بيانات حجم الشمعات الأخيرة من yfinance (5 دقيقة) ──
-    vol_series    = []   # آخر 20 شمعة
-    vol_current   = 0
-    vol_avg_5     = 0    # متوسط 5 شمعات
-    vol_avg_20    = 0    # متوسط 20 شمعة
-    price_series  = []
-    spike_detected = False
-    spike_ratio    = rel_vol
-
-    try:
-        import yfinance as _yf
-        _tk  = _yf.Ticker("GC=F")
-        _df  = _tk.history(period="2d", interval="5m")
-        if _df is not None and not _df.empty:
-            _vols  = _df['Volume'].dropna().values
-            _close = _df['Close'].dropna().values
-            if len(_vols) >= 5:
-                vol_series   = list(_vols[-20:])
-                vol_current  = int(_vols[-1])
-                vol_avg_5    = round(float(sum(_vols[-6:-1]) / 5), 1)
-                vol_avg_20   = round(float(sum(_vols[-21:-1]) / min(20, len(_vols)-1)), 1) if len(_vols) > 1 else vol_avg_5
-                price_series = list(_close[-20:])
-                if vol_avg_5 > 0:
-                    spike_ratio  = round(vol_current / vol_avg_5, 3)
-                    spike_detected = spike_ratio >= 2.5
-    except Exception:
-        vol_current = int(rel_vol * 10000)
-        vol_avg_5   = 10000
-        vol_avg_20  = 10000
-        spike_ratio = rel_vol
-        spike_detected = rel_vol >= 2.5
-
-    # ── نوع السيولة الداخلة (شراء أم بيع) ──
-    vwap_gap    = gold - vwap
-    price_above_vwap = gold > vwap
-    price_above_bb_mid = gold > bb_mid
-
-    # المنطق: إذا السعر فوق VWAP والفوليوم مرتفع → سيولة شرائية
-    if vwap_gap > 0 and spike_ratio >= 1.5:
-        liq_type   = "🟢 سيولة شرائية مفاجئة"
-        liq_action = "LONG — الضغط الشرائي يسيطر"
-    elif vwap_gap < 0 and spike_ratio >= 1.5:
-        liq_type   = "🔴 سيولة بيعية مفاجئة"
-        liq_action = "SHORT — الضغط البيعي يسيطر"
-    elif spike_ratio >= 2.5:
-        liq_type   = "⚡ سيولة ضخمة مجهولة الاتجاه"
-        liq_action = "انتظر إغلاق الشمعة لتحديد الاتجاه"
-    elif spike_ratio >= 1.5:
-        liq_type   = "🟡 سيولة فوق المتوسط"
-        liq_action = "نشاط متزايد — راقب الاتجاه"
-    else:
-        liq_type   = "⚪ سيولة طبيعية"
-        liq_action = "لا يوجد دخول مفاجئ"
-
-    # ── مؤشر ضغط الشراء/البيع (Buy/Sell Pressure Index - BSPI) ──
-    # من -100 (بيع كامل) إلى +100 (شراء كامل)
-    bspi = 0
-    bspi_reasons = []
-
-    # موقع السعر من VWAP
-    vwap_score = math.tanh(vwap_gap / max(atr * 0.3, 1)) * 40
-    bspi += vwap_score
-    bspi_reasons.append(f"VWAP Gap {vwap_gap:+.2f}$ → {round(vwap_score):+d}")
-
-    # RSI
-    rsi_score = (rsi - 50) * 0.8
-    bspi += rsi_score
-    bspi_reasons.append(f"RSI({rsi:.1f}) → {round(rsi_score):+d}")
-
-    # MACD Histogram
-    macd_score = math.tanh(macd_hist / max(atr * 0.2, 0.1)) * 20
-    bspi += macd_score
-    bspi_reasons.append(f"MACD_H → {round(macd_score):+d}")
-
-    # OBV
-    obv_score = 15 if 'صعودي' in obv_trend else (-15 if 'هبوطي' in obv_trend else 0)
-    bspi += obv_score
-    bspi_reasons.append(f"OBV → {obv_score:+d}")
-
-    # تكثيف الإشارة عند وجود سبايك (لا يُضاف كسبب منفصل)
-    if spike_ratio >= 2.0:
-        bspi *= 1.2  # تضخيم الإشارة — السبايك يُعزز القراءة الحالية
-
-    bspi = max(-100, min(100, int(bspi)))
-
-    # ── مستوى التنبيه ──
-    if spike_ratio >= 3.0:
-        alert_level = "🚨 تنبيه قصوى — سبايك ضخم جداً"
-        alert_emoji = "🚨"
-    elif spike_ratio >= 2.0:
-        alert_level = "⚡ تنبيه عالٍ — دخول مؤسسي محتمل"
-        alert_emoji = "⚡"
-    elif spike_ratio >= 1.5:
-        alert_level = "⚠️ تنبيه متوسط — نشاط غير عادي"
-        alert_emoji = "⚠️"
-    else:
-        alert_level = "✅ طبيعي — لا سبايك"
-        alert_emoji = "✅"
-
-    # ── مؤشر البولينجر باند للضغط ──
-    bb_width     = round(bb_upper - bb_lower, 2)
-    bb_pct       = round((gold - bb_lower) / bb_width * 100, 1) if bb_width > 0 else 50
-    bb_squeeze   = bb_width < atr * 1.5
-    if bb_pct >= 80:
-        bb_pressure = "🔴 السعر عند سقف البولينجر — خطر انعكاس أو اختراق"
-    elif bb_pct <= 20:
-        bb_pressure = "🟢 السعر عند قاع البولينجر — خطر انعكاس أو هبوط"
-    elif bb_pct >= 60:
-        bb_pressure = "🟡 السعر في النصف العلوي — ميل صعودي"
-    else:
-        bb_pressure = "🟡 السعر في النصف السفلي — ميل هبوطي"
-
-    # ── رسم مخطط الحجم النسبي ──
-    def _vol_bar(ratio: float) -> str:
-        bars = min(int(ratio * 4), 20)
-        return "█" * bars + "░" * max(0, 12 - bars)
-
-    # ── بناء التقرير ──
-    report = f"""{alert_emoji} كاشف السيولة الحية والمفاجئة — XAU/USD
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 الوقت     : {now.strftime('%H:%M:%S UTC')} | {now.strftime('%d %b %Y')}
-💰 السعر     : {gold:.2f}$ | VWAP: {vwap:.2f}$ ({vwap_gap:+.2f}$)
-{alert_level}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 تحليل الحجم (Volume Analysis)
-   الحجم الحالي (5د)   : {vol_current:>10,} عقد
-   متوسط 5 شمعات       : {int(vol_avg_5):>10,} عقد
-   متوسط 20 شمعة       : {int(vol_avg_20):>10,} عقد
-   نسبة السبايك        : {spike_ratio:.2f}x  [{_vol_bar(spike_ratio)}]
-   الفوليوم اليومي (rel): {rel_vol:.2f}x المتوسط اليومي
-
-{'🚨 *** سبايك مفاجئ محدد! ***' if spike_detected else '   لا يوجد سبايك حالياً'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💧 نوع السيولة الداخلة
-   {liq_type}
-   → {liq_action}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔋 مؤشر ضغط الشراء/البيع (BSPI) = {bspi:+d}/100
-"""
-    for r in bspi_reasons:
-        report += f"   {r}\n"
-
-    bspi_label = ("🟢 ضغط شرائي قوي" if bspi >= 50 else
-                  "🟡 ميل شرائي" if bspi >= 20 else
-                  "🔴 ضغط بيعي قوي" if bspi <= -50 else
-                  "🟠 ميل بيعي" if bspi <= -20 else "⚪ توازن")
-
-    report += f"""   النتيجة: {bspi_label}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📐 بولينجر باند — ضغط السيولة
-   العرض الحالي: {bb_width:.2f}$ ({'🗜️ Squeeze ضيق' if bb_squeeze else '📊 طبيعي'})
-   موقع السعر  : {bb_pct:.1f}% من النطاق
-   {bb_pressure}
-   BB Upper: {bb_upper:.2f}$ | Mid: {bb_mid:.2f}$ | Lower: {bb_lower:.2f}$
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📡 مؤشرات تأكيد السيولة
-   OBV : {int(obv_val):,} ({obv_trend}) {'🟢' if 'صعودي' in obv_trend else '🔴'}
-   ADX : {adx:.1f} ({'قوي' if adx>=30 else 'متوسط' if adx>=20 else 'ضعيف'}) | D+{di_plus:.1f} vs D-{di_minus:.1f}
-   CCI : {cci:.1f} ({'تشبع شراء ⚠️' if cci>100 else 'تشبع بيع ⚠️' if cci<-100 else 'طبيعي'})
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 تفسير السبايك:
-   VSI ≥ 3.0x → دخول مؤسسي ضخم/إخبار مفاجئ 🚨
-   VSI ≥ 2.0x → دخول مؤسسي محتمل أو نيوز ⚡
-   VSI ≥ 1.5x → نشاط فوق المعتاد، راقب الاتجاه ⚠️
-   VSI < 1.0x → سوق هادئ، لا توتر حالياً ✅"""
-
-    return report
-
-
-def _build_liquidity_concentration_zones(d: dict) -> str:
-    """
-    القالب الخامس الجديد: مناطق ارتكاز سيولة الشراء والبيع (Volume Profile)
-    يبحث عن POC (نقطة التحكم) و HVNs (عقد الحجم العالي) لتحديد
-    أقوى دعوم ومقاومات السيولة الفعلية
-    """
-    from datetime import datetime, timezone
-    import numpy as np
-
-    now = datetime.now(timezone.utc)
-    gold = float(d.get('gold', 0))
-    atr = float(d.get('atr', 20) or 20)
-
-    # ── جلب بيانات 5 أيام على فريم 15 دقيقة لبناء Volume Profile ──
-    try:
-        import yfinance as _yf
-        _tk = _yf.Ticker("GC=F")
-        _df = _tk.history(period="5d", interval="15m")
-        if _df is None or _df.empty:
-            raise ValueError("No data")
-        
-        closes = _df['Close'].values
-        vols = _df['Volume'].values
-        
-        # تقسيم النطاق السعري إلى 30 مستوى (Bins)
-        min_p = np.min(closes)
-        max_p = np.max(closes)
-        bins = np.linspace(min_p, max_p, 30)
-        
-        # توزيع الفوليوم على المستويات السعرية
-        profile = np.zeros(len(bins)-1)
-        for i in range(len(closes)):
-            # إيجاد البن (Bin) المناسب للسعر
-            idx = np.digitize(closes[i], bins) - 1
-            idx = max(0, min(idx, len(profile)-1))
-            profile[idx] += vols[i]
-            
-        # إيجاد POC (نقطة التحكم = السعر صاحب أعلى فوليوم)
-        poc_idx = np.argmax(profile)
-        poc_price = float((bins[poc_idx] + bins[poc_idx+1]) / 2)
-        poc_vol = float(profile[poc_idx])
-        
-        # إيجاد أقوى مقاومات ودعوم السيولة (HVNs) أعلى وأسفل السعر الحالي
-        resistance_zones = []
-        support_zones = []
-        
-        # نبحث في البروفايل عن القمم المحلية للفوليوم
-        for i in range(1, len(profile)-1):
-            if profile[i] > profile[i-1] and profile[i] > profile[i+1]:
-                price_lvl = float((bins[i] + bins[i+1]) / 2)
-                if profile[i] > poc_vol * 0.3: # على الأقل 30% من الـ POC
-                    if price_lvl > gold:
-                        resistance_zones.append((price_lvl, float(profile[i])))
-                    elif price_lvl < gold:
-                        support_zones.append((price_lvl, float(profile[i])))
-                        
-        # ترتيب المقاومات تصاعدياً والدعوم تنازلياً
-        resistance_zones.sort(key=lambda x: x[0])
-        support_zones.sort(key=lambda x: x[0], reverse=True)
-        
-    except Exception as e:
-        # بيانات احتياطية في حال فشل الجلب
-        poc_price = gold - atr * 0.5
-        poc_vol = 15000
-        resistance_zones = [(gold + atr * 0.8, 8000), (gold + atr * 1.5, 6000)]
-        support_zones = [(gold - atr * 0.8, 9000), (gold - atr * 1.5, 7500)]
-
-    def _format_zone(zones, title, emoji):
-        res = f"   {emoji} {title}:\n"
-        if not zones:
-            res += "      لا توجد مناطق واضحة قريبة\n"
-        else:
-            for i, (p, v) in enumerate(zones[:3]):
-                strength = "قوية جداً 🔥" if v > poc_vol * 0.7 else "قوية ⚡" if v > poc_vol * 0.5 else "متوسطة 🛡️"
-                res += f"      {i+1}. {p:.2f}$ — حجم: {int(v):,} عقد ({strength})\n"
-        return res
-
-    # ── بناء التقرير ──
-    poc_dist = gold - poc_price
-    if poc_dist > atr * 0.5:
-        poc_status = "🟢 السعر يتداول بحرية فوق سيولة الشراء الرئيسية"
-    elif poc_dist < -atr * 0.5:
-        poc_status = "🔴 السعر مكبوت تحت سيولة البيع الرئيسية"
-    else:
-        poc_status = "🟡 السعر عالق داخل قلب السيولة (منطقة تذبذب / تجميع)"
-
-    report = f"""🧲 خريطة ارتكاز السيولة المؤسساتية (Volume Profile)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💰 السعر الحالي : {gold:.2f}$
-📌 نقطة التحكم (POC) : {poc_price:.2f}$
-   → (أكبر كتلة سيولة متمركزة في السوق)
-   {poc_status}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧱 أهم مناطق ارتكاز السيولة
-{_format_zone(resistance_zones, "مناطق سيولة البيع (مقاومات حجمية)", "🧱")}
-{_format_zone(support_zones, "مناطق سيولة الشراء (دعوم حجمية)", "🛡️")}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 دليل القراءة السريعة:
-   🔥 مناطق "قوية جداً": تحتاج سيولة ضخمة لاختراقها — السعر يرتد منها غالباً بقوة.
-   📌 التداول قريب من POC = "سوق متوازن" | الابتعاد عنه = "ترند قوي".
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📰 بُعد السعر عن نقطة التحكم (POC)
-   السعر الحالي : {gold:.2f}$
-   نقطة التحكم  : {poc_price:.2f}$
-   الفارق       : {gold - poc_price:+.2f}$ ({abs(round((gold / poc_price - 1) * 100, 2)):.2f}%)
-   {'🟢 السعر فوق POC — زخم صعودي قائم' if gold > poc_price + atr * 0.3 else '🔴 السعر تحت POC — ضغط بيعي قائم' if gold < poc_price - atr * 0.3 else '🟡 السعر قريب من POC — منطقة تذبذب / تجميع'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 التوصية بناءً على الموقع:
-   {'↗️ انتظر كسر أقرب مقاومة حجمية لتأكيد الصعود المستمر' if gold > poc_price + atr * 0.3 else '↘️ انتظر اختبار أقرب دعم حجمي — الارتداد عنه فرصة دخول' if gold < poc_price - atr * 0.3 else '⚖️ ترقب الكسر فوق أو تحت POC لتحديد الاتجاه التالي'}"""
-    return report
-
-
-def _build_global_options_radar(d: dict) -> str:
-    """
-    القالب السادس: رادار عقود الخيارات الشامل
-    يغطي: النفط، الفضة، النحاس، الذهب، البيتكوين، مناجم، معدين، صندوق GLD
-    مع توضيح حالة الجنيه المصري.
-    """
-    from datetime import datetime, timezone
-    
-    now = datetime.now(timezone.utc)
-    
-    # ── قائمة الأصول (Tickers) ──
-    assets = [
-        ("USO",  "🛢️ النفط (USO)"),
-        ("SLV",  "🥈 الفضة (SLV)"),
-        ("CPER", "🥉 النحاس (CPER)"),
-        ("GLD",  "📦 صندوق الذهب (GLD)"),
-        ("IAU",  "🥇 الذهب (IAU)"),
-        ("BITO", "₿ البيتكوين (BITO)"),
-        ("GDX",  "⛏️ سهم المناجم (GDX)"),
-        ("GDXJ", "⚙️ سهم المعدين (GDXJ)"),
-    ]
-    
-    # سنستخدم الدالة الموجودة مسبقاً _fetch_options_institutional
-    # لجمع البيانات لكل أصل
-    
-    report = f"""🌍 رادار عقود الخيارات العالمي (الحيتان والمؤسسات)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 تحديث: {now.strftime('%d %b %Y - %H:%M UTC')}
-
-📊 يوضح هذا التقرير أحجام تداول عقود الخيارات (Options) خلال اليوم والأسبوع الماضي:
-   • Calls (شراء) 🟢: مراهنة على الصعود
-   • Puts (بيع) 🔴: مراهنة على الهبوط أو تحوط
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-
-    def _format_asset(data: dict) -> str:
-        err = data.get("error")
-        lbl = data.get("label", "")
-        if err:
-            return f"🔹 {lbl}\n   ⚠️ {err}\n"
-            
-        c_vol = data.get("calls_vol", 0)
-        p_vol = data.get("puts_vol", 0)
-        c_wk  = data.get("calls_vol_wk", 0)
-        p_wk  = data.get("puts_vol_wk", 0)
-        pcr   = data.get("pcr_vol", 0)
-        
-        # تصنيف اليوم
-        if pcr is None:
-            bias = "⚪ محايد"
-        elif pcr >= 1.2:
-            bias = "🔴 هبوطي (سيطرة Puts)"
-        elif pcr <= 0.8:
-            bias = "🟢 صعودي (سيطرة Calls)"
-        else:
-            bias = "🟡 توازن نسبي"
-            
-        # شريط بسيط
-        total = c_vol + p_vol
-        if total == 0:
-            bar = "░░░░░░|░░░░░░"
-        else:
-            c_ratio = c_vol / total
-            c_bars = round(c_ratio * 10)
-            p_bars = 10 - c_bars
-            bar = "🟢"*c_bars + "🔴"*p_bars
-            
-        return (
-            f"🔹 {lbl}\n"
-            f"   ├ اليوم  : Calls {c_vol:,} | Puts {p_vol:,}\n"
-            f"   ├ الأسبوع: Calls {c_wk:,} | Puts {p_wk:,}\n"
-            f"   ├ PCR(Vol): {pcr if pcr else '—'} → {bias}\n"
-            f"   └ الاتجاه: [{bar}]\n"
-        )
-
-    # جلب وتنسيق البيانات
-    for ticker, label in assets:
-        data = _fetch_options_institutional(ticker, label)
-        report += _format_asset(data) + "   ─\n"
-
-    # ── ملاحظة الجنيه المصري ──
-    report += f"""🇪🇬 الجنية المصري (EGP)
-   ├ ℹ️ لا توجد عقود خيارات عامة (Public Options) مسعرة للجنيه المصري في الأسواق العالمية (مثل CBOE).
-   └ 💡 تتم تداولات المشتقات (NDFs - العقود الآجلة غير القابلة للتسليم) بشكل أساسي عبر أسواق (OTC) بين البنوك المركزية والمؤسسات.
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 دليل القراءة:
-   - PCR > 1 = ضغط بيعي قوي للمؤسسات.
-   - PCR < 1 = ضغط شرائي قوي للمؤسسات."""
-
-    return report
-
-
-def _build_whale_wallet_monitor(d: dict) -> str:
-    """
-    القالب السابع: مراقب محافظ الحيتان (Whale Wallets & Dark Pools)
-    يرصد الصفقات الكبيرة (Block Trades) وعمليات التجميع/التصريف المخفية
-    (High Volume + Low Price Spread).
-    """
-    from datetime import datetime, timezone
-    import numpy as np
-
-    now = datetime.now(timezone.utc)
-    gold = float(d.get('gold', 0))
-    atr = float(d.get('atr', 20) or 20)
-    
-    report = f"""🐋 مراقب محافظ الحيتان والتجميع المخفي (Dark Pools)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 الوقت: {now.strftime('%H:%M:%S UTC')}
-💰 الأصل: الذهب (XAU/USD) السعر: {gold:.2f}$
-
-يبحث هذا الرادار عن بصمات محافظ الحيتان (Block Trades)
-عبر رصد السيولة الضخمة التي تدخل السوق بدون تحريك ملحوظ للسعر
-(دليل على تجميع أو تصريف مخفي في مناطق Dark Pools).
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-
-    whale_activity = []
-    
-    try:
-        import yfinance as _yf
-        _tk = _yf.Ticker("GC=F")
-        # سحب بيانات آخر 5 أيام على فريم 5 دقائق
-        _df = _tk.history(period="5d", interval="5m")
-        
-        if _df is not None and not _df.empty:
-            closes = _df['Close'].values
-            opens = _df['Open'].values
-            vols = _df['Volume'].values
-            times = _df.index
-            
-            # حساب متوسط الفوليوم لآخر 100 شمعة
-            avg_vol = np.mean(vols[-100:]) if len(vols) >= 100 else np.mean(vols)
-            if avg_vol == 0: avg_vol = 1
-            
-            # نبحث عن الشمعات التي يتوفر فيها الشرط:
-            for i in range(len(vols) - 40, len(vols)):
-                if i < 0: continue
-                vol_ratio = vols[i] / avg_vol
-                body_size = abs(closes[i] - opens[i])
-                
-                # فوليوم أكثر من 3.5 أضعاف المتوسط (حجم غير طبيعي)
-                if vol_ratio > 3.5:
-                    # إذا كان الجسم صغيراً جداً (أقل من 5% من ATR)، فهذا تجميع/تصريف مخفي
-                    if body_size < (atr * 0.05):
-                        whale_type = "🥷 تجميع/تصريف مخفي (Dark Pool)"
-                        action = "تثبيت السعر لامتصاص الكميات بدون لفت الانتباه."
-                    # إذا كان الإغلاق أعلى من الفتح بوضوح
-                    elif closes[i] > opens[i]:
-                        whale_type = "🐳 بلوك شرائي ضخم (Buy Block Trade)"
-                        action = "دخول حوت ماركت شراء لرفع السعر بقوة."
-                    # إذا كان الإغلاق أقل بوضوح
-                    else:
-                        whale_type = "🦈 بلوك بيعي ضخم (Sell Block Trade)"
-                        action = "تفريغ محفظة حوت ببيع ماركت عنيف."
-                        
-                    whale_activity.append({
-                        "time": times[i].strftime('%d %b %H:%M'),
-                        "price": closes[i],
-                        "vol_ratio": vol_ratio,
-                        "type": whale_type,
-                        "action": action,
-                        "contracts": vols[i]
-                    })
-    except Exception as e:
-        report += f"⚠️ جاري تجهيز بيانات البلوك تريد... الرجاء الانتظار في التحديث القادم.\n"
-
-    # تنسيق النتائج
-    if not whale_activity:
-        report += "🟢 لا توجد بصمات حديثة لمحافظ حيتان في الساعات الماضية.\n   السيولة متوزعة بشكل طبيعي بين المتداولين.\n"
-    else:
-        report += "🚨 تم رصد نشاط محافظ حيتان (Smart Money) مؤخراً:\n\n"
-        # عرض آخر 4 أحداث فقط
-        for act in whale_activity[-4:]:
-            report += f"   {act['type']}\n"
-            report += f"   ├ التوقيت: {act['time']} UTC\n"
-            report += f"   ├ السعر المتمركز عنده: {act['price']:.2f}$\n"
-            report += f"   ├ حجم الصفقة: {int(act['contracts']):,} عقد ({act['vol_ratio']:.1f}x ضعف المتوسط)\n"
-            report += f"   └ التحليل: {act['action']}\n\n"
-
-    # تحليل تجميعي للحالة العامة
-    report += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    report += "💡 دليل القراءة:\n"
-    report += "   - Block Trade: دخول محافظ ضخمة للبيع أو الشراء المفاجئ.\n"
-    report += "   - Dark Pool: ارتفاع الفوليوم بشكل جنوني مع ثبات السعر (يمتص العروض بصمت)."
-    
-    return report
-
-def _build_aggressive_whale_monitor(d: dict) -> str:
-    """
-    القالب الثامن الجديد: مراقب محافظ الحيتان والسيولة الهجومية (Momentum Block Trades)
-    """
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
-    gold = float(d.get('gold', 0))
-    obv_val = float(d.get('obv_val', 0) or 0)
-    rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
-    atr = float(d.get('atr', 20.0) or 20.0)
-    vwap = float(d.get('vwap', gold) or gold)
-
-    # تحليل السيولة المؤسسية التراكمية
-    if obv_val > 500000 and rel_vol >= 1.5:
-        flow_state = "🚀 تدفق هجومي شرائي كاسح (Aggressive Long Inflow)"
-        flow_desc = "رصد عمليات شراء ضخمة عبر محافظ الحيتان (Block Trades) بأحجام تتجاوز المتوسط بـ 1.5x، مع امتصاص كامل للعروض عند مناطق الفوموك والتمركز فوق الـ VWAP."
-        whale_bias = "شراء مؤسسي (Accumulation)"
-    elif obv_val < -500000 and rel_vol >= 1.5:
-        flow_state = "🔻 تصريف هجومي بيعي مكثف (Aggressive Short Outflow)"
-        flow_desc = "رصد ضغوط بيعية مكثفة وتسييل مراكز مؤسسية ضخمة بأحجام عالية، مما يضع السعر تحت سيطرة البائعين أسفل متوسط التكلفة المؤسسي (VWAP)."
-        whale_bias = "تصريف مؤسسي (Distribution)"
-    elif obv_val > 0:
-        flow_state = "🟢 تجميع هادئ ومستمر (Quiet Institutional Buying)"
-        flow_desc = "استمرار التدفقات النقدية الإيجابية نحو الذهب بنسق معتدل، مما يدل على بناء مراكز طويلة الأجل بدون إحداث قفزات سعرية حادة."
-        whale_bias = "شراء تدريجي (Mild Long)"
-    elif obv_val < 0:
-        flow_state = "🔴 خروج سيولة تدريجي (Quiet Outflow)"
-        flow_desc = "تراجع طفيف في حجم السيولة المؤسسية الداعمة مع تفوق نسبي لعروض البيع على أومر الشراء الحالية."
-        whale_bias = "جني أرباح / بيع (Mild Short)"
-    else:
-        flow_state = "⚪ توازن وحياد سيولة (Neutral Volume Flow)"
-        flow_desc = "تساوى قوى الشراء والبيع المؤسسية في الوقت الراهن مع انتظار المحفز القادم من الأسواق العالمية."
-        whale_bias = "حياد (Neutral)"
-
-    # حساب مستويات ارتكاز الحيتان اللحظية
-    whale_support = round(vwap - atr * 0.6, 2)
-    whale_resist = round(vwap + atr * 0.6, 2)
-
-    report = f"""💥 [8] مراقب محافظ الحيتان والسيولة الهجومية (Momentum Block Trades)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 التوقيت: {now.strftime('%H:%M:%S UTC')}
-💰 السعر: {gold:.2f}$ | VWAP المؤسسي: {vwap:.2f}$
-📊 السيولة التراكمية (OBV): {int(obv_val):+,} | معدل التدفق: {rel_vol:.1f}x
-
-مؤشر نشاط الحيتان العالمي (Institutional Action):
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧭 حالة التدفق الحالي: {flow_state}
-💡 التفاصيل الفنية: {flow_desc}
-
-🎯 خارطة تمركز الحيتان اللحظية:
-   ├ 🟢 خط الدفاع المؤسسي (الدعم): {whale_support}$
-   ├ 🔴 حاجز جني الأرباح (المقاومة): {whale_resist}$
-   └ ⚖️ التوجه العام للمحافظ: {whale_bias}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📌 إرشادات التداول: الدخول مع السيولة الهجومية (عندما يكون Rel Vol > 1.5) يوفر أعلى نسب نجاح للاختراقات السعرية.
-"""
-    return report
-
-
-def _build_total_liquidity_flow_matrix(d: dict) -> str:
-    """
-    القالب الثامن: خزانة السيولة الكلية وتدفق العقود
-    """
-    import math
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
-    gold = float(d.get('gold', 0))
-    atr = float(d.get('atr', 20) or 20)
-    rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
-    obv_val = float(d.get('obv_val', 0) or 0)
-    rsi = float(d.get('rsi', 50) or 50)
-    
-    # محاكاة إحصائية بناء على قوة السيولة والاتجاه
-    # إجمالي الفوليوم اللحظي المقدر (بالعقود)
-    base_contracts = 15000 * rel_vol
-    
-    # نسبة الشراء مقابل البيع بناء على الـ OBV و RSI و MACD
-    obv_bias = 0.5 + (math.tanh(obv_val / 100000) * 0.2)  # من 30% لـ 70%
-    rsi_bias = (rsi - 50) / 100                           # من -0.5 لـ +0.5
-    buy_ratio = max(0.1, min(0.9, obv_bias + rsi_bias * 0.3))
-    sell_ratio = 1.0 - buy_ratio
-    
-    buy_contracts = int(base_contracts * buy_ratio)
-    sell_contracts = int(base_contracts * sell_ratio)
-    net_flow = buy_contracts - sell_contracts
-    
-    # التدفق المالي التقديري (بالمليون)
-    money_flow = (net_flow * 100) / 1_000_000  # تقدير رمزي لقيمة العقد بـ 100 ألف
-    
-    report = f"""🧮 [8] مؤشر ميزان قوى السيولة (Liquidity Pressure Index)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 الوقت: {now.strftime('%H:%M:%S UTC')}
-💰 السعر: {gold:.2f}$ | الفوليوم: {rel_vol:.2f}x المتوسط
-
-يقيس هذا المؤشر توازن الضغط الشرائي مقابل البيعي
-بناءً على OBV وRSI والفوليوم النسبي.
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚖️ نسبة الضغط الشرائي مقابل البيعي
-   🟢 ضغط الشراء  : {buy_ratio*100:.1f}% (مبني على OBV + RSI)
-   🔴 ضغط البيع   : {sell_ratio*100:.1f}%
-   الميزان        : {'🟢 شرائي' if buy_ratio > 0.55 else '🔴 بيعي' if buy_ratio < 0.45 else '🟡 متوازن'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 مكونات الحساب:
-   OBV Bias  : {'+' if obv_val > 0 else ''}{obv_val:.0f} → {obv_bias:.2f} نسبة
-   RSI Bias  : {rsi:.1f} → {rsi_bias:+.2f} نسبة
-   Rel Vol   : {rel_vol:.2f}x المتوسط
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ ملاحظة: هذه أرقام إحصائية تقديرية مشتقة من المؤشرات — ليست بيانات Order Book مباشرة.
-
-{'🟢 التوقع: ضغط شرائي يدعم الصعود' if buy_ratio > 0.55 else '🔴 التوقع: ضغط بيعي يهدد بالتراجع' if buy_ratio < 0.45 else '🟡 التوقع: تعادل في القوى — انتظر كسراً'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 كلما ارتفعت نسبة الضغط الشرائي فوق 60%، زادت فرص الارتداد الصاعد."""
-    return report
-
-def _build_smart_money_vs_retail(d: dict) -> str:
-    """
-    القالب التاسع: ميزان قوى الحيتان مقابل القطيع
-    """
-    from datetime import datetime, timezone
-    import math
-    now = datetime.now(timezone.utc)
-    gold = float(d.get('gold', 0))
-    rsi = float(d.get('rsi', 50) or 50)
-    rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
-    obv_trend = d.get('obv_trend', '')
-    
-    # مؤشر الحيتان (Smart Money) — مبني على الفوليوم غير الطبيعي + OBV
-    # الفوليوم العالي (> 1.5x) مع OBV صعودي = تجميع مؤسسي
-    vol_raw  = math.tanh((rel_vol - 1.0) / 0.8) * 40  # من -40 إلى +40
-    obv_raw  = 30 if 'صعودي' in obv_trend else (-30 if 'هبوطي' in obv_trend else 0)
-    smart_money_power = max(10, min(90, 50 + vol_raw + obv_raw))
-
-    if smart_money_power > 60:
-        smart_money_bias = "🟢 شراء تجميعي"
-    elif smart_money_power < 40:
-        smart_money_bias = "🔴 بيع وتصريف"
-    else:
-        smart_money_bias = "⚪ محايد/تحوط"
-
-    # مؤشر القطيع (Retail) — مبني على RSI كمؤشر للشعور الجماهيري
-    # RSI > 65 = شراء جماعي مفرط، RSI < 35 = بيع جماعي مفرط
-    retail_sentiment = (rsi - 50) / 50  # من -1 إلى +1
-    retail_power = max(10, min(90, 50 + retail_sentiment * 40))
-
-    if rsi > 65:
-        retail_bias = "🟢 شراء جماعي (FOMO)"
-    elif rsi < 35:
-        retail_bias = "🔴 بيع جماعي (Panic)"
-    elif rsi > 52:
-        retail_bias = "🟡 ميل شرائي خفيف"
-    elif rsi < 48:
-        retail_bias = "🟠 ميل بيعي خفيف"
-    else:
-        retail_bias = "⚪ تداول عشوائي"
-
-    # نسبة الهيمنة بناءً على قوة كل طرف
-    total = smart_money_power + retail_power
-    sm_dom  = round((smart_money_power / total) * 100, 1) if total > 0 else 50
-    ret_dom = round(100 - sm_dom, 1)
-
-    report = f"""⚖️ [9] ميزان القوى: الحيتان (Smart Money) 🆚 القطيع (Retail)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 تحديث: {now.strftime('%H:%M:%S UTC')}
-💰 السعر : {gold:.2f}$
-
-يقارن هذا القالب بين تمركزات المحافظ المليارية (بصمات الفوليوم المخفية)
-وبين توجهات صغار المتداولين (المؤشرات التقليدية).
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🐋 المحافظ الكبرى والمؤسسات (Smart Money)
-   ├ التوجه الحالي : {smart_money_bias}
-   ├ قوة الزخم المؤسسي : {smart_money_power:.1f}/100
-   └ نسبة السيطرة في السوق : {sm_dom:.1f}%
-
-🚶‍♂️ صغار المتداولين والقطيع (Retail)
-   ├ التوجه الحالي : {retail_bias}
-   ├ قوة الزخم الفردي : {retail_power:.1f}/100
-   └ نسبة التواجد في السوق : {ret_dom:.1f}%
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ تحليل الانحراف (Divergence Analysis)
-"""
-    if smart_money_power > 60 and retail_power < 40:
-        report += "   🚨 الحيتان يشترون بصمت بينما يبيع القطيع بخوف! (إشارة صعود انفجاري)"
-    elif smart_money_power < 40 and retail_power > 60:
-        report += "   🚨 الحيتان يصرفون الكميات في قمة الشراء الجماهيري (فخ شرائي - احذر هبوط حاد)"
-    else:
-        report += "   ✅ توافق بين المؤسسات والأفراد (اتجاه مستقر حالياً)."
-
-    report += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n💡 القاعدة الذهبية: دائماً اتبع الـ Smart Money عندما يتعارض مع القطيع."
-    return report
-
-def _build_ultimate_quant_score(d: dict) -> str:
-    """
-    القالب العاشر: محرك القرار الخوارزمي النهائي (Ultimate Quant Decision Engine)
-    """
-    import math
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
-    gold = float(d.get('gold', 0))
-    rsi = float(d.get('rsi', 50) or 50)
-    macd_hist = float(d.get('macd_hist', 0) or 0)
-    rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
-    obv_val = float(d.get('obv_val', 0) or 0)
-    dxy = float(d.get('dxy', 104.0) or 104.0)
-    us10y = float(d.get('us10y', 4.0) or 4.0)
-    ema50 = float(d.get('ema50', gold) or gold)
-    ema200 = float(d.get('ema200', gold) or gold)
-    vwap = float(d.get('vwap', gold) or gold)
-
-    # 1. حساب قوة الشراء وقوة البيع بشكل مستقل وواقعي بناءً على 4 ركائز
-    whale_factor = math.tanh(obv_val / 50000.0)
-    tech_factor = (rsi - 50.0) / 50.0 + (1.0 if gold > ema50 else -1.0) * 0.5 + (1.0 if macd_hist > 0 else -1.0) * 0.5
-    vol_factor = min(2.0, max(0.0, rel_vol)) / 2.0 * (1.0 if gold > vwap else -1.0)
-    macro_factor = -math.tanh((dxy - 104.0) / 3.0) - math.tanh((us10y - 4.0) / 0.5)
-
-    raw_net = (whale_factor * 25.0) + (tech_factor * 20.0) + (vol_factor * 15.0) + (macro_factor * 15.0)
-    net_score = max(-100.0, min(100.0, raw_net))
-
-    if net_score >= 0:
-        long_score = min(95.0, max(30.0, 50.0 + (net_score * 0.45)))
-        short_score = max(5.0, 100.0 - long_score - 10.0)
-    else:
-        short_score = min(95.0, max(30.0, 50.0 + (abs(net_score) * 0.45)))
-        long_score = max(5.0, 100.0 - short_score - 10.0)
-
-    # 2. تحديد القرار الخوارزمي النهائي بوضوح
-    diff = long_score - short_score
-    if diff >= 25.0:
-        decision = "🟢 شراء قوي مدعوم مؤسسياً (Strong Buy)"
-        trend_dom = "🔥 هيمنة شرائية مطلقة؛ السيولة المؤسسية والزخم الفني يدعمان صعود الذهب باحتمالية استمرار عالية."
-    elif diff >= 10.0:
-        decision = "🟢 شراء مضاربي / ميل صعودي (Buy / Bullish Bias)"
-        trend_dom = "↗️ تفوق شرائي معتاد؛ الكفة ترجح الصعود التدرجي مع مراقبة مستويات الدعم القريبة."
-    elif diff <= -25.0:
-        decision = "🔴 بيع قوي بضغط مؤسسي (Strong Sell)"
-        trend_dom = "🔻 هيمنة بيعية مطلقة؛ ضغوط تسييل واضحة وزخم سلبي يرجح كسر الدعوم الحالية."
-    elif diff <= -10.0:
-        decision = "🔴 بيع مضاربي / ميل هبوطي (Sell / Bearish Bias)"
-        trend_dom = "↘️ تفوق بيعي؛ السوق يميل للهبوط المؤقت أو التصحيح، ويفضل البيع مع الارتدادات."
-    else:
-        decision = "⚪ حياد / انتظار التأكيد (Neutral / Standby)"
-        trend_dom = "⚖️ توازن القوى بين المشتري والبائع؛ السوق يمر بمرحلة تجميع أو حيرة ويتطلب كسر النطاق السعري."
-
-    prob_reversal = max(10.0, min(90.0, 50.0 - (abs(diff) * 0.4)))
-
-    if diff >= 15.0:
-        if long_score >= 75.0:
-            quant_impact = f"🚀 محفز صعود قوي جداً؛ التفوق الخوارزمي الكاسر لقوى الشراء ({long_score:.1f}%) يعكس سيولة مؤسسية متدفقة وزخماً إيجابياً متزامناً مع أوزان الماكرو، مما يمنح الذهب طاقة اندفاعية عالية لاختراق المقاومات الراهنة واستهداف قمم جديدة، مع بقاء مخاطر الانعكاس منخفضة ({prob_reversal:.0f}%)."
-        else:
-            quant_impact = f"🟢 صعود مدعوم بالزخم؛ رجحان كفة الشراء بنسبة {long_score:.1f}% مقابل {short_score:.1f}% يدعم استمرار المسار الصاعد للذهب بشكل متدرج، ويعتبر أي تراجع فني نحو مناطق الدعم الرئيسية فرصة جيدة للتمركز مع الاتجاه العام."
-    elif short_score >= long_score + 15.0:
-        if short_score >= 75.0:
-            quant_impact = f"🔻 ضغط بيعي هائل وتحذير هبوطي؛ السيطرة الخوارزمية لقوى البيع ({short_score:.1f}%) تشير إلى خروج كثيف للسيولة وتصريف مؤسسي واضح، مما يفرض على الذهب ضغوطاً قوية لكسر الدعوم الحالية والتوجه نحو مستويات طلب أدنى."
-        else:
-            quant_impact = f"🔴 تراجع فني مرجح؛ تفوق قوى البيع ({short_score:.1f}%) يضع الذهب في مسار هابط اختباري، مما يجعل صفقات البيع من المقاومات هي الخيار الأرجح إحصائياً حتى ظهور ارتداد وسيولة شرائية جديدة."
-    else:
-        quant_impact = f"⚪ حياد وتذبذب عرضي؛ توازن القوى الرياضية بين الشراء ({long_score:.1f}%) والبيع ({short_score:.1f}%) وارتفاع مخاطر الانعكاس ({prob_reversal:.0f}%) يجعلان الذهب محصوراً في نطاق تجميع/تصريف حساس، ونوصي بانتظار كسر النطاق السعري لتحديد الوجهة القادمة."
-
-    report = f"""🧠 [10] محرك القرار الخوارزمي النهائي (Ultimate Quant Score)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 التوقيت: {now.strftime('%H:%M:%S UTC')}
-💰 السعر: {gold:.2f}$ | VWAP: {vwap:.2f}$
-
-🏆 التقييم الخوارزمي النهائي للاتجاه:
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📈 قوة الشراء (Long):  {long_score:.1f}%
-📉 قوة البيع (Short):   {short_score:.1f}%
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 القرار الخوارزمي النهائي: {decision}
-💡 مؤشر هيمنة الاتجاه (Trend Dominance):
-   └ {trend_dom}
-🔄 احتمالية الانعكاس السعري (Reversal Risk): {prob_reversal:.1f}%
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 تأثير هذا التحليل على الذهب:
-   {quant_impact}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📌 ملاحظة خوارزمية: تم احتساب قوة الاتجاه بدمج أوزان الحيتان، الزخم الفني، السيولة النسبية، وبيانات الاقتصاد الكلي.
-"""
-    return report
-def _build_timeframe_impact_matrix(d: dict) -> str:
-    """
-    القالب الحادي عشر: تأثير البيانات على الفترات الزمنية
-    """
-    import math
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
-    gold = float(d.get('gold', 0))
-    rsi = float(d.get('rsi', 50) or 50)
-    macd_hist = float(d.get('macd_hist', 0) or 0)
-    rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
-    obv_val = float(d.get('obv_val', 0) or 0)
-    dxy = float(d.get('dxy', 104.0) or 104.0)
-    atr = float(d.get('atr', 20.0) or 20.0)
-    obv_trend = d.get('obv_trend', '')
-    us10y = float(d.get('us10y', 4.0) or 4.0)
-    ema50 = float(d.get('ema50', gold) or gold)
-    ema200 = float(d.get('ema200', gold) or gold)
-    vwap = float(d.get('vwap', gold) or gold)
-
-    # 1. المدى اليومي اللحظي (Intraday — خلال جلسة اليوم)
-    diff_vwap = gold - vwap
-    if gold >= vwap and rsi >= 50:
-        id_status = "🟢 صعود لحظي مدعوم بالزخم (Intraday Bullish)"
-        id_data = f"السعر ({gold:.2f}$) يتداول أعلى مؤشر متوسط التكلفة المؤسسي (VWAP) عند {vwap:.2f}$ بفارق +{diff_vwap:.2f}$، مدعوماً بمؤشر القوة النسبية (RSI = {rsi:.1f}) وسيولة تداول بمعدل ({rel_vol:.1f}x) من المتوسط."
-        id_reason = "تمركز السعر فوق الـ VWAP يشير إلى أن غالبية المحافظ المؤسسية متمركزة في الشراء ومستعدة للدفاع عن هذا المستوى كدعم لحظي، مما يرجح استمرار الموجة الصاعدة خلال الساعات القادمة لاختبار المقاومات اليومية."
-        id_bull = 1
-    elif gold < vwap and rsi < 50:
-        id_status = "🔴 هبوط لحظي بضغط بيعي (Intraday Bearish)"
-        id_data = f"السعر ({gold:.2f}$) يتداول أدنى مؤشر متوسط التكلفة المؤسسي (VWAP) عند {vwap:.2f}$ بفارق {diff_vwap:.2f}$، مع ضعف في القوة النسبية (RSI = {rsi:.1f}) وحجم تداول ({rel_vol:.1f}x)."
-        id_reason = "الفشل في تجاوز الـ VWAP يعكس سيطرة البائعين اللحظيين ووجود عروض بيعية تضغط على السعر مع كل محاولة صعود، مما يجعل المسار الأقرب هو الهبوط لاختبار الدعم اليومي."
-        id_bull = -1
-    elif gold >= vwap and rsi < 50:
-        id_status = "🟡 صعود لحظي حذر وضعيف الزخم (Cautious Intraday Rise)"
-        id_data = f"السعر ({gold:.2f}$) فوق الـ VWAP عند {vwap:.2f}$، لكن مؤشر الزخم (RSI = {rsi:.1f}) يشير إلى تباطؤ في قوة الشراء."
-        id_reason = "على الرغم من التماسك السعري فوق متوسط التكلفة المؤسسي، إلا أن تراجع الزخم ينذر باحتمالية تصحيح لحظي واختبار للدعم قبل مواصلة الاتجاه."
-        id_bull = 0
-    else:
-        id_status = "🟠 هبوط لحظي مع محاولات تعافي (Intraday Recovery Attempt)"
-        id_data = f"السعر ({gold:.2f}$) تحت الـ VWAP عند {vwap:.2f}$، بينما يحاول مؤشر (RSI = {rsi:.1f}) إظهار زخم ارتدادي."
-        id_reason = "السعر ما زال في منطقة الضغط السلبي لحظياً، لكن صعود مؤشر الزخم يدل على وجود مشترين مضاربين يحاولون دفع السعر لاختراق الـ VWAP، ويتطلب التأكيد إغلاق شمعة ساعة أعلاه."
-        id_bull = 0
-
-    # 2. المدى القريب (Short-Term — أيام إلى أسابيع)
-    if macd_hist >= 0 and gold >= ema50:
-        st_status = "🟢 اتجاه صاعد مستقر ومتسع (Short-Term Bullish Trend)"
-        st_data = f"السعر ({gold:.2f}$) يستقر بثبات فوق متوسط 50 شمعة (EMA50 عند {ema50:.2f}$)، مع تقاطع إيجابي في هيستوجرام الماكرو (MACD Hist = {macd_hist:+.2f})."
-        st_reason = "التداول المستمر فوق الـ EMA50 يؤكد سلامة الهيكل الصعودي المتوسط، والنمو الإيجابي في الماكرو يثبت وجود سيولة دافعة تمنع الانكفاء السريع، مما يدعم استهداف قمم أسبوعية جديدة."
-        st_bull = 1
-    elif macd_hist < 0 and gold < ema50:
-        st_status = "🔴 اتجاه هابط وموجة تصحيحية حادة (Short-Term Bearish Trend)"
-        st_data = f"السعر ({gold:.2f}$) يستقر أدنى متوسط 50 شمعة (EMA50 عند {ema50:.2f}$)، مع زخم سلبي في هيستوجرام الماكرو (MACD Hist = {macd_hist:+.2f})."
-        st_reason = "كسر متوسط ال50 شمعة مع سلبية الماكرو يعني تحول الهيكل الفني للمدى القريب من الصعود إلى الهبوط، حيث أصبحت المقاومات الأسبوعية تعمل كحواجز صد تصريفية."
-        st_bull = -1
-    elif gold >= ema50 and macd_hist < 0:
-        st_status = "🟡 صعود أسبوعي يمر بمرحلة جني أرباح (Bullish with Profit Taking)"
-        st_data = f"السعر ({gold:.2f}$) يحافظ على بقائه فوق متوسط الـ 50 (EMA50 عند {ema50:.2f}$)، رغم تراجع تقاطع الماكرو (MACD Hist = {macd_hist:+.2f})."
-        st_reason = "الهيكل الأسبوعي العام ما زال صاعداً وسليماً، لكن تباطؤ الماكرو يعكس عمليات جني أرباح وهدوء مؤقت في الزخم، وتعتبر ملامسة الـ EMA50 منطقة إعادة اختبار جوهرية."
-        st_bull = 1
-    else:
-        st_status = "↗️ محاولة تعافي وبناء قاع أسبوعي (Short-Term Recovery)"
-        st_data = f"السعر ({gold:.2f}$) تحت متوسط الـ 50 (EMA50 عند {ema50:.2f}$)، لكن هناك انحناء إيجابي في الماكرو (MACD Hist = {macd_hist:+.2f})."
-        st_reason = "ظهور الزخم الإيجابي في الماكرو يدل على ضعف قوة البائعين وبدء تجميع شرائي لمحاولة استرداد متوسط الـ EMA50، وإغلاق يومي أعلاه سيعيد تفعيل المسار الصاعد."
-        st_bull = 0
-
-    # 3. المدى المتوسط (Medium-Term — أسابيع إلى أشهر)
-    if 'صعودي' in str(obv_trend) or obv_val > 0:
-        mt_status = "🟢 تجميع مؤسسي وارتكاز إيجابي (Medium-Term Accumulation)"
-        mt_data = f"مؤشر السيولة التراكمية (OBV = {int(obv_val):+,}) يسجل مساراً ({obv_trend})، مما يؤكد دخول تدفقات نقدية مؤسسية مستمرة في صفقات الذهب."
-        mt_reason = "الارتفاع التراكمي في حجم السيولة (OBV) يكشف عن قيام الحيتان والمحافظ الكبرى بالشراء الصامت وامتصاص العروض، وهو المحرك الأساسي لبناء موجات صعود شهرية مستدامة."
-        mt_bull = 1
-    else:
-        mt_status = "🔴 تصريف مؤسسي وخروج سيولة (Medium-Term Distribution)"
-        mt_data = f"مؤشر السيولة التراكمية (OBV = {int(obv_val):+,}) يسجل مساراً ({obv_trend})، مما يعكس تفوق حجم السيولة الخارجة على الداخلة."
-        mt_reason = "تراجع مؤشر السيولة التراكمية يدل على قيام المؤسسات بجني الأرباح أو تسييل المراكز الكبرى، مما يقلل من حظوظ الذهب في تحقيق اختراقات شهرية بدون عودة السيولة."
-        mt_bull = -1
-
-    # 4. المدى البعيد / الاستثماري (Long-Term — أشهر إلى نهاية العام)
-    macro_env = -math.tanh((dxy - 104.0)/2.0) - math.tanh((us10y - 4.0)/0.5)
-    if gold >= ema200 and macro_env >= 0:
-        lt_status = "🟢 بيئة استثمارية ذهبية كبرى (Secular Bull Market)"
-        lt_data = f"السعر ({gold:.2f}$) يحلق فوق متوسط 200 شمعة التاريخي (EMA200 عند {ema200:.2f}$)، بالتزامن مع ضعف في مؤشر الدولار (DXY = {dxy:.2f}) وهدوء عوائد السندات (US10Y = {us10y:.2f}%)."
-        lt_reason = "التناغم بين التفوق الفني التاريخي فوق EMA200 والظروف الماكرو-اقتصادية الداعمة (تراجع جاذبية الدولار والسندات) يوفر أرضية صلبة للذهب لاستمرار مسار الصعود الاستثماري طويل الأجل للتحوط ضد التضخم والمخاطر."
-        lt_bull = 1
-    elif gold >= ema200 and macro_env < 0:
-        lt_status = "🟡 صعود استثماري يواجه رياحاً اقتصادية معاكسة (Resilient Bull Trend)"
-        lt_data = f"السعر ({gold:.2f}$) يتماسك بقوة فوق متوسط EMA200 ({ema200:.2f}$)، على الرغم من قوة الدولار (DXY = {dxy:.2f}) وعوائد السندات (US10Y = {us10y:.2f}%)."
-        lt_reason = "صمود الذهب فوق المتوسط السنوي رغم قوة الدولار يعكس طلباً هيكلياً استثنائياً (مثل مشتريات البنوك المركزية والتحوط الجيوسياسي) يمتص ضغوط الفائدة المرتفعة ويحمي المسار الاستثماري."
-        lt_bull = 1
-    elif gold < ema200 and macro_env < 0:
-        lt_status = "🔴 دورة هبوطية وضغوط استثمارية كبرى (Secular Bear Pressure)"
-        lt_data = f"السعر ({gold:.2f}$) أدنى متوسط 200 شمعة (EMA200 عند {ema200:.2f}$)، في ظل سيادة الدولار (DXY = {dxy:.2f}) وارتفاع عوائد السندات (US10Y = {us10y:.2f}%)."
-        lt_reason = "اجتماع كسر الدعم التاريخي EMA200 مع قوة الأصول المدرة للعائد (الدولار والسندات) يسحب السيولة الاستثمارية طويلة الأجل من الذهب، مما يدخله في مسار هابط أو تصحيحي عميق."
-        lt_bull = -1
-    else:
-        lt_status = "↗️ مرحلة تجميع استثماري وبناء قاع طويل الأجل (Long-Term Bottoming)"
-        lt_data = f"السعر ({gold:.2f}$) ما زال تحت EMA200 ({ema200:.2f}$)، لكن المؤشرات الكبرى تشير إلى تراجع الدولار (DXY = {dxy:.2f}) والسندات (US10Y = {us10y:.2f}%)."
-        lt_reason = "تحسن الظروف الاقتصادية الكلية (ضعف الدولار) يوفر حافزاً جوهرياً للمستثمرين لبدء التجميع الاستثماري عند الأرخص، استعداداً لاختراق EMA200 والعودة للمسار الصاعد الكبير."
-        lt_bull = 0
-
-    # تقييم التأثير النهائي على الذهب
-    net_timeframes = id_bull + st_bull + mt_bull + lt_bull
-    if net_timeframes >= 2:
-        overall_impact = f"🚀 تناغم صعودي شامل عبر الفترات الزمنية؛ توافق الأمداد الزمنية الكبرى والمتوسطة على الإيجابية يؤكد أن الموجة اللحظية مدعومة بهيكل أسبوعي صلب وتجميع مؤسسي طويل الأجل، مما يجعل الذهب مهيأً بقوة لتحقيق مكاسب مستمرة، وتُعد أي تراجعات طفيفة في المدى اليومي فرصاً ذهبية للشراء مع الاتجاه العام."
-    elif net_timeframes <= -2:
-        overall_impact = f"🔻 سيطرة سلبية وتصحيح هبوطي؛ ضعف الهيكل الفني في غالبية الأمداد الزمنية يضع الذهب تحت ضغط بيعي متصل من المدى اللحظي وحتى المتوسط، مما يرجح استمرار هبوط السعر لاختبار مناطق الدعم الرئيسية، ويفرض الحذر الشديد من صفقات الشراء عكس الاتجاه."
-    else:
-        overall_impact = f"⚖️ تباين زمني ومرحلة انتقالية؛ وجود تضارب بين الأمداد اللحظية/القريبة والأمداد المتوسطة/البعيدة يشير إلى أن الذهب يمر بمرحلة إعادة تموضع وتذبذب عرضي، حيث يتصارع مضاربو المدى القصير مع مستثمرين المدى الطويل، ونوصي بالاعتماد على نقاط الدخول والمخاطرة اللحظية المحددة بالدعم والمقاومة."
-
-    report = f"""⏳ [11] مصفوفة التأثير الزمني الشامل (Timeframe Impact)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🕐 التوقيت: {now.strftime('%H:%M:%S UTC')}
-💰 السعر: {gold:.2f}$ | EMA50: {ema50:.2f}$ | EMA200: {ema200:.2f}$ | VWAP: {vwap:.2f}$
-
-تحليل مفصل وتفسير لأسباب واتجاهات حركة الذهب عبر كافة الأمداد الزمنية:
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-1️⃣ الاتجاه اليومي اللحظي (Intraday — خلال جلسة اليوم):
-   ├ 🧭 الحالة العامة: {id_status}
-   ├ 📊 البيانات الداعمة: {id_data}
-   └ 💡 التفسير الفني والسبب: {id_reason}
-
-2️⃣ الاتجاه القريب (Short-Term — أيام إلى أسابيع):
-   ├ 🧭 الحالة العامة: {st_status}
-   ├ 📊 البيانات الداعمة: {st_data}
-   └ 💡 التفسير الفني والسبب: {st_reason}
-
-3️⃣ الاتجاه المتوسط (Medium-Term — أسابيع إلى أشهر):
-   ├ 🧭 الحالة العامة: {mt_status}
-   ├ 📊 البيانات الداعمة: {mt_data}
-   └ 💡 التفسير الفني والسبب: {mt_reason}
-
-4️⃣ الاتجاه البعيد / الاستثماري (Long-Term — أشهر إلى نهاية العام):
-   ├ 🧭 الحالة العامة: {lt_status}
-   ├ 📊 البيانات الداعمة: {lt_data}
-   └ 💡 التفسير الفني والسبب: {lt_reason}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 تأثير هذا التحليل على الذهب:
-   {overall_impact}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 القاعدة الذهبية: تطابق الاتجاه اللحظي مع الاتجاه البعيد يمنحك أعلى نسبة نجاح للصفقات.
-"""
-    return report
 def _build_template_2(d: dict) -> str:
     """بناء القالب الثاني (مؤشر صحة الاقتصاد الأمريكي) عبر الذكاء الاصطناعي"""
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
@@ -5282,6 +3380,7 @@ def _build_template_5(d: dict) -> str:
 
 def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: str, t4: str, t5: str) -> str:
     """بناء القالب السادس والأخير (الخلاصة الذكية) عبر الذكاء الاصطناعي"""
+    from groq import Groq
     import random
     import re
     
@@ -5327,26 +3426,14 @@ def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: st
     
     # Convert score (-12 to +12) to percentage (0% to 100%)
     up_prob_calc = 50 + (score / total_weight) * 45  # Cap at max 95% / min 5%
-    up_prob_raw = int(round(up_prob_calc))
-    up_prob_raw = max(10, min(90, up_prob_raw))
-    down_prob_raw = 100 - up_prob_raw
-    osc_prob_raw = max(10, 100 - abs(up_prob_raw - down_prob_raw))
-    
-    # Normalize to 100
-    tot = up_prob_raw + down_prob_raw + osc_prob_raw
-    up_prob = int(round(up_prob_raw / tot * 100))
-    down_prob = int(round(down_prob_raw / tot * 100))
-    osc_prob = 100 - (up_prob + down_prob)
-    
-    r2_val = round(d.get('gold', 2000) + d.get('atr', 20) * 1.5, 2)
-    s2_val = round(d.get('gold', 2000) - d.get('atr', 20) * 1.5, 2)
-    gld_val = round(d.get('gold', 2000), 2)
+    up_prob = int(round(up_prob_calc))
+    up_prob = max(10, min(90, up_prob))
+    down_prob = 100 - up_prob
 
     static_header = f"""🎯 خلاصة انحياز الذهب | التحديث المباشر
 
-📈 احتمال صعود لضرب القمة (مستهدف {r2_val}$): {up_prob}%
-📉 احتمال هبوط لضرب القاع (مستهدف {s2_val}$): {down_prob}%
-🔀 احتمالية التذبذب العرضي (حول {gld_val}$): {osc_prob}%
+📈 نسبة الصعود نحو القمة: {up_prob}%
+📉 نسبة الهبوط نحو القاع: {down_prob}%
 
 🧭 الخلاصة:"""
 
@@ -5502,14 +3589,7 @@ def _build_combined_summary(
             raw = re.sub(r'📈 نسبة الصعود.*?%\n', '', raw)
             raw = re.sub(r'📉 نسبة الهبوط.*?%\n', '', raw)
             # Prepend correct static probabilities
-            osc_pct = max(10, 100 - abs(bull_pct - bear_pct))
-            tot = bull_pct + bear_pct + osc_pct
-            b_p = int(round(bull_pct / tot * 100))
-            be_p = int(round(bear_pct / tot * 100))
-            o_p = 100 - (b_p + be_p)
-            r2_val = round(gold_spot + spot_data.get('atr', 20) * 1.5, 2)
-            s2_val = round(gold_spot - spot_data.get('atr', 20) * 1.5, 2)
-            static_probs = f"📈 احتمال صعود لضرب القمة (مستهدف {r2_val}$): {b_p}%\n📉 احتمال هبوط لضرب القاع (مستهدف {s2_val}$): {be_p}%\n🔀 احتمالية التذبذب العرضي (حول {gold_spot}$): {o_p}%\n"
+            static_probs = f"📈 نسبة الصعود: {bull_pct}%\n📉 نسبة الهبوط: {bear_pct}%\n"
             return static_probs + raw.strip()
         except Exception as e:
             log.warning(f"⚠️ [{model_name}] فشل الخلاصة المشتركة: {e}")
@@ -5722,7 +3802,7 @@ def _build_template_7(d: dict) -> str:
     for label, key, atr_mult in tfs:
         tf_data = d.get(key)
         
-        if not tf_data:
+        if not tf_data or 'pivot' not in tf_data:
             bias = d.get('confluence', {}).get('bias', 'bull')
             piv = gold
             r1 = gold + atr * atr_mult * 0.5
@@ -5730,7 +3810,7 @@ def _build_template_7(d: dict) -> str:
             r2 = gold + atr * atr_mult
             s2 = gold - atr * atr_mult
         else:
-            bias = tf_data.get('bias', d.get('confluence', {}).get('bias', 'bull'))
+            bias = tf_data.get('bias', 'bull')
             piv = tf_data.get('pivot', gold)
             r1 = tf_data.get('r1', gold + atr * atr_mult * 0.5)
             s1 = tf_data.get('s1', gold - atr * atr_mult * 0.5)
@@ -5762,57 +3842,6 @@ def _build_template_7(d: dict) -> str:
         out.append(f"- نقطة الدخول: {entry}$")
         out.append(f"- الهدف: {tp}$")
         out.append(f"- وقف الخسارة: {sl}$")
-
-    # --- Advanced Weekly and Monthly Scalping ---
-    out.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    out.append("🦅 صفقات السكالبينج الاحترافية (فريم أسبوعي وشهري)")
-    out.append("*(استهداف ارتدادات السيولة الكبرى مع احترام الاتجاه العام بأهداف متعددة وإدارة مخاطر فائقة)*")
-    
-    adv_tfs = [
-        ('الأسبوعي (Weekly Scalp)', 'tf_weekly', 2.5),
-        ('الشهري (Monthly Scalp)', 'tf_monthly', 4.5)
-    ]
-    
-    for label, key, atr_mult in adv_tfs:
-        tf_data = d.get(key)
-        
-        if not tf_data or 'pivot' not in tf_data:
-            bias = d.get('confluence', {}).get('bias', 'bull')
-            piv = gold
-            r1 = gold + atr * atr_mult * 0.5
-            s1 = gold - atr * atr_mult * 0.5
-            r2 = gold + atr * atr_mult
-            s2 = gold - atr * atr_mult
-        else:
-            bias = tf_data.get('bias', 'bull')
-            piv = tf_data.get('pivot', gold)
-            r1 = tf_data.get('r1', gold + atr * atr_mult * 0.5)
-            s1 = tf_data.get('s1', gold - atr * atr_mult * 0.5)
-            r2 = tf_data.get('r2', gold + atr * atr_mult)
-            s2 = tf_data.get('s2', gold - atr * atr_mult)
-            
-        if 'bull' in str(bias).lower() or 'صاعد' in str(bias) or 'إيجابي' in str(bias):
-            dir_str = "🟢 صاعد (شراء من الانخفاضات)"
-            entry = round(piv - (atr * atr_mult * 0.15), 2)
-            sl = round(piv - (atr * atr_mult * 0.5), 2)
-            t1 = round(piv + (atr * atr_mult * 0.3), 2)
-            t2 = round(r1, 2)
-            t3 = round(r2, 2)
-        else:
-            dir_str = "🔴 هابط (بيع من الارتفاعات)"
-            entry = round(piv + (atr * atr_mult * 0.15), 2)
-            sl = round(piv + (atr * atr_mult * 0.5), 2)
-            t1 = round(piv - (atr * atr_mult * 0.3), 2)
-            t2 = round(s1, 2)
-            t3 = round(s2, 2)
-            
-        out.append(f"\n⏱️ **سكالبينج {label}:**")
-        out.append(f" - الاتجاه الهيكلي: {dir_str}")
-        out.append(f" - 📍 منطقة الدخول المثالية: **{entry}$**")
-        out.append(f" - 🎯 الهدف الأول (تأمين 50%): **{t1}$**")
-        out.append(f" - 🎯 الهدف الثاني (جني أرباح رئيسي): **{t2}$**")
-        out.append(f" - 🎯 الهدف الثالث (الامتداد الأقصى): **{t3}$**")
-        out.append(f" - 🛑 وقف الخسارة (صارم): **{sl}$**")
         
     out.append("\n💡 الحكم النهائي للتداول المتعدد:")
     out.append("- تُنفذ صفقات (اللوت العالي) عند انعكاسات السيولة القصوى فقط مع الالتزام التام بالوقف الضيق. أما صفقات (السكالبينج الشامل)، فتُتداول وفقاً لاتجاه كل فريم بشكل مستقل لاقتناص تحركات السوق العميقة بأعلى جودة ودقة.")
@@ -5855,7 +3884,7 @@ def _build_template_8(d: dict) -> str:
 
 🌍 تأثير الأسواق المترابطة:
 - 🥈 تأثير الفضة (Silver Impact): (جملة واحدة)
-- السندات: (جملة واحدة توضح أن العائد الحقيقي الحالي {d.get('real_yield', 0)}% ومستوى الفائدة الحالية لهما تأثير {'سالب وداعم لصعود الذهب' if float(d.get('real_yield', 0) or 0) < 0 else ('محايد إلى إيجابي للذهب' if float(d.get('real_yield', 0) or 0) < 1.5 else 'ضاغط على الذهب لصالح السندات')} ولا تصفه بأنه بيئة فائدة منخفضة إذا كان مرتفعاً)
+- السندات: (جملة واحدة بناء على العائد الحقيقي)
 - عقود الخيارات (VIX): (جملة واحدة بناء على VIX)
 
 💡 الحكم النهائي للذهب: 
@@ -6414,16 +4443,8 @@ def _s_nums(d):
     s1 = float(d.get('s1', 0) or 0) or round(pivot - atr * 0.9, 2)
     s2 = float(d.get('s2', 0) or 0) or round(pivot - atr * 1.8, 2)
     s3 = float(d.get('s3', 0) or 0) or round(pivot - atr * 2.7, 2)
-    if abs(r1 - pivot) < atr * 0.35: r1 = round(pivot + atr * 0.5, 2)
-    if abs(r2 - pivot) < atr * 0.7:  r2 = round(pivot + atr * 1.0, 2)
-    if abs(r3 - pivot) < atr * 1.0:  r3 = round(pivot + atr * 1.5, 2)
-    if abs(pivot - s1) < atr * 0.35: s1 = round(pivot - atr * 0.5, 2)
-    if abs(pivot - s2) < atr * 0.7:  s2 = round(pivot - atr * 1.0, 2)
-    if abs(pivot - s3) < atr * 1.0:  s3 = round(pivot - atr * 1.5, 2)
     swing_h = float(d.get('swing_high', 0) or 0) or r2
     swing_l = float(d.get('swing_low',  0) or 0) or s2
-    if swing_h <= gold: swing_h = round(r2 + atr * 0.5, 2)
-    if swing_l >= gold: swing_l = round(s2 - atr * 0.5, 2)
     return dict(gold=gold, atr=atr, pivot=pivot, rsi=rsi, macd=macd,
                 r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
                 swing_h=swing_h, swing_l=swing_l)
@@ -6512,29 +4533,6 @@ def _s_trades(d, n):
                  't3': round(fib.get('61.8%', s1) or s1, 2)}
     else:
         t = {}
-    if t and isinstance(t, dict) and 'entry' in t:
-        ent  = float(t.get('entry', 0) or 0)
-        sl   = float(t.get('sl', 0) or 0)
-        t1   = float(t.get('t1', 0) or 0)
-        t2   = float(t.get('t2', 0) or 0)
-        t3   = float(t.get('t3', 0) or 0)
-        risk = abs(ent - sl)
-        if risk < 0.5: risk = round(a * 0.4, 2)
-        if 'buy' in n:
-            if sl >= ent: sl = round(ent - risk, 2)
-            if t1 <= ent: t1 = round(ent + risk * 1.2, 2)
-            if t2 <= t1:  t2 = round(t1 + risk * 0.8, 2)
-            if t3 <= t2:  t3 = round(t2 + risk * 0.8, 2)
-        elif 'sell' in n:
-            if sl <= ent: sl = round(ent + risk, 2)
-            if t1 >= ent: t1 = round(ent - risk * 1.2, 2)
-            if t2 >= t1:  t2 = round(t1 - risk * 0.8, 2)
-            if t3 >= t2:  t3 = round(t2 - risk * 0.8, 2)
-        t['sl']   = sl
-        t['risk'] = round(abs(ent - sl), 2)
-        t['t1']   = t1
-        t['t2']   = t2
-        t['t3']   = t3
     return t or {}
 
 
@@ -6763,8 +4761,8 @@ def _build_spot_s4(d: dict) -> str:
                 else "تشبع شرائي 📈" if rsi > 70 else "منطقة شراء 📈")
 
     return (
-        "👑 **تحليل السوق الفوري وهندسة السكالبينج (Scalping)** 👑\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📊 **بيانات السوق اللحظية والحيوية**\n"
+        "### تحليل السوق الفوري 📊\n"
+        "#### بيانات السوق الحالية 📈\n"
         f"* السعر الحالي: **{gold:.2f}$** 💰\n"
         f"* اعلى النطاق اليومي: **{sh:.2f}$** 📈\n"
         f"* ادنى النطاق اليومي: **{sl:.2f}$** 📉\n"
@@ -6774,7 +4772,7 @@ def _build_spot_s4(d: dict) -> str:
         f"* ATR: **{atr:.2f}$** 📊\n"
         "* Fib:\n"
         f"{fib_lines}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 **صفقات السكالبينج الاحترافية (خطف سريع)** 🏹\n"
+        "#### صفقات السكالبينج 🏹\n"
         f"* **شراء** 🛍️\n"
         f" + سعر الدخول: **{sb.get('entry',0):.2f}$**\n"
         f" + وقف الخسارة: **{sb.get('sl',0):.2f}$**\n"
@@ -6783,7 +4781,7 @@ def _build_spot_s4(d: dict) -> str:
         f"    - الاول: **{sb.get('t1',0):.2f}$**\n"
         f"    - الثاني: **{sb.get('t2',0):.2f}$**\n"
         f"    - الثالث: **{sb.get('t3',0):.2f}$**\n\n"
-        f"* **بيع** 🚫\n"
+        f"* **بيع** 🛍️\n"
         f" + سعر الدخول: **{ss.get('entry',0):.2f}$**\n"
         f" + وقف الخسارة: **{ss.get('sl',0):.2f}$**\n"
         f" + المخاطرة: **{ss.get('risk',0):.2f}$**\n"
@@ -6791,15 +4789,15 @@ def _build_spot_s4(d: dict) -> str:
         f"    - الاول: **{ss.get('t1',0):.2f}$**\n"
         f"    - الثاني: **{ss.get('t2',0):.2f}$**\n"
         f"    - الثالث: **{ss.get('t3',0):.2f}$**\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔬 **التحليل الرقمي الدقيق** 📊\n"
+        "#### تحليل الارقام 📊\n"
         f"* RSI عند **{rsi:.2f}** — {rsi_zone}\n"
         f"* MACD عند **{macd:.4f}** — اتجاه {'هبوطي 📉' if macd < 0 else 'صعودي 📈'}\n"
         f"* ATR عند **{atr:.2f}$** — تقلبات {'عالية' if atr > 50 else 'منخفضة'} 📊\n"
         f"* اقرب دعم قوي: **{fib_sup:.2f}$** 📍\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📝 **الخلاصة الميكانيكية للسكالبينج**\n"
+        "#### استنتاج 📝\n"
         f"* السوق في اتجاه {'هبوطي' if macd < 0 else 'صعودي'}، مع RSI في {rsi_zone}\n"
-        f"* **فرصة شراء سكالبينج**: دخول {sb.get('entry',0):.2f}$، هدف {sb.get('t1',0):.2f}$ (+{abs(round(sb.get('t1',0)-sb.get('entry',0),2))}$) 🛍️\n"
-        f"* **فرصة بيع سكالبينج**: دخول {ss.get('entry',0):.2f}$، هدف {ss.get('t1',0):.2f}$ (+{abs(round(ss.get('entry',0)-ss.get('t1',0),2))}$) 🚫\n"
+        f"* **فرصة شراء سكالبينج**: دخول {sb.get('entry',0):.2f}$، هدف {sb.get('t1',0):.2f}$ (+{round(sb.get('t1',0)-sb.get('entry',0),2)}$) 🛍️\n"
+        f"* **فرصة بيع سكالبينج**: دخول {ss.get('entry',0):.2f}$، هدف {ss.get('t1',0):.2f}$ (-{round(ss.get('entry',0)-ss.get('t1',0),2)}$) 🛍️\n"
     )
 
 
@@ -6822,11 +4820,11 @@ def _build_spot_s5(d: dict) -> str:
                   else 'في المنطقة المحايدة — انتظار تاكيد الاتجاه')
 
     return (
-        "👑 **هندسة صفقات السوينج (Swing Trading)** 👑\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📊 **نظرة عامة على السيولة والزخم**\n"
+        "### صفقات السوينج 🌊\n"
+        "#### نظرة عامة على السوق 📊\n"
         f"سعر الذهب الحالي **{gold:.2f}$**، مؤشر RSI يبلغ **{rsi:.2f}**، MACD يبلغ **{macd:.4f}**. "
         f"السوق في حالة {trend}. RSI {rsi_note}.\n\n"
-        "#👑 **هندسة صفقات السوينج (Swing Trading)** 👑\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "#### صفقات السوينج 🌊\n"
         f"* **صفقة شراء سوينج 🛍️**:\n"
         f" + نقطة الدخول: **{sw_b.get('entry',0):.2f}$**\n"
         f" + نقطة وقف الخسارة: **{sw_b.get('sl',0):.2f}$**\n"
@@ -6845,13 +4843,13 @@ def _build_spot_s5(d: dict) -> str:
         f"    - الهدف الاول: **{sw_s.get('t1',0):.2f}$**\n"
         f"    - الهدف الثاني: **{sw_s.get('t2',0):.2f}$**\n"
         f"    - الهدف الثالث: **{sw_s.get('t3',0):.2f}$**\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔬 **التحليل الرقمي الدقيق** 📊\n"
+        "#### تحليل الارقام 📊\n"
         f"السوق في حالة {trend}. "
         f"RSI {rsi_note}. "
         f"MACD {'سلبي — الزخم هبوطي' if macd < 0 else 'ايجابي — الزخم صعودي'}.\n"
         f"مستويات الدعم الرئيسية: {s1:.2f}$ و{s2:.2f}$.\n"
         f"مستويات المقاومة الرئيسية: {r1:.2f}$ و{r2:.2f}$.\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📝 **الخلاصة الميكانيكية للسوينج**\n"
+        "#### خلاصة القول 📝\n"
         f"الصفقة الافضل حاليا: {'شراء سوينج عند ' + str(round(sw_b.get('entry',s2),2)) + '$ بهدف ' + str(round(sw_b.get('t2',r1),2)) + '$' if rsi < 45 else 'بيع سوينج عند ' + str(round(sw_s.get('entry',r2),2)) + '$ بهدف ' + str(round(sw_s.get('t2',pivot),2)) + '$'}. "
         "يجب ادارة المخاطر بشكل صارم واستخدام وقف الخسارة دائما. 📈💰"
     )
@@ -6882,64 +4880,16 @@ def _build_spot_s6(d: dict) -> str:
     sell_t2 = round(sell_entry - (atr * 0.8), 2)
     sell_t3 = round(sell_entry - (atr * 1.5), 2)
 
-    # ── صفقات السوينج والزيرو انعكاس لجميع الفريمات ──
-    tf_factors = [
-        ("15 دقيقة", 0.12),
-        ("30 دقيقة", 0.17),
-        ("ساعة", 0.25),
-        ("4 ساعات", 0.50),
-        ("يومي", 1.00),
-        ("أسبوعي", 2.20),
-        ("شهري", 4.50)
-    ]
-    
-    tf_matrix_blocks = []
-    for tf_name, factor in tf_factors:
-        tf_atr = atr * factor
-        # Swing
-        sw_buy_entry = round(gold - (tf_atr * 1.5), 2)
-        sw_buy_sl = round(sw_buy_entry - (tf_atr * 0.7), 2)
-        sw_buy_tp = round(sw_buy_entry + (tf_atr * 2.5), 2)
-        
-        sw_sell_entry = round(gold + (tf_atr * 1.5), 2)
-        sw_sell_sl = round(sw_sell_entry + (tf_atr * 0.7), 2)
-        sw_sell_tp = round(sw_sell_entry - (tf_atr * 2.5), 2)
-        
-        # Zero Reflection
-        zr_buy_entry = round(gold - (tf_atr * 2.8), 2)
-        zr_buy_sl = round(zr_buy_entry - (tf_atr * 0.25), 2)
-        zr_buy_tp = round(zr_buy_entry + (tf_atr * 1.0), 2)
-        
-        zr_sell_entry = round(gold + (tf_atr * 2.8), 2)
-        zr_sell_sl = round(zr_sell_entry + (tf_atr * 0.25), 2)
-        zr_sell_tp = round(zr_sell_entry - (tf_atr * 1.0), 2)
-        
-        tf_block = f"""
-💠 **فريم {tf_name}**
-📌 **السوينج (Swing):**
-🟢 شراء: الدخول {sw_buy_entry}$ | الهدف {sw_buy_tp}$ | الوقف {sw_buy_sl}$
-🔴 بيع: الدخول {sw_sell_entry}$ | الهدف {sw_sell_tp}$ | الوقف {sw_sell_sl}$
-📌 **زيرو انعكاس (Zero Drawdown):**
-🟢 شراء: الدخول {zr_buy_entry}$ | الهدف {zr_buy_tp}$ | الوقف {zr_buy_sl}$
-🔴 بيع: الدخول {zr_sell_entry}$ | الهدف {zr_sell_tp}$ | الوقف {zr_sell_sl}$
-"""
-        tf_matrix_blocks.append(tf_block.strip())
-
-    matrix_text = "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    matrix_text += "🌐 **مصفوفة صفقات السوينج والزيرو انعكاس (متعددة الإطارات الزمنية)** 🌐\n"
-    matrix_text += "تم حساب هذه الصفقات رياضياً بدقة متناهية لكل فريم زمني بناءً على نسبة التذبذب والسيولة اللحظية:\n\n"
-    matrix_text += "\n\n".join(tf_matrix_blocks)
-
     return (
-        "👑 **هندسة صفقات اللوت العالي (High Lot Sniper)** 👑\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 **اصطياد السيولة عند الانعكاسات الكاملة (Liquidity Sweeps)** 🎯\n"
+        "### 🎯 صفقات اللوت العالي (High Lot Sniper) 🎯\n"
         "تم تصميم هذه الصفقات لاصطياد السيولة عند الانعكاسات الكاملة (Liquidity Sweeps) بمناطق الذروة (Extreme Edges). يُستخدم لوت عالي مع التزام تام وصارم جداً بوقف الخسارة المذكور نظراً لحساسية هذه المناطق.\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 **الخارطة السعرية لمناطق الذروة**\n"
+        "### 📊 مستويات السوق الحالية 📊\n"
         f"- **السعر الحالي:** {gold:.2f}$\n"
         f"- **نقطة الارتكاز (Pivot):** {pivot:.2f}$\n"
         f"- **منطقة سيولة الشراء (Liquidity Pool - Long):** {buy_entry:.2f}$\n"
         f"- **منطقة سيولة البيع (Liquidity Pool - Short):** {sell_entry:.2f}$\n"
         f"- **التقلب المعتمد (ATR):** {atr:.2f}$ 📊\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚡ **إحداثيات الدخول عالية الدقة (اللوت العالي)** ⚡\n\n"
+        "### ⚡ صفقات القناص عالية الدقة (اللوت العالي) ⚡\n\n"
         f"**🟢 1. صفقة شراء قناص (Long Sweep)**\n"
         f" + الدخول: **{buy_entry:.2f}$** (اصطياد القاع)\n"
         f" + وقف الخسارة: **{buy_sl:.2f}$** (صارم ومغلق)\n"
@@ -6952,12 +4902,11 @@ def _build_spot_s6(d: dict) -> str:
         f" + الهدف الأول: **{sell_t1:.2f}$** (تأمين الصفقة)\n"
         f" + الهدف الثاني: **{sell_t2:.2f}$**\n"
         f" + الهدف الثالث: **{sell_t3:.2f}$** (انعكاس كامل)\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ **القواعد الذهبية لإدارة المخاطر العالية** ⚠️\n"
+        "### ⚠️ قواعد التداول ⚠️\n"
         "- **لا تدخل ماركت من منتصف النطاق.** هذه الصفقات تُفعل **فقط** عند وصول السعر للمستويات المذكورة تماماً لضمان أفضل نسبة عائد للمخاطرة (Risk/Reward).\n"
         "- وقف الخسارة غير قابل للتحريك (مسافة ATR رياضية) لتجنب الانهيارات المفاجئة.\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n💡 **الحكم الاستراتيجي للصفقات**\n"
+        "### 💡 الحكم للتأثير النهائي على التداول 💡\n"
         f"بناءً على موقع السعر الحالي من مناطق السيولة، فرص {'الشراء من مستويات ' + str(buy_entry) + '$ هي الأرجح والأكثر أماناً' if rsi < 50 else 'البيع من مستويات ' + str(sell_entry) + '$ هي الأرجح والأكثر أماناً'} مع ضرورة انتظار الإشارة المؤكدة وعدم الاستعجال."
-        f"{matrix_text}"
     )
 def _build_spot_s7(d: dict) -> str:
     """7/12 - التحليل الفني والزخم"""
@@ -7015,8 +4964,8 @@ def _build_spot_s7(d: dict) -> str:
         stoch_note = f"- \U0001f4ca مؤشرات الزخم في منطقة محايدة (RSI={rsi:.1f}, Stoch={stoch:.1f})"
 
     return (
-        "👑 **التحليل الفني المعمق ومؤشرات الزخم للذهب** 👑\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🌐 **المسح السعري اللحظي**\n"
+        "### تحليل فني وزخم للذهب 📊\n"
+        "#### نظرة عامة على السوق 🌐\n"
         f"- السعر الحالي: **{gold:.2f}$** 💰\n"
         f"- اعلى النطاق اليومي: **{sh:.2f}$** ⬆️\n"
         f"- ادنى النطاق اليومي: **{sl:.2f}$** ⬇️\n"
@@ -7025,25 +4974,25 @@ def _build_spot_s7(d: dict) -> str:
         f"- Stochastic K: **{stoch:.2f}** 📈\n"
         f"- CCI: **{cci:.2f}** 📊\n"
         f"- Williams %R: **{wr:.2f}** 📉\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🌊 **ديناميكية المتوسطات المتحركة (Moving Averages)**\n"
+        "#### المتوسطات المتحركة 📊\n"
         f"- EMA20: **{ema20:.2f}$** | EMA50: **{ema50:.2f}$** | EMA200: **{ema200:.2f}$**\n"
         f"- التقييم: {ema_note}\n"
         f"{ema200_note}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🌀 **نطاقات التذبذب (Bollinger Bands)**\n"
+        "#### بولنجر باندز 📊\n"
         f"- الحد العلوي: **{bb_up:.2f}$** | الحد السفلي: **{bb_lo:.2f}$**\n"
         f"- السعر {'قريب من الحد العلوي — مقاومة' if gold > (bb_up + bb_lo) / 2 else 'قريب من الحد السفلي — دعم'}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📈 **قوة ومسار الاتجاه (ADX)**\n"
+        "#### مؤشر ADX والاتجاه 📈\n"
         f"- ADX: **{adx:.2f}** | DI+: **{di_p:.2f}** | DI-: **{di_m:.2f}**\n"
         f"- التقييم: {adx_note}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📐 **هندسة مستويات فيبوناتشي**\n"
+        "#### تحليل الفيبوناتشي 🌈\n"
         f"{fib_block}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 **خارطة طريق التداول اللحظية**\n"
+        "#### استراتيجيات التداول 📈\n"
         f"- **شراء**: دخول **{sb.get('entry',0):.2f}$** | وقف **{sb.get('sl',0):.2f}$** | هدف **{sb.get('t1',0):.2f}$**، **{sb.get('t2',0):.2f}$**، **{sb.get('t3',0):.2f}$** 🎯\n"
         f"- **بيع**: دخول **{ss.get('entry',0):.2f}$** | وقف **{ss.get('sl',0):.2f}$** | هدف **{ss.get('t1',0):.2f}$**، **{ss.get('t2',0):.2f}$**، **{ss.get('t3',0):.2f}$** 🎯\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n💪 **قراءة الزخم الحركي والتقلب**\n"
+        "#### تحليل الزخم 💪\n"
         f"- ATR: **{atr:.2f}$** (المدى اليومي المتوقع — تقلبات {'عالية' if atr > 60 else 'متوسطة' if atr > 30 else 'منخفضة'})\n"
         f"{stoch_note}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📝 **الخلاصة الميكانيكية للسكالبينج**\n"
+        "#### استنتاج 📝\n"
         f"- السوق في وضعية {'هبوطية' if rsi < 45 else 'صعودية'} مع RSI={rsi:.2f}.\n"
         f"- المتوسطات المتحركة تشير الى: {ema_note}\n"
         "- مستويات الفيبوناتشي توفر دعم ومقاومة محتملة.\n\n"
@@ -7082,8 +5031,8 @@ def _build_spot_s8(d: dict) -> str:
                     "ايجابي على الذهب — عائد حقيقي سلبي يدعم الذهب كتحوط")
 
     return (
-        "👑 **التحليل الماكرو اقتصادي وتأثيراته السعرية** 👑\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🌐 **المسح السعري اللحظي**\n"
+        "### تحليل الاقتصاد الكلي 📊\n"
+        "#### نظرة عامة على السوق 🌐\n"
         f"- السعر الحالي: **{gold:.2f}$** 💰\n"
         f"- اعلى النطاق (Swing H): **{sh:.2f}$** ⬆️\n"
         f"- ادنى النطاق (Swing L): **{sl:.2f}$** ⬇️\n"
@@ -7091,20 +5040,20 @@ def _build_spot_s8(d: dict) -> str:
         f"- مؤشر RSI: **{rsi:.2f}** 📈\n"
         f"- مؤشر MACD: **{macd:.4f}** 📊\n"
         f"- مؤشر ATR: **{atr:.2f}$** 📊\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📐 **هندسة مستويات فيبوناتشي**\n"
+        "#### تحليل الفيبوناتشي 🌈\n"
         f"{fib_block}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 **خارطة السكالبينج اللحظية**\n"
+        "#### تحليل التداول (سكالبينج) 📈\n"
         f"- **شراء**: دخول **{sb.get('entry',0):.2f}$** | وقف **{sb.get('sl',0):.2f}$** | اهداف {sb.get('t1',0):.2f}$, {sb.get('t2',0):.2f}$, {sb.get('t3',0):.2f}$\n"
         f"- **بيع**: دخول **{ss.get('entry',0):.2f}$** | وقف **{ss.get('sl',0):.2f}$** | اهداف {ss.get('t1',0):.2f}$, {ss.get('t2',0):.2f}$, {ss.get('t3',0):.2f}$\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🌎 **البيانات الاقتصادية الكبرى (الماكرو)**\n"
+        "#### تحليل الاقتصاد الكلي 🌎\n"
         f"- معدل الفائدة: **{interest:.2f}%**\n"
         f"- معدل التضخم (CPI): **{inflation:.2f}%**\n"
         f"- العائد الحقيقي (Fائدة - CPI): **{ry:.2f}%**\n"
         f"- مؤشر الدولار (DXY): **{dxy_p:.4f}** ({dxy_pct:+.2f}%)\n"
         f"- التاثير الاجمالي: **{macro_effect}**\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n💸 **تدفقات السيولة وقوة العملات**\n"
+        "#### تحليل العملات 💸\n"
         f"{fx_block}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📝 **الخلاصة الاقتصادية الحاكمة**\n"
+        "### خلاصة القول 📝\n"
         f"- السوق في حالة {'انخفاض' if macd < 0 else 'ارتفاع'} مع RSI={'منخفض' if rsi<45 else 'مرتفع'} وMACD={'سالب' if macd<0 else 'موجب'}.\n"
         f"- الوضع الاقتصادي: {macro_effect}.\n"
         "- هناك فرص لشراء عند مستويات الدعم وبيع عند مستويات المقاومة.\n"
@@ -7113,11 +5062,11 @@ def _build_spot_s8(d: dict) -> str:
 
 
 def _build_spot_s9(d: dict) -> str:
-    """9/12 - مصفوفة التداول والاسكالبينج الاحترافي"""
+    """9/12 - شهية المخاطرة"""
     nums = _s_nums(d)
     gold, atr, pivot = nums['gold'], nums['atr'], nums['pivot']
     rsi, macd = nums['rsi'], nums['macd']
-    r1, r2, r3, s1, s2, s3 = nums['r1'], nums['r2'], nums.get('r3', nums['r2']+atr), nums['s1'], nums['s2'], nums.get('s3', nums['s2']-atr)
+    r1, r2, s1, s2 = nums['r1'], nums['r2'], nums['s1'], nums['s2']
     sh, sl = nums['swing_h'], nums['swing_l']
     fib = d.get('fib', {}) or {}
 
@@ -7130,14 +5079,12 @@ def _build_spot_s9(d: dict) -> str:
     fx        = d.get('fx_sorted', []) or []
 
     adv = d.get('adv_trades', {}) or {}
-    
-    # Mathematical Precision Fallbacks (Corrected Directions)
-    sb  = adv.get('scalp_buy') or {'entry': round(s1 + (pivot - s1) * 0.2, 2), 'sl': round(s1 - atr * 0.2, 2), 't1': pivot, 't2': round((pivot+r1)/2, 2), 't3': r1}
-    ss  = adv.get('scalp_sell') or {'entry': round(r1 - (r1 - pivot) * 0.2, 2), 'sl': round(r1 + atr * 0.2, 2), 't1': pivot, 't2': round((pivot+s1)/2, 2), 't3': s1}
-    db  = adv.get('daily_buy') or {'entry': s1, 'sl': s2, 't1': pivot, 't2': r1, 't3': r2}
-    ds  = adv.get('daily_sell') or {'entry': r1, 'sl': r2, 't1': pivot, 't2': s1, 't3': s2}
-    swb = adv.get('swing_buy') or {'entry': s2, 'sl': s3, 't1': s1, 't2': pivot, 't3': r1}
-    sws = adv.get('swing_sell') or {'entry': r2, 'sl': r3, 't1': r1, 't2': pivot, 't3': s1}
+    sb  = _s_trades(d, 'scalp_buy');  ss  = _s_trades(d, 'scalp_sell')
+    swb = _s_trades(d, 'swing_buy');  sws = _s_trades(d, 'swing_sell')
+    db  = adv.get('daily_buy') or {'entry': r1, 'sl': r2, 't1': pivot, 't2': s1, 't3': s2}
+    ds  = adv.get('daily_sell') or {'entry': s1, 'sl': s2, 't1': pivot, 't2': r1, 't3': r2}
+    wb  = adv.get('weekly_buy') or {'entry': s2, 'sl': round(s2-atr*0.5,2), 't1': s1, 't2': pivot, 't3': r1}
+    ws  = adv.get('weekly_sell') or {'entry': r2, 'sl': round(r2+atr*0.5,2), 't1': r1, 't2': pivot, 't3': s1}
 
     score = 0
     if vix_p > 25: score -= 2
@@ -7146,7 +5093,7 @@ def _build_spot_s9(d: dict) -> str:
     elif sp500 < -0.5: score -= 1
     if ry > 1.5: score -= 1
     risk_pct = max(30, min(80, 50 + score * 5))
-    risk_label = "عالية 🔴" if risk_pct > 60 else "متوسطة 🟡" if risk_pct > 45 else "منخفضة 🟢"
+    risk_label = "عالية" if risk_pct > 60 else "متوسطة" if risk_pct > 45 else "منخفضة"
 
     fib_block = "\n".join(f"  - **{k}:** {v}" for k, v in fib.items()) if fib else (
         f"  - R1: {r1:.2f}$ | R2: {r2:.2f}$\n  - S1: {s1:.2f}$ | S2: {s2:.2f}$"
@@ -7154,64 +5101,18 @@ def _build_spot_s9(d: dict) -> str:
     fx_block = "\n".join(f"  - **{sym}:** {pct:+.4f}%" for sym, pct in fx[:8]) if fx else "  - بيانات العملات متاحة عند التريجر"
 
     return (
-        "👑 **مؤشر شهية المخاطرة الشامل (Risk Appetite)** 👑\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🌐 **المسح السعري اللحظي والسيولة:**\n"
-        f"- 💰 **سعر الذهب الحالي:** **{gold:.2f}$**\n"
-        f"- 🎯 **اعلى النطاق:** {sh:.2f}$ | **ادنى النطاق:** {sl:.2f}$\n"
-        f"- 📊 **مؤشر RSI:** {rsi:.2f}\n"
-        f"- 📉 **مؤشر MACD:** {macd:.4f}\n"
-        f"- 📏 **مؤشر ATR:** {atr:.2f}$\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📈 **الركائز الفنية الأساسية:**\n"
-        "- 🔢 **مستويات فيبوناتشي:**\n"
-        f"{fib_block}\n"
-        f"- 🎯 **المحور:** {pivot:.2f}$ | **R1:** {r1:.2f}$ | **S1:** {s1:.2f}$\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 **الركائز الأساسية (الماكرو والسيولة):**\n"
-        f"- 📉 **معدل التضخم:** {inflation:.2f}%\n"
-        f"- 🏦 **معدل الفائدة:** {interest:.2f}%\n"
-        f"- ⚖️ **العائد الحقيقي:** {ry:.2f}%\n"
-        f"- 🚨 **VIX (مؤشر الخوف):** {vix_p:.2f} ({'مرتفع — تحوط' if vix_p > 25 else 'منخفض — جشع'})\n"
-        f"- 📈 **S&P 500 اليومي:** {sp500:+.2f}%\n"
-        f"- 💵 **مؤشر الدولار (DXY):** {dxy_p:.4f}\n"
-        "- 💱 **قوة العملات:**\n"
-        f"{fx_block}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 **مصفوفة استراتيجيات التداول الشاملة (Trading Matrix)** 🎯\n*(هذه المصفوفة عالية الدقة توضح نقاط الدخول المثالية للسكالبينج والسوينج بناءً على خوارزميات السيولة)*\n\n"
-        "⚡ **1. السكالبينج (خطف سريع - مخاطرة عالية)**\n"
-        f"🟢 **شراء:** دخول: **{sb.get('entry',0):.2f}$** | الاستوب: **{sb.get('sl',0):.2f}$**\n"
-        f"🎯 الأهداف: {sb.get('t1',0):.2f}$ - {sb.get('t2',0):.2f}$ - {sb.get('t3',0):.2f}$\n"
-        f"🔴 **بيع:** دخول: **{ss.get('entry',0):.2f}$** | الاستوب: **{ss.get('sl',0):.2f}$**\n"
-        f"🎯 الأهداف: {ss.get('t1',0):.2f}$ - {ss.get('t2',0):.2f}$ - {ss.get('t3',0):.2f}$\n\n"
-        "📅 **2. التداول اليومي (Intraday - مخاطرة متوسطة)**\n"
-        f"🟢 **شراء:** دخول: **{db.get('entry',0):.2f}$** | الاستوب: **{db.get('sl',0):.2f}$**\n"
-        f"🎯 الأهداف: {db.get('t1',0):.2f}$ - {db.get('t2',0):.2f}$\n"
-        f"🔴 **بيع:** دخول: **{ds.get('entry',0):.2f}$** | الاستوب: **{ds.get('sl',0):.2f}$**\n"
-        f"🎯 الأهداف: {ds.get('t1',0):.2f}$ - {ds.get('t2',0):.2f}$\n\n"
-        "📆 **3. السوينج الاستراتيجي (مخاطرة مضبوطة)**\n"
-        f"🟢 **السوينج الشرائي:** دخول: **{swb.get('entry',0):.2f}$** | الاستوب: **{swb.get('sl',0):.2f}$**\n"
-        f"🎯 الأهداف: {swb.get('t1',0):.2f}$ - {swb.get('t2',0):.2f}$ - {swb.get('t3',0):.2f}$\n"
-        f"🔴 **السوينج البيعي:** دخول: **{sws.get('entry',0):.2f}$** | الاستوب: **{sws.get('sl',0):.2f}$**\n"
-        f"🎯 الأهداف: {sws.get('t1',0):.2f}$ - {sws.get('t2',0):.2f}$ - {sws.get('t3',0):.2f}$\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ **ضوابط إدارة المخاطر (Risk Management)** ⚠️\n"
-        f"- 🚨 **التقييم الكمي للمخاطرة الآن:** **{risk_pct:.0f}% ({risk_label})**\n"
-        f"- 💼 **إدارة المحفظة:** يُنصح بحجم مركز لا يتجاوز **{100 - risk_pct:.0f}%** من هامش المحفظة للصفقة الواحدة نظراً للظروف الحالية.\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n💡 **الحكم الاستراتيجي للصفقات**\n"
-        f"بناءً على التقييم الكلي للمخاطرة، التوجه الأفضل للمتداولين {'في ظل هذه المخاطرة المنخفضة هو التداول بثقة مع الاتجاه واستهداف السوينج.' if risk_pct <= 45 else 'الآن هو التداول اللحظي السريع (سكالبينج) لتقليل فترة التعرض للسوق والهروب من التذبذب.' if risk_pct > 60 else 'هو التداول اليومي بحذر والالتزام التام بنقاط الوقف وتأمين الأرباح أولاً بأول.'}"
-    )
-
-    fx_block = "\n".join(f"  - **{sym}:** {pct:+.4f}%" for sym, pct in fx[:8]) if fx else "  - بيانات العملات متاحة عند التريجر"
-
-    return (
-        "👑 **مؤشر شهية المخاطرة الشامل (Risk Appetite)** 👑\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🌐 **المسح السعري اللحظي**\n"
+        "### شهية المخاطرة 📊\n"
+        "#### نظرة عامة على السوق 🌐\n"
         f"- **سعر الذهب الحالي:** {gold:.2f}$ 💰\n"
         f"- **اعلى النطاق:** {sh:.2f}$ | **ادنى النطاق:** {sl:.2f}$\n"
         f"- **مؤشر RSI:** {rsi:.2f} 📊\n"
         f"- **مؤشر MACD:** {macd:.4f} 📉\n"
         f"- **مؤشر ATR:** {atr:.2f}$ 📊\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📈 **الركائز الفنية الأساسية**\n"
+        "#### تحليل الفني 📈\n"
         "- **مستويات فيبوناتشي:**\n"
         f"{fib_block}\n"
         f"- **نقطة المحور:** {pivot:.2f}$ | **R1:** {r1:.2f}$ | **S1:** {s1:.2f}$\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 **الركائز الأساسية (الماكرو والسيولة)**\n"
+        "#### تحليل الاساسي 📊\n"
         f"- **معدل التضخم:** {inflation:.2f}%\n"
         f"- **معدل الفائدة:** {interest:.2f}%\n"
         f"- **العائد الحقيقي:** {ry:.2f}%\n"
@@ -7220,20 +5121,20 @@ def _build_spot_s9(d: dict) -> str:
         f"- **مؤشر الدولار (DXY):** {dxy_p:.4f}\n"
         "- **قوة العملات:**\n"
         f"{fx_block}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 **مصفوفة استراتيجيات التداول الشاملة (Trading Matrix)** 🎯\n*(بناءً على تفصيل الصفقات في القوالب السابقة، نضع بين يديك الآن \"المصفوفة الشاملة\" لإدارة رأس المال وتوزيع المخاطرة للسكالبينج والسوينج)*\n\n"
-        "⚡ **1. السكالبينج (خطف سريع - مخاطرة عالية)**\n"
+        "### 🎯 مصفوفة استراتيجيات التداول الشاملة (Trading Matrix) 🎯\n*(بناءً على تفصيل الصفقات في القوالب السابقة، نضع بين يديك الآن \"المصفوفة الشاملة\" لإدارة رأس المال وتوزيع المخاطرة للسكالبينج والسوينج)*\n\n"
+        "#### ⚡ 1. السكالبينج (خطف سريع - مخاطرة عالية)\n"
         f"- **🟢 شراء:** الدخول {sb.get('entry',0):.2f}$ | الوقف {sb.get('sl',0):.2f}$ | الأهداف {sb.get('t1',0):.2f}$ - {sb.get('t2',0):.2f}$ - {sb.get('t3',0):.2f}$\n"
         f"- **🔴 بيع:** الدخول {ss.get('entry',0):.2f}$ | الوقف {ss.get('sl',0):.2f}$ | الأهداف {ss.get('t1',0):.2f}$ - {ss.get('t2',0):.2f}$ - {ss.get('t3',0):.2f}$\n\n"
-        "📅 **2. التداول اليومي (Intraday - مخاطرة متوسطة)**\n"
+        "#### 📅 2. التداول اليومي (Intraday - مخاطرة متوسطة)\n"
         f"- **🟢 شراء:** الدخول {db.get('entry',0):.2f}$ | الوقف {db.get('sl',0):.2f}$ | الأهداف {db.get('t1',0):.2f}$ - {db.get('t2',0):.2f}$\n"
         f"- **🔴 بيع:** الدخول {ds.get('entry',0):.2f}$ | الوقف {ds.get('sl',0):.2f}$ | الأهداف {ds.get('t1',0):.2f}$ - {ds.get('t2',0):.2f}$\n\n"
-        "📆 **3. السوينج الاستراتيجي (مخاطرة مضبوطة)**\n"
+        "#### 📆 3. التداول الأسبوعي والسوينج (مدى أبعد - إدارة رأس مال صارمة)\n"
         f"- **🟢 السوينج الشرائي:** الدخول {swb.get('entry',0):.2f}$ | الوقف {swb.get('sl',0):.2f}$ | الأهداف {swb.get('t1',0):.2f}$ - {swb.get('t2',0):.2f}$ - {swb.get('t3',0):.2f}$\n"
         f"- **🔴 السوينج البيعي:** الدخول {sws.get('entry',0):.2f}$ | الوقف {sws.get('sl',0):.2f}$ | الأهداف {sws.get('t1',0):.2f}$ - {sws.get('t2',0):.2f}$ - {sws.get('t3',0):.2f}$\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ **ضوابط إدارة المخاطر (Risk Management)** ⚠️\n"
+        "### ⚠️ إدارة المخاطر (Risk Appetite Profile) ⚠️\n"
         f"- **التقييم الكمي للمخاطرة في السوق الآن:** {risk_pct:.0f}% ({risk_label})\n"
         f"- **إدارة المحفظة:** يُنصح بحجم مركز لا يتجاوز {100 - risk_pct:.0f}% من هامش المحفظة للصفقة الواحدة نظراً للظروف الحالية.\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n💡 **الحكم الاستراتيجي للصفقات**\n"
+        "### 💡 الحكم للتأثير النهائي على التداول 💡\n"
         f"بناءً على التقييم الكلي للمخاطرة، التوجه الأفضل للمتداولين {'في ظل هذه المخاطرة المنخفضة هو التداول بثقة مع الاتجاه' if risk_pct <= 45 else 'الآن هو التداول اللحظي السريع (سكالبينج) لتقليل فترة التعرض للسوق' if risk_pct > 60 else 'هو التداول اليومي بحذر والالتزام التام بنقاط الوقف'}."
     )
 
@@ -7272,16 +5173,16 @@ def _build_spot_s10(d: dict) -> str:
         f"*   **معدل الفائدة الفيدرالي**: {interest:.2f}% 📈\n"
         f"*   **معدل التضخم (CPI)**: {inflation:.2f}% 📊\n"
         f"*   **العائد الحقيقي** (TNX - CPI): **{ry:.2f}%** 📊\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n💰 **ترجمة الأرقام لتأثير سعري مباشر على الذهب**\n"
+        "#### تاثير الارقام على اسعار الذهب 💰\n"
         f"*   **تاثير عائد السندات ({tnx:.2f}%)**: {tnx_impact}\n"
         f"*   **تاثير معدل الفائدة ({interest:.2f}%)**: {int_impact}\n"
         f"*   **تاثير معدل التضخم ({inflation:.2f}%)**: {inf_impact}\n"
         f"*   **تاثير العائد الحقيقي ({ry:.2f}%)**: {ry_impact}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔮 **توقعات المسار السعري (Forecasting)**\n"
+        "#### التوقعات 📝\n"
         f"*   **النظرة المستقبلية للذهب**: {gold_outlook}\n"
         f"*   **السعر الحالي**: {gold:.2f}$\n"
         f"*   **منحنى العوائد**: {curve_lbl} — {'اشارة تحوط' if spread < 0 else 'اشارة ايجابية'}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n📝 **الخلاصة الميكانيكية للسكالبينج**\n"
+        "#### استنتاج 📝\n"
         f"*   بيئة الفائدة الحالية ({interest:.2f}%) مع تضخم ({inflation:.2f}%) تشير الى ان "
         f"العائد الحقيقي {ry:.2f}% وهو {'يضغط سلبا على الذهب' if ry > 0 else 'يدعم الذهب بشكل قوي'}.\n"
         "*   ومع ذلك، يجب مراعاة العوامل الجيوسياسية والطلب المادي على الذهب.\n"
@@ -7561,9 +5462,8 @@ RSI: {rsi} | MACD: {macd_val} | العائد الحقيقي: {ry}%
 
 🎯 خلاصة انحياز الذهب | {mode_label} | التحديث المباشر
 
-📈 احتمال صعود لضرب القمة (مستهدف {r2}$): [توقعك كنسبة]%
-📉 احتمال هبوط لضرب القاع (مستهدف {s2}$): [توقعك كنسبة]%
-🔀 احتمالية التذبذب العرضي (حول {gold}$): [توقعك كنسبة]%
+📈 نسبة الصعود: [توقعك كنسبة]%
+📉 نسبة الهبوط: [توقعك كنسبة]%
 
 🧭 الخلاصة:
 [فقرة قصيرة جداً من سطرين تلخص وضع السوق والقرار المناسب بناء على الأرقام أعلاه]
@@ -7647,804 +5547,8 @@ def _build_all_tf_levels(data: dict) -> str:
         
     return "\n".join(lines)
 
-def _build_spot_s14(data: dict) -> str:
-    """القالب الجديد: القمة المتوقعة والقاع المتوقع وسعر الإغلاق والاتجاه الأول"""
-    nums = _s_nums(data)
-    current = nums.get('gold', data.get('gold', 0.0))
-    atr = nums.get('atr', 20.0)
-    pivot = nums.get('pivot', current)
-    
-    # Recorded extremes
-    recorded_high = data.get('daily_high', current)
-    if recorded_high <= current: recorded_high = current + (atr * 0.2)
-    recorded_low = data.get('daily_low', current)
-    if recorded_low >= current: recorded_low = current - (atr * 0.2)
-    
-    # Expected Extremes for the day (guaranteed logical vs current and recorded)
-    expected_high = max(float(nums.get('r2', 0)), current + atr * 0.6, recorded_high + atr * 0.1)
-    expected_low = min(float(nums.get('s2', 0)), current - atr * 0.6, recorded_low - atr * 0.1)
-    
-    rsi = nums.get('rsi', 50)
-    macd = nums.get('macd', 0.0)
-    
-    dist_high = abs(expected_high - current)
-    dist_low = abs(current - expected_low)
-    
-    close = data.get('prev_close', current)
-    confluence = data.get('confluence', {})
-    trend = confluence.get('verdict', 'محايد')
-    
-    if "شراء" in trend or "صاعد" in trend or (rsi > 55 and macd > 0):
-        expected_close = nums.get('r1', current + (atr * 0.5))
-    elif "بيع" in trend or "هابط" in trend or (rsi < 45 and macd < 0):
-        expected_close = nums.get('s1', current - (atr * 0.5))
-    else:
-        expected_close = pivot
-        
-    if "شراء" in trend or "صاعد" in trend or (rsi > 55 and macd > 0):
-        first_target = f"📈 استهداف القمة المتوقعة أولاً ({expected_high:.2f}$)"
-        reason = f"السيولة تتدفق بقوة نحو الأعلى (RSI: {rsi:.1f})، والاتجاه العام صاعد ومستقر. من المرجح جداً أن يندفع السعر لاختبار مناطق المقاومة العنيفة عند القمة المتوقعة قبل أي محاولة هبوط."
-    elif "بيع" in trend or "هابط" in trend or (rsi < 45 and macd < 0):
-        first_target = f"📉 استهداف القاع المتوقع أولاً ({expected_low:.2f}$)"
-        reason = f"السوق يخضع لضغوط بيعية واضحة (RSI: {rsi:.1f})، والاتجاه العام يميل بقوة للهبوط. التوقعات تشير لضرب مستويات الدعم العميقة عند القاع المتوقع قبل أي ارتداد."
-    else:
-        if dist_high < dist_low:
-            first_target = f"📈 الأقرب رياضياً هو القمة ({expected_high:.2f}$)"
-            reason = f"السوق حالياً في مسار متذبذب (عرضي)، ولكن السعر يتمركز في النصف العلوي وأقرب لمناطق القمة، مما يرجح اختبارها أولاً لتفريغ السيولة الشرائية المتبقية."
-        else:
-            first_target = f"📉 الأقرب رياضياً هو القاع ({expected_low:.2f}$)"
-            reason = f"السوق حالياً في مسار متذبذب (عرضي)، ولكن السعر يتمركز في النصف السفلي وأقرب لمناطق القاع، مما يرجح اختباره أولاً لتجميع سيولة شرائية جديدة."
-
-    template = f"""
-👑 **خارطة المسار اليومي المتوقع (Daily Expected Range)** 👑
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 **المحطات السعرية الأقصى توقعاً اليوم (Spot)**
-💰 السعر اللحظي الحالي: **{current:.2f}$**
-📌 القمة المسجلة حتى الآن: **{recorded_high:.2f}$**
-📌 القاع المسجل حتى الآن: **{recorded_low:.2f}$**
-🔒 سعر الإغلاق السابق (Prev Close): **{close:.2f}$**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 القمة المتوقعة (المستهدفة): **{expected_high:.2f}$**
-⚓ القاع المتوقع (المستهدف): **{expected_low:.2f}$**
-🏁 سعر الإغلاق المتوقع (Expected Close): **{expected_close:.2f}$**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧭 **البوصلة الزمنية: إلى أين نتجه أولاً؟**
-⚡ {first_target}
-
-🔬 **التحليل الميكانيكي الدقيق للمسار:**
-{reason}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 *تنويه: القمة والقاع هنا ليسا ما تم تسجيله بالفعل، بل هما الأهداف القصوى (القمة المتوقعة والقاع المتوقع) التي يتجه لها السعر اليوم بناءً على خوارزميات قياس الزخم والسيولة (ATR).*
-"""
-    return template.strip()
-
-def _build_spot_s15(data: dict) -> str:
-    """القالب الجديد: الحجم والسيولة والزخم وهل الاختراق حقيقي أم وهمي"""
-    current = data.get('gold', 0.0)
-    vol = data.get('rel_vol', 1.0)
-    rsi = data.get('rsi', 50.0)
-    macd_hist = data.get('macd_hist', 0.0)
-    
-    if vol > 1.5:
-        vol_state = "🔵 سيولة مؤسساتية ضخمة (حجم تداول مرتفع جداً)"
-        vol_score = "ممتاز ✅"
-    elif vol > 1.0:
-        vol_state = "🟢 سيولة نشطة (حجم تداول فوق المتوسط)"
-        vol_score = "جيد ☑️"
-    elif vol > 0.7:
-        vol_state = "🟡 سيولة طبيعية (حجم تداول متوسط)"
-        vol_score = "مقبول ➖"
-    else:
-        vol_state = "🔴 سيولة ضعيفة/جفاف (حجم تداول منخفض)"
-        vol_score = "ضعيف ❌"
-
-    if rsi >= 65 and macd_hist > 0:
-        mom_state = "🚀 زخم شرائي انفجاري"
-    elif rsi <= 35 and macd_hist < 0:
-        mom_state = "🩸 زخم بيعي عنيف"
-    elif rsi > 50:
-        mom_state = "📈 زخم شرائي معتدل"
-    elif rsi < 50:
-        mom_state = "📉 زخم بيعي معتدل"
-    else:
-        mom_state = "⚖️ زخم محايد (انعدام اتجاه واضح)"
-
-    if vol >= 1.2:
-        if rsi >= 55:
-            breakout_state = "✅ الاختراقات الصاعدة (Breakouts) حقيقية وموثوقة (مدعومة بسيولة شراء قوية)."
-        elif rsi <= 45:
-            breakout_state = "✅ الكسور الهابطة (Breakdowns) حقيقية وموثوقة (مدعومة بسيولة بيع قوية)."
-        else:
-            breakout_state = "⚠️ الحركات السعرية الحالية تحتاج تأكيد بإغلاق الشموع (حرب سيولة ومحاولة للسيطرة)."
-    else:
-        breakout_state = "❌ احذر: الاختراقات والكسور الحالية غالباً **(وهمية - Fakeouts)** بسبب ضعف الفوليوم والسيولة الداعمة (مصيدة صناع السوق)."
-
-    template = f"""
-👑 **الرادار المؤسساتي: كشف السيولة والكسور الوهمية** 👑
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌊 **مؤشرات الفوليوم وتدفق السيولة (Liquidity)**
-🔹 حالة السيولة اللحظية: **{vol_state}**
-🔹 قوة الزخم (Momentum): **{mom_state}**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 **كشف التلاعب: هل الاختراقات والكسور حقيقية؟**
-🚨 **التقييم الخوارزمي:** 
-{breakout_state}
-
-💡 *القاعدة الذهبية: لا تثق بأي اختراق لمقاومة أو كسر لدعم ما لم يكن مصحوباً بسيولة مؤسساتية مؤكدة لتجنب مصيدة صناع السوق.*
-"""
-    return template.strip()
-
-def _build_spot_s16(data: dict) -> str:
-    """القالب الجديد: استراتيجية التداول بحجم اللوت الكامل (Full Lot Strategy)"""
-    current = data.get('gold', 0.0)
-    s1 = data.get('s1', current - 15)
-    s2 = data.get('s2', current - 30)
-    s3 = data.get('s3', current - 50)
-    r1 = data.get('r1', current + 15)
-    r2 = data.get('r2', current + 30)
-    r3 = data.get('r3', current + 50)
-
-    template = f"""
-👑 **الخطة التكتيكية للسيولة (Full Lot Strategy)** 👑
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🟢 **1. استراتيجية الشراء (الدعوم الحيوية):**
-🛒 **نشتري لوت كامل:** **{s1:.2f}$**
-🎯 **الهدف:** **{r1:.2f}$**
-🛑 **الاستوب:** إغلاق شمعة ساعة أسفل **{s2:.2f}$**
-
-🔴 **2. استراتيجية تأكيد الكسر (التحول البيعي):**
-🔻 **بيع لوت كامل** بعد إغلاق شمعة ساعة أسفل: **{s2:.2f}$**
-🎯 **الهدف الممتد:** **{s3:.2f}$**
-
-🩸 **3. استراتيجية البيع العكسي (القمم):**
-📉 **بيع لوت كامل:** **{r2:.2f}$**
-🎯 **الهدف الممتد:** **{s3:.2f}$**
-🛑 **الاستوب:** إغلاق شمعة يومية أعلى **{r3:.2f}$**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 *تنويه: يُرجى الالتزام التام بشروط الإغلاق الموضحة في وقف الخسارة لحماية رأس المال.*
-"""
-    return template.strip()
-
-def _build_early_warning_alert(data: dict) -> str:
-    """القالب الجديد: تنبيه مبكر — انعكاس مرتقب"""
-    current = data.get('gold', 0.0)
-    rsi = data.get('tf_hourly', {}).get('rsi', 50)
-    atr = data.get('atr', 20.0)
-    
-    if rsi >= 70:
-        grade = "A"
-        expected_price = data.get('r3', current + atr * 2.5)
-        hours_to_rev = 12
-    elif rsi <= 30:
-        grade = "A"
-        expected_price = data.get('s3', current - atr * 2.5)
-        hours_to_rev = 12
-    elif rsi > 55:
-        grade = "B"
-        expected_price = data.get('r2', current + atr * 1.5)
-        hours_to_rev = 24
-    elif rsi < 45:
-        grade = "B"
-        expected_price = data.get('s2', current - atr * 1.5)
-        hours_to_rev = 24
-    else:
-        grade = "C"
-        expected_price = data.get('r1', current + atr * 0.8) if current > data.get('pivot', current) else data.get('s1', current - atr * 0.8)
-        hours_to_rev = 48
-        
-    try:
-        from datetime import datetime, timedelta
-        import pytz
-        CAIRO_TZ = pytz.timezone('Africa/Cairo')
-        rev_date = datetime.now(CAIRO_TZ) + timedelta(hours=hours_to_rev)
-        today_date = datetime.now(CAIRO_TZ).date()
-        
-        if rev_date.date() == today_date:
-            day_str = "اليوم"
-        elif rev_date.date() == today_date + timedelta(days=1):
-            day_str = "غداً"
-        else:
-            day_str = "قريباً"
-            
-        date_formatted = rev_date.strftime("%d %b %Y %H:00")
-    except:
-        day_str = "قريباً"
-        date_formatted = ""
-
-    if grade == "A":
-        grade_desc = "تشبع حاد ومفرط (انعكاس وشيك جداً وعنيف)"
-    elif grade == "B":
-        grade_desc = "بداية تشبع وزخم قوي ممتد (انعكاس محتمل قريباً)"
-    else:
-        grade_desc = "تذبذب سيولة (انعكاس ضعيف يعتمد على الدعوم/المقاومات)"
-        
-    template = f"""
-⏰ **تنبيه مبكر — انعكاس مرتقب**
-*(هذا التنبيه يخبرك بأن الاتجاه الحالي شارف على الانتهاء وسيعكس مساره)*
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 **XAUUSD | H1**
-⏳ **الإطار الزمني المتوقع للانعكاس:** {day_str} — {date_formatted}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 **نقطة الارتطام (السعر المتوقع):** **{expected_price:.2f}$**
-*(هي النقطة التي سينتهي عندها المسار الحالي وينعكس منها السوق، وهي أفضل منطقة لتعليق أوامر Limit عكسية)*
-
-🧠 **قوة التأكيد (الدرجة {grade}):** **{grade_desc}**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ **استعد وراقب السعر عند نقطة الارتطام لتقتنص الانعكاس.**
-"""
-    return template.strip()
-
-
-
-def _fetch_breaking_news() -> str:
-    """
-    جلب آخر الأخبار العاجلة — يجرب 4 مصادر RSS بالتسلسل حتى ينجح أحدها.
-    مصادر: ForexLive → Investing.com → MarketWatch → Reuters (Gold)
-    """
-    import requests
-    import xml.etree.ElementTree as ET
-    import re
-
-    RSS_SOURCES = [
-        {
-            'url': 'https://www.forexlive.com/feed/news',
-            'title_tag': 'title',
-            'desc_tag': 'description',
-            'name': 'ForexLive'
-        },
-        {
-            'url': 'https://www.investing.com/rss/news_25.rss',
-            'title_tag': 'title',
-            'desc_tag': 'description',
-            'name': 'Investing.com'
-        },
-        {
-            'url': 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines',
-            'title_tag': 'title',
-            'desc_tag': 'description',
-            'name': 'MarketWatch'
-        },
-        {
-            'url': 'https://feeds.reuters.com/reuters/businessNews',
-            'title_tag': 'title',
-            'desc_tag': 'description',
-            'name': 'Reuters'
-        },
-    ]
-
-    HEADERS = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-    }
-
-    for src in RSS_SOURCES:
-        try:
-            r = requests.get(src['url'], timeout=7, headers=HEADERS)
-            if r.status_code != 200:
-                log.warning(f"[News] {src['name']} => HTTP {r.status_code}")
-                continue
-
-            try:
-                root = ET.fromstring(r.content)
-            except ET.ParseError:
-                content_clean = r.content.lstrip(b'\xef\xbb\xbf')
-                root = ET.fromstring(content_clean)
-
-            items = root.findall('.//item')
-            if not items:
-                log.warning(f"[News] {src['name']} => 0 items found")
-                continue
-
-            news_list = []
-            for item in items[:6]:
-                title_el = item.find(src['title_tag'])
-                desc_el  = item.find(src['desc_tag'])
-                title = (title_el.text or '').strip() if title_el is not None else ''
-                desc  = (desc_el.text  or '').strip() if desc_el  is not None else ''
-                desc = re.sub(r'<[^>]+>', '', desc).strip()
-                desc = re.sub(r'\s+', ' ', desc)
-                if title and len(title) > 5:
-                    news_list.append(f"Title: {title}\nDetails: {desc[:300]}" if desc else f"Title: {title}")
-
-            if news_list:
-                log.info(f"[News] ✅ Got {len(news_list)} items from {src['name']}")
-                return "\n\n".join(news_list)
-            else:
-                log.warning(f"[News] {src['name']} => items parsed but all empty")
-
-        except requests.exceptions.Timeout:
-            log.warning(f"[News] {src['name']} => timeout")
-        except Exception as e:
-            log.warning(f"[News] {src['name']} => error: {e}")
-
-    log.warning("[News] ❌ All RSS sources failed — returning empty")
-    return ""
-
-def _build_sudden_news_alert(data: dict) -> str:
-    """رادار الأخبار العاجلة — يستخدم الأخبار الحقيقية أو تحليل السوق عند تعذّر الجلب"""
-    import random
-
-    HEADER = "🚨 **رادار الأخبار العاجلة (Breaking News)** 🚨\n━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-    news_text = _fetch_breaking_news()
-    has_news  = bool(news_text and len(news_text.strip()) > 15)
-
-    # ── المسار 1: أخبار متاحة → Groq يحلل ويترجم ──
-    if has_news:
-        prompt = f"""أنت خبير اقتصادي مختص في الذهب.
-إليك آخر أخبار عاجلة من السوق:
-{news_text}
-
-المطلوب:
-1. اختر أهم خبر أو حدث مهما كان تأثيره (حتى لو كان متوسطاً).
-2. لا تقل أبداً 'لا توجد أحداث مؤثرة' — دائماً اختر الأهم مما ورد.
-3. ترجم وصغ بالعربية داخل هذا القالب فقط دون أي ديباجة:
-
-{HEADER}
-📰 **الخبر البارز:**
-[عنوان الخبر وتفاصيله المترجمة بدقة واحترافية]
-
-🔥 **درجة التأثير:** [عالية جداً / متوسطة / ضعيفة]
-📈 **التوجه المتوقع للذهب بناءً على الخبر:** [صعودي 🟢 / هبوطي 🔴 / تذبذب 🟡]
-"""
-        client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
-        if client:
-            for attempt in range(2):
-                try:
-                    resp = client.chat.completions.create(
-                        messages=[{"role": "user", "content": prompt}],
-                        model=random.choice(GROQ_MODELS),
-                        temperature=0.3,
-                        max_tokens=600
-                    )
-                    ans = resp.choices[0].message.content.strip()
-                    if ans and len(ans) > 30:
-                        return ans
-                except Exception as e:
-                    log.warning(f"[NewsAlert] Groq attempt {attempt+1} failed: {e}")
-
-        # Groq فشل لكن الأخبار موجودة — نعرضها مباشرة بتنسيق جيد
-        first_item = news_text.split('\n\n')[0]
-        lines = first_item.split('\n')
-        title   = lines[0].replace('Title:', '').strip()
-        details = lines[1].replace('Details:', '').strip() if len(lines) > 1 else ''
-        return (
-            f"{HEADER}\n"
-            f"📰 **الخبر البارز:**\n{title}\n"
-            + (f"📄 {details}\n" if details else '')
-            + f"\n🔥 **درجة التأثير:** متوسطة"
-            f"\n📈 **التوجه المتوقع للذهب:** تذبذب 🟡"
-        )
-
-    # ── المسار 2: لا أخبار خارجية → تحليل سوق حقيقي من البيانات ──
-    gold  = data.get('gold', 0.0)
-    atr   = data.get('atr', 20.0)
-    rsi   = float(data.get('rsi', 50))
-    bias  = data.get('confluence', {}).get('bias', 'neutral')
-    r1    = data.get('r1', round(gold + atr, 2))
-    s1    = data.get('s1', round(gold - atr, 2))
-    adx   = float(data.get('adx', 20))
-
-    if bias == 'bull':
-        bias_ar    = "صعودي 🟢"
-        sentiment  = f"الزخم الداخلي إيجابي — السعر {gold:.2f}$ يستهدف المقاومة {r1:.2f}$"
-        impact_lvl = "متوسطة" if adx < 25 else "عالية"
-    elif bias == 'bear':
-        bias_ar    = "هبوطي 🔴"
-        sentiment  = f"ضغط بيع سائد — السعر {gold:.2f}$ يستهدف الدعم {s1:.2f}$"
-        impact_lvl = "متوسطة" if adx < 25 else "عالية"
-    else:
-        bias_ar    = "تذبذب 🟡"
-        sentiment  = f"السوق في نطاق عرضي بين {s1:.2f}$ و{r1:.2f}$ — انتظار محفّز لكسر النطاق"
-        impact_lvl = "ضعيفة"
-
-    rsi_note = (
-        f"RSI={rsi:.1f} → تشبع شرائي ⚠️" if rsi > 68 else
-        f"RSI={rsi:.1f} → تشبع بيعي 🔻" if rsi < 32 else
-        f"RSI={rsi:.1f} → محايد ↔️"
-    )
-
-    return (
-        f"{HEADER}\n"
-        f"📰 **الوضع الراهن للسوق:**\n"
-        f"{sentiment}\n"
-        f"📊 {rsi_note} | ATR اليومي: {atr:.2f}$ | ADX: {adx:.1f}\n"
-        f"🎯 نطاق التداول: {s1:.2f}$ ↔ {r1:.2f}$\n\n"
-        f"🔥 **درجة الحركة المتوقعة:** {impact_lvl}\n"
-        f"📈 **التوجه المتوقع للذهب:** {bias_ar}"
-    )
-
-def _build_institutional_liquidity_map(data: dict) -> str:
-    """القالب الجديد: خريطة السيولة المؤسساتية (Smart Money Concepts)"""
-    gold = data.get('gold', 0.0)
-    atr = data.get('atr', 20.0)
-    s3 = data.get('s3', gold - atr * 2)
-    r3 = data.get('r3', gold + atr * 2)
-    sh = data.get('swing_h', gold + atr)
-    sl = data.get('swing_l', gold - atr)
-    
-    hist_ctx = data.get('hist_ctx', {}) or {}
-    low_52w = hist_ctx.get('low_52w', gold - atr * 15)
-    high_52w = hist_ctx.get('high_52w', gold + atr * 15)
-    
-    # Buy-side Liquidity (Whales buying from retail sell-stops)
-    buy_zone_top = round(min(s3, sl) + (atr * 0.2), 2)
-    buy_zone_bot = round(min(s3, sl) - (atr * 0.8), 2)
-    
-    # Sell-side Liquidity (Whales selling into retail buy-stops)
-    sell_zone_bot = round(max(r3, sh) - (atr * 0.2), 2)
-    sell_zone_top = round(max(r3, sh) + (atr * 0.8), 2)
-    
-    # Sovereign / Macro zones (using nearest 100 round numbers or 52W extremes)
-    macro_buy = round(low_52w, 2)
-    if gold - macro_buy > 200:
-        macro_buy = round(gold - (gold % 100), 2)  # nearest lower 100
-        
-    macro_sell = round(high_52w, 2)
-    if macro_sell - gold > 200:
-        macro_sell = round(gold + (100 - (gold % 100)), 2) # nearest upper 100
-
-    template = f"""
-🏦 **رادار السيولة المؤسساتية (Smart Money & Whales)** 🏦
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 **خريطة الأوامر المعلقة لكبار اللاعبين**
-
-🟢 **1. منطقة تجميع الحيتان (Discount Liquidity Pool):**
-📍 **النطاق المستهدف:** **{buy_zone_bot:.2f}$** إلى **{buy_zone_top:.2f}$**
-💡 **من ينتظر هنا؟** صناديق التحوط والمؤسسات المالية الكبرى.
-⚙️ **الاستراتيجية:** اصطياد قيعان الأفراد (Stop-Hunt) لبناء مراكز شراء ضخمة بأسعار مخفضة جداً، حيث تتحول ستوبات المبيعات إلى وقود لصعودهم.
-
-🔴 **2. منطقة تصريف الحيتان (Premium Liquidity Pool):**
-📍 **النطاق المستهدف:** **{sell_zone_bot:.2f}$** إلى **{sell_zone_top:.2f}$**
-💡 **من ينتظر هنا؟** البنوك التجارية وكبار المضاربين (Whales).
-⚙️ **الاستراتيجية:** ضرب قمم الأفراد وتصريف العقود الشرائية الضخمة وجني الأرباح العنيفة عند هذه المستويات.
-
-🏛️ **3. الجدار الاستراتيجي (مناطق البنوك المركزية والصناديق السيادية):**
-🛡️ **خط الدفاع الشرائي (أوامر سيادية):** بالقرب من **{macro_buy:.2f}$**
-🧱 **خط الدفاع البيعي (تدخلات عكسية):** بالقرب من **{macro_sell:.2f}$**
-💡 **ملاحظة:** هذه المستويات تُمثل "القيمة العادلة الكبرى" ولا تُكسر بسهولة، وتُعد أهدافاً استثمارية طويلة الأمد للإبقاء على توازن الأسواق.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ *تنويه: الأسعار داخل هذه المناطق تشهد تذبذباً عنيفاً جداً (Spikes) ومحاولات خداع (Fakeouts) قبل أخذ الاتجاه الحقيقي (Mark-up / Mark-down).*
-"""
-    return template.strip()
-
-
-def _build_volume_contracts_tracker(data: dict) -> str:
-    """القالب الجديد: كاشف السيولة اللحظية وأحجام العقود"""
-    gold = data.get('gold', 0.0)
-    atr = data.get('atr', 20.0)
-    rsi = data.get('tf_daily', {}).get('rsi', 50)
-    macd_hist = data.get('tf_daily', {}).get('macd_hist', 0)
-    
-    base_volume = 280000 
-    vol_multiplier = (atr / 22.0)
-    micro_variance = (gold % 10) / 100.0
-    total_lots = int(base_volume * vol_multiplier * (1 + micro_variance))
-    
-    buy_ratio = 0.5 + ((rsi - 50) / 100.0)
-    if macd_hist > 0:
-        buy_ratio += 0.05
-    elif macd_hist < 0:
-        buy_ratio -= 0.05
-        
-    buy_ratio = max(0.25, min(0.75, buy_ratio))
-    sell_ratio = 1.0 - buy_ratio
-    
-    buy_contracts = int(total_lots * buy_ratio)
-    sell_contracts = total_lots - buy_contracts
-    
-    if atr > 30 or rsi > 70 or rsi < 30:
-        liquidity_state = "🚨 تدفق مفاجئ وعنيف (Sudden Influx)"
-        relative_strength = int(120 + (atr - 30) * 2)
-    elif atr < 15:
-        liquidity_state = "💤 سيولة ضعيفة ومستقرة (Low Volume)"
-        relative_strength = int(70 + atr)
-    else:
-        liquidity_state = "✅ سيولة طبيعية ومستقرة (Normal Volume)"
-        relative_strength = int(90 + (atr - 15) * 1.5)
-        
-    dominant_side = "المشترين 🟢" if buy_contracts > sell_contracts else "البائعين 🔴"
-    
-    if buy_contracts > sell_contracts * 1.2:
-        short_term = "سيولة الشراء المفاجئة تدفع السعر لاختبار المقاومات اللحظية بقوة."
-        daily_term = "استمرار تدفق السيولة يعزز احتمالية إغلاق يومي إيجابي واختراق القمم."
-        mid_term = "تراكم عقود الشراء المؤسساتية يدعم بناء ترند صاعد مستقر للأيام القادمة."
-    elif sell_contracts > buy_contracts * 1.2:
-        short_term = "ضغط البيع المباشر يختبر دعوم المشترين وقد يؤدي لكسر لحظي."
-        daily_term = "سيطرة البائعين ترفع احتمالات إغلاق يومي سلبي هابط."
-        mid_term = "التصريف الواضح للعقود ينذر بضغط هبوطي ممتد خلال الأسبوع الحالي."
-    else:
-        short_term = "حرب سيولة وتوازن مؤقت يضع السعر في مسار تذبذب لحظي."
-        daily_term = "توازن العقود قد يؤدي إلى إغلاق يومي قريب من مستويات الافتتاح (شمعة دوجي/حيرة)."
-        mid_term = "السوق في مرحلة تجميع/تصريف بانتظار محفز أساسي (أخبار) لتحديد مسار الأيام القادمة."
-
-    template = f"""
-🌊 **كاشف السيولة اللحظية وأحجام العقود** 🌊
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 **مقادير الفوليوم والسيولة النشطة الآن:**
-🔹 حالة السيولة: **{liquidity_state}**
-🔹 إجمالي التداول التقديري: **{total_lots:,}** عقد قياسي (Lot)
-🔹 القوة النسبية للسيولة: **{relative_strength}%** (مقارنة بالمتوسط).
-
-⚖️ **ميزان القوى (تحليل العقود):**
-🟢 عقود الشراء (Longs): **{buy_contracts:,}** عقد ({int(buy_ratio*100)}%).
-🔴 عقود البيع (Shorts): **{sell_contracts:,}** عقد ({int(sell_ratio*100)}%).
-💡 *الغلبة الحالية لـ **{dominant_side}** بناءً على تدفق السيولة الفعلي.*
-
-⏱️ **تأثير السيولة على المسار الزمني:**
-🎯 **المدى القريب (اللحظي):** 
-{short_term}
-📅 **المدى اليومي (نهاية الجلسة):** 
-{daily_term}
-📆 **المدى المتوسط (الأيام القادمة):** 
-{mid_term}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ *تنويه: أرقام العقود هي تقديرات رياضية دقيقة مبنية على تذبذب وزخم السوق الفوري (Spot).*
-"""
-    return template.strip()
-
-
-def _build_etf_flows_report(d: dict) -> str:
-    """قالب تدفقات السيولة في صناديق الذهب (ETF Flows)"""
-    import datetime
-    import math
-
-    gold = d.get('gold', 2400)
-    atr = d.get('atr', 20)
-    score = d.get('tf_daily', {}).get('score', 0)
-    rsi = d.get('rsi', 50)
-    macd = d.get('macd', 0.0)
-    
-    today = datetime.date.today()
-    last_week_end = today - datetime.timedelta(days=today.weekday() + 3)
-    
-    months_ar = {
-        1: "يناير", 2: "فبراير", 3: "مارس", 
-        4: "أبريل", 5: "مايو", 6: "يونيو", 
-        7: "يوليو", 8: "أغسطس", 9: "سبتمبر", 
-        10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر"
-    }
-    date_str_ar = f"{last_week_end.day} {months_ar[last_week_end.month]}"
-    
-    is_inflow = (score >= 0 and macd > -0.5) or (rsi > 45 and score > -2)
-    base_vol = (atr / 20.0) * (gold / 2000.0)
-    
-    if is_inflow:
-        title_state = "عودة قوية للاستثمارات إلى صناديق الذهب بعد تخارج سابق" if score >= 2 else "عودة ضعيفة للاستثمارات إلى صناديق الذهب بعد نزيف حاد"
-        week_usd = round(base_vol * (0.2 + abs(score)*0.1), 1)
-        if week_usd == 0: week_usd = 0.3
-        prev_outflow = round(week_usd * 2.5 + 1.2, 1)
-        point1 = f"شهدت صناديق الذهب العالمية دخول استثمارات طفيفة خلال الأسبوع المنتهي في {date_str_ar} بمقدار {week_usd} مليار دولار، بعد ما خرج في أسبوعين متتاليين {prev_outflow} مليار دولار."
-        tons_added = round(week_usd * 8.6, 1) 
-        point2 = f"الأسبوع الماضي ارتفعت حيازات الصناديق من الذهب بمقدار {tons_added} طن ذهب، وده أقل مستوى يدخل الصناديق منذ عدة أشهر 🍫"
-        eu_tons = round(tons_added * 0.6, 1)
-        na_tons = round(tons_added * 0.4, 1)
-        point3 = f"صناديق الذهب في أوروبا كانت الأكبر في دخول الاستثمارات بمقدار {eu_tons} طن ذهب، والصناديق في أمريكا الشمالية سجلت دخول {na_tons} طن."
-        net_4m = round(tons_added * 15.2 + 130.5, 1)
-        point4 = f"خلال آخر 4 شهور صناديق الذهب العالمي سجلت صافي خروج للاستثمارات في 3 شهور منهم وقللت حيازاتها من الذهب بمقدار {net_4m} طن 🔽."
-    else:
-        title_state = "استمرار نزيف الاستثمارات من صناديق الذهب العالمية"
-        week_usd = round(base_vol * (0.3 + abs(score)*0.15), 1)
-        if week_usd == 0: week_usd = 0.5
-        prev_inflow = round(week_usd * 1.5 + 0.8, 1)
-        point1 = f"شهدت صناديق الذهب العالمية خروج استثمارات حادة خلال الأسبوع المنتهي في {date_str_ar} بمقدار {week_usd} مليار دولار، مقارنة بدخول {prev_inflow} مليار دولار سابقاً."
-        tons_lost = round(week_usd * 8.6, 1)
-        point2 = f"الأسبوع الماضي انخفضت حيازات الصناديق من الذهب بمقدار {tons_lost} طن ذهب، في أقوى وتيرة تسييل منذ عدة أشهر 🍫"
-        na_tons = round(tons_lost * 0.55, 1)
-        eu_tons = round(tons_lost * 0.45, 1)
-        point3 = f"صناديق الذهب في أمريكا الشمالية كانت الأكبر في التخارج بمقدار {na_tons} طن ذهب، والصناديق في أوروبا سجلت خروج {eu_tons} طن."
-        net_4m = round(tons_lost * 15.2 + 150.5, 1)
-        point4 = f"خلال آخر 4 شهور صناديق الذهب العالمي سجلت صافي خروج للاستثمارات بشكل متتالي وقللت حيازاتها من الذهب بمقدار {net_4m} طن 🔽."
-
-    report = f"""📊 | {title_state}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🟠 {point1}
-
-🟠 {point2}
-
-🟠 {point3}
-
-🟠 {point4}
-"""
-    return report
-
-
-def _build_scalping_weekly_monthly(data: dict) -> str:
-    """قالب صفقات السكالبينج الأسبوعي والشهري — احترافي ودقيق"""
-    nums = _s_nums(data)
-    gold   = nums['gold']
-    atr    = nums['atr']
-    pivot  = nums['pivot']
-    rsi    = nums['rsi']
-    macd   = nums['macd']
-    r1, r2, r3 = nums['r1'], nums['r2'], nums.get('r3', round(nums['r2'] + atr, 2))
-    s1, s2, s3 = nums['s1'], nums['s2'], nums.get('s3', round(nums['s2'] - atr, 2))
-    sh, sl = nums['swing_h'], nums['swing_l']
-
-    fib = data.get('fib', {}) or {}
-
-    # اتجاه الصفقة بناءً على RSI و MACD
-    if rsi > 55 and macd > 0:
-        bias = 'شراء'
-        bias_icon = '🟢'
-    elif rsi < 45 and macd < 0:
-        bias = 'بيع'
-        bias_icon = '🔴'
-    else:
-        bias = 'محايد'
-        bias_icon = '⚪'
-
-    # ─── السكالبينج اليومي (مرجع) ───
-    scalp_b_entry = round(s1 + (pivot - s1) * 0.25, 2)
-    scalp_b_sl    = round(scalp_b_entry - atr * 0.35, 2)
-    scalp_b_t1    = round(scalp_b_entry + atr * 0.45, 2)
-    scalp_b_t2    = round(max(pivot, scalp_b_t1 + atr * 0.3), 2)
-    scalp_b_t3    = round(max(r1, scalp_b_t2 + atr * 0.3), 2)
-
-    scalp_s_entry = round(r1 - (r1 - pivot) * 0.25, 2)
-    scalp_s_sl    = round(scalp_s_entry + atr * 0.35, 2)
-    scalp_s_t1    = round(scalp_s_entry - atr * 0.45, 2)
-    scalp_s_t2    = round(min(pivot, scalp_s_t1 - atr * 0.3), 2)
-    scalp_s_t3    = round(min(s1, scalp_s_t2 - atr * 0.3), 2)
-
-    # ─── السكالبينج الأسبوعي ───
-    week_atr = round(atr * 3.5, 2)
-    w_buy_entry = round(sl + atr * 0.5, 2)
-    w_buy_sl    = round(sl - atr * 0.4, 2)
-    w_buy_t1    = round(w_buy_entry + week_atr * 0.4, 2)
-    w_buy_t2    = round(w_buy_entry + week_atr * 0.75, 2)
-    w_buy_t3    = round(max(sh, w_buy_t2 + week_atr * 0.3), 2)
-
-    w_sell_entry = round(sh - atr * 0.5, 2)
-    w_sell_sl    = round(sh + atr * 0.4, 2)
-    w_sell_t1    = round(w_sell_entry - week_atr * 0.4, 2)
-    w_sell_t2    = round(w_sell_entry - week_atr * 0.75, 2)
-    w_sell_t3    = round(min(sl, w_sell_t2 - week_atr * 0.3), 2)
-
-    w_rr_buy  = round(abs(w_buy_t2 - w_buy_entry) / max(abs(w_buy_entry - w_buy_sl), 0.01), 2)
-    w_rr_sell = round(abs(w_sell_entry - w_sell_t2) / max(abs(w_sell_sl - w_sell_entry), 0.01), 2)
-
-    # ─── السكالبينج الشهري ───
-    month_atr = round(atr * 10.0, 2)
-    fib_618 = float(fib.get('61.8%', 0) or 0) or round(gold - atr * 3, 2)
-    fib_236 = float(fib.get('23.6%', 0) or 0) or round(gold + atr * 3, 2)
-
-    m_buy_entry = round(fib_618, 2)
-    m_buy_sl    = round(fib_618 - atr * 1.2, 2)
-    m_buy_t1    = round(m_buy_entry + month_atr * 0.3, 2)
-    m_buy_t2    = round(m_buy_entry + month_atr * 0.6, 2)
-    m_buy_t3    = round(m_buy_entry + month_atr * 1.0, 2)
-
-    m_sell_entry = round(fib_236, 2)
-    m_sell_sl    = round(fib_236 + atr * 1.2, 2)
-    m_sell_t1    = round(m_sell_entry - month_atr * 0.3, 2)
-    m_sell_t2    = round(m_sell_entry - month_atr * 0.6, 2)
-    m_sell_t3    = round(m_sell_entry - month_atr * 1.0, 2)
-
-    m_rr_buy  = round(abs(m_buy_t2 - m_buy_entry) / max(abs(m_buy_entry - m_buy_sl), 0.01), 2)
-    m_rr_sell = round(abs(m_sell_entry - m_sell_t2) / max(abs(m_sell_sl - m_sell_entry), 0.01), 2)
-
-    # تقدير نسبة الربح/الخسارة
-    risk_buy_d  = round(abs(scalp_b_entry - scalp_b_sl), 2)
-    rew_buy_d   = round(abs(scalp_b_t2 - scalp_b_entry), 2)
-    rr_buy_d    = round(rew_buy_d / max(risk_buy_d, 0.01), 2)
-
-    risk_sell_d = round(abs(scalp_s_sl - scalp_s_entry), 2)
-    rew_sell_d  = round(abs(scalp_s_entry - scalp_s_t2), 2)
-    rr_sell_d   = round(rew_sell_d / max(risk_sell_d, 0.01), 2)
-
-    report = f"""👑 **مصفوفة السكالبينج الشاملة — يومي / أسبوعي / شهري** 👑
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💰 **السعر الحالي:** **{gold:.2f}$** | **ATR اليومي:** {atr:.2f}$ | **الاتجاه:** {bias_icon} {bias}
-🎯 **المحور:** {pivot:.2f}$ | **R1:** {r1:.2f}$ | **S1:** {s1:.2f}$
-📊 **RSI:** {rsi:.2f} | **MACD:** {macd:.4f}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📅 **أولاً: صفقات السكالبينج اليومي (Intraday)**
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-🟢 **سكالبينج شراء (Scalp Buy):**
-▪️ الدخول: **{scalp_b_entry:.2f}$** | وقف الخسارة: **{scalp_b_sl:.2f}$** (خطر: {round(scalp_b_entry-scalp_b_sl,2)}$)
-▪️ هدف 1: **{scalp_b_t1:.2f}$** | هدف 2: **{scalp_b_t2:.2f}$** | هدف 3: **{scalp_b_t3:.2f}$**
-▪️ نسبة R:R → **1:{rr_buy_d:.1f}** *(مكافأة مقابل مخاطرة)*
-
-🔴 **سكالبينج بيع (Scalp Sell):**
-▪️ الدخول: **{scalp_s_entry:.2f}$** | وقف الخسارة: **{scalp_s_sl:.2f}$** (خطر: {round(scalp_s_sl-scalp_s_entry,2)}$)
-▪️ هدف 1: **{scalp_s_t1:.2f}$** | هدف 2: **{scalp_s_t2:.2f}$** | هدف 3: **{scalp_s_t3:.2f}$**
-▪️ نسبة R:R → **1:{rr_sell_d:.1f}**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📆 **ثانياً: صفقات السكالبينج الأسبوعي (Weekly Swing)**
-*(ATR أسبوعي مقدر: {week_atr:.2f}$)*
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-🟢 **أسبوعي شراء:**
-▪️ الدخول: **{w_buy_entry:.2f}$** | وقف الخسارة: **{w_buy_sl:.2f}$**
-▪️ هدف 1: **{w_buy_t1:.2f}$** | هدف 2: **{w_buy_t2:.2f}$** | هدف 3 (قمة): **{w_buy_t3:.2f}$**
-▪️ نسبة R:R → **1:{w_rr_buy:.1f}**
-
-🔴 **أسبوعي بيع:**
-▪️ الدخول: **{w_sell_entry:.2f}$** | وقف الخسارة: **{w_sell_sl:.2f}$**
-▪️ هدف 1: **{w_sell_t1:.2f}$** | هدف 2: **{w_sell_t2:.2f}$** | هدف 3 (قاع): **{w_sell_t3:.2f}$**
-▪️ نسبة R:R → **1:{w_rr_sell:.1f}**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🗓️ **ثالثاً: صفقات السكالبينج الشهري (Monthly Position)**
-*(ATR شهري مقدر: {month_atr:.2f}$)*
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-🟢 **شهري شراء (عند فيبوناتشي 61.8%):**
-▪️ الدخول: **{m_buy_entry:.2f}$** | وقف الخسارة: **{m_buy_sl:.2f}$**
-▪️ هدف 1: **{m_buy_t1:.2f}$** | هدف 2: **{m_buy_t2:.2f}$** | هدف 3: **{m_buy_t3:.2f}$**
-▪️ نسبة R:R → **1:{m_rr_buy:.1f}**
-
-🔴 **شهري بيع (عند فيبوناتشي 23.6%):**
-▪️ الدخول: **{m_sell_entry:.2f}$** | وقف الخسارة: **{m_sell_sl:.2f}$**
-▪️ هدف 1: **{m_sell_t1:.2f}$** | هدف 2: **{m_sell_t2:.2f}$** | هدف 3: **{m_sell_t3:.2f}$**
-▪️ نسبة R:R → **1:{m_rr_sell:.1f}**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ *جميع الأرقام محسوبة رياضياً بدقة بناءً على ATR الحالي ومستويات فيبوناتشي الفعلية. تُحدَّث تلقائياً مع كل تقرير.*"""
-    return report
-
-
-def _build_liquidity_time_targets(data: dict) -> str:
-    """القالب الجديد: أهداف السيولة الزمنية (جلسة، يوم، أسبوع، شهر)"""
-    current = float(data.get('gold', 2000.0))
-    atr = float(data.get('atr', 20.0))
-    
-    rsi = float(data.get('rsi', 50.0))
-    macd = float(data.get('macd', 0.0))
-    confluence = data.get('confluence', {})
-    trend = confluence.get('verdict', 'محايد')
-    
-    if "شراء" in trend or "صاعد" in trend or (rsi > 55 and macd > 0):
-        flow_dir = 1
-        flow_text = "🟢 تدفق شرائي (Bullish Liquidity)"
-    elif "بيع" in trend or "هابط" in trend or (rsi < 45 and macd < 0):
-        flow_dir = -1
-        flow_text = "🔴 تدفق بيعي (Bearish Liquidity)"
-    else:
-        flow_dir = 1 if rsi >= 50 else -1
-        flow_text = "⚪ سيولة متذبذبة (Neutral / Choppy)"
-
-    target_session = round(current + (flow_dir * atr * 0.35), 2)
-    target_day = round(current + (flow_dir * atr * 0.85), 2)
-    target_week = round(current + (flow_dir * atr * 2.5), 2)
-    target_month = round(current + (flow_dir * atr * 8.0), 2)
-
-    icon_s = "📈" if flow_dir == 1 else "📉"
-    
-    template = f"""
-👑 **أهداف السيولة الزمنية المتراكمة (Time-Based Liquidity Targets)** 👑
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧭 **اتجاه السيولة المهيمن الآن:** **{flow_text}**
-💰 **السعر اللحظي الراهن:** **{current:.2f}$**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 **رقم السيولة المستهدف إلى نهاية الجلسة (Session):**
-{icon_s} السعر الدقيق: **{target_session:.2f}$**
-*(يمثل المحطة القادمة لضرب سيولة المضاربين اللحظيين)*
-
-🎯 **رقم السيولة المستهدف إلى نهاية اليوم (Daily):**
-{icon_s} السعر الدقيق: **{target_day:.2f}$**
-*(يمثل إغلاق شمعة اليوم وتمركز سيولة التبييت)*
-
-🎯 **رقم السيولة المستهدف إلى نهاية الأسبوع (Weekly):**
-{icon_s} السعر الدقيق: **{target_week:.2f}$**
-*(يمثل نقطة تمركز صناع السوق وصناديق التحوط للأسبوع)*
-
-🎯 **رقم السيولة المستهدف إلى نهاية الشهر (Monthly):**
-{icon_s} السعر الدقيق: **{target_month:.2f}$**
-*(يمثل الهدف الماكرو-اقتصادي للسيولة المؤسساتية الاستراتيجية)*
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ *ملاحظة كمية: هذه الأرقام ديناميكية وتتحدث فورياً مع تحرك مؤشرات التذبذب (ATR) وتدفقات الفوليوم.*
-"""
-    return template.strip()
-
-
 def send_reports(data: dict, report_text: str, prefix: str = ""):
-    try:
-        from Goldbot.send_lock import SEND_LOCK, _futures_cache
-    except ImportError:
-        from send_lock import SEND_LOCK, _futures_cache
+    from Goldbot.send_lock import SEND_LOCK, _futures_cache
 
     log.info("🤖 [Spot] بدء توليد التقارير (خارج القفل)...")
     raw_reports = []
@@ -8527,20 +5631,12 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
 
 
-        raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الفوري)", t0 if t0 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        raw_reports.append(("📊 التقرير الفني المتقدم (الفوري)", t1 if t1 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الفوري)", t2 if t2 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        raw_reports.append(("⚠️ تقرير شهية المخاطرة (الفوري)", t3 if t3 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        raw_reports.append(("📈 تقرير عوائد السندات (الفوري)", t4 if t4 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        raw_reports.append(("💱 تقرير قوة العملات (الفوري)", t5 if t5 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        
-        # القوالب الإضافية للبوت الأول (للوصول إلى 29 قالب شامل)
-        raw_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7 if t7 else _build_template_7(data), None))
-        raw_reports.append(("🐋 تاثير الاسواق والمؤسسات (الفوري)", t8 if t8 else _build_template_8(data), None))
-        raw_reports.append(("🎯 المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
-        raw_reports.append(("📊 تقرير اتجاه الذهب اليومي (الفوري)", t9 if t9 else _build_template_9(data), None))
-        raw_reports.append(("📆 التقرير الاسبوعي الشامل (الفوري)", t10 if t10 else _build_template_10(data), None))
-        raw_reports.append(("📰 تقرير CFTC (الفوري)", t11 if t11 else _build_template_11(data), None))
+        if t0: raw_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس (الفوري)", t0, None))
+        if t1: raw_reports.append(("📊 التقرير الفني المتقدم (الفوري)", t1, None))
+        if t2: raw_reports.append(("🌍 تقرير الاقتصاد الكلي (الفوري)", t2, None))
+        if t3: raw_reports.append(("⚠️ تقرير شهية المخاطرة (الفوري)", t3, None))
+        if t4: raw_reports.append(("📈 تقرير عوائد السندات (الفوري)", t4, None))
+        if t5: raw_reports.append(("💱 تقرير قوة العملات (الفوري)", t5, None))
         
         # ── 4. قالب سيولة اليومي ──
         from datetime import datetime
@@ -8579,7 +5675,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 2️⃣ {sell_t2}$
 3️⃣ {sell_t3}$
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ تنبيه: الدخول فقط بعد الكسر والثبات (إغلاق شمعة 15 دقيقة).
+⚠️ تنبيه: الدخول فقط بعد الكسر والثبات (إغلاق شمعة).
 """
 
         # ── 5. صفقات Buy Limit / Sell Limit ──
@@ -8638,17 +5734,11 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         
         # القالب الجديد للمستويات
         bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
-        # القوالب الذكية T0-T4 (نفس البوت الأول)
-        bot2_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس", t0 if t0 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        bot2_reports.append(("📊 التقرير الفني المتقدم", t1 if t1 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        bot2_reports.append(("🌍 تقرير الاقتصاد الكلي", t2 if t2 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        bot2_reports.append(("⚠️ تقرير شهية المخاطرة", t3 if t3 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
-        bot2_reports.append(("📈 تقرير عوائد السندات", t4 if t4 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
         # القالب الذكي الجديد CFTC (t11)
         bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(data), None))
         t13_src = t13 if t13 and 'تعذر' not in str(t13) else _build_template_13(data)
         if not t13_src:
-            t13_src = "━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + "\n".join([str(c) for c in _build_template_13.__code__.co_consts if isinstance(c, str) and len(c) > 5])
+            t13_src = "━━━━━━━━━━━━━━━━━━━━━━━━━━" + "━━━━━━━━━━━━━━━━━━━━━━━━━━".join(_build_template_13.__code__.co_consts) # Fallback if everything fails
         
         import re
         t13_clean = re.sub(r'\[.*?\]', '', t13_src, flags=re.DOTALL)
@@ -8658,22 +5748,19 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         # القوالب الفورية S1-S12 — البوت الثالث @Dsssoppp78_bot
         bot3_reports = []
         try:
-            bot3_reports.append(("[فوري] 1/16 الاسعار والفيبوناتشي",       _build_spot_s1(data),  None))
-            bot3_reports.append(("[فوري] 2/16 الاطارات الزمنية",            _build_spot_s2(data),  None))
-            bot3_reports.append(("[فوري] 3/16 زيرو انعكاس",                 _build_spot_s3(data),  None))
-            bot3_reports.append(("[فوري] 4/16 السكالبينج",                   _build_spot_s4(data),  None))
-            bot3_reports.append(("[فوري] 5/16 السوينج",                      _build_spot_s5(data),  None))
-            bot3_reports.append(("[فوري] 6/16 اللوت العالي",                 _build_spot_s6(data),  None))
-            bot3_reports.append(("[فوري] 7/16 التحليل الفني والزخم",         _build_spot_s7(data),  None))
-            bot3_reports.append(("[فوري] 8/16 الاقتصاد الكلي",              _build_spot_s8(data),  None))
-            bot3_reports.append(("[فوري] 9/16 شهية المخاطرة",               _build_spot_s9(data),  None))
-            bot3_reports.append(("[فوري] 10/16 عوائد السندات",              _build_spot_s10(data), None))
-            bot3_reports.append(("[فوري] 11/16 قوة العملات DXY",             _build_spot_s11(data), None))
-            bot3_reports.append(("[فوري] 12/16 الخلاصة المحورية",            _build_spot_s12(data), None))
-            bot3_reports.append(("[فوري] 13/16 المستهدف الأسبوعي", _build_friday_target(data, False), None))
-            bot3_reports.append(("[فوري] 14/16 مسار القمة والقاع", _build_spot_s14(data), None))
-            bot3_reports.append(("[فوري] 15/16 الرادار المؤسساتي والسيولة", _build_spot_s15(data), None))
-            bot3_reports.append(("[فوري] 16/16 استراتيجية اللوت الكامل", _build_spot_s16(data), None))
+            bot3_reports.append(("[فوري] 1/12 الاسعار والفيبوناتشي",       _build_spot_s1(data),  None))
+            bot3_reports.append(("[فوري] 2/12 الاطارات الزمنية",            _build_spot_s2(data),  None))
+            bot3_reports.append(("[فوري] 3/12 زيرو انعكاس",                 _build_spot_s3(data),  None))
+            bot3_reports.append(("[فوري] 4/12 السكالبينج",                   _build_spot_s4(data),  None))
+            bot3_reports.append(("[فوري] 5/12 السوينج",                      _build_spot_s5(data),  None))
+            bot3_reports.append(("[فوري] 6/12 اللوت العالي",                 _build_spot_s6(data),  None))
+            bot3_reports.append(("[فوري] 7/12 التحليل الفني والزخم",         _build_spot_s7(data),  None))
+            bot3_reports.append(("[فوري] 8/12 الاقتصاد الكلي",              _build_spot_s8(data),  None))
+            bot3_reports.append(("[فوري] 9/12 شهية المخاطرة",               _build_spot_s9(data),  None))
+            bot3_reports.append(("[فوري] 10/12 عوائد السندات",              _build_spot_s10(data), None))
+            bot3_reports.append(("[فوري] 11/12 قوة العملات DXY",             _build_spot_s11(data), None))
+            bot3_reports.append(("[فوري] 12/12 الخلاصة المحورية",            _build_spot_s12(data), None))
+            bot3_reports.append(("[فوري] 13/13 المستهدف الأسبوعي", _build_friday_target(data, False), None))
             log.info(f"[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي")
         except Exception as _se:
             log.warning(f"[S1-S12] خطا في توليد القوالب الفورية: {_se}")
@@ -8690,69 +5777,24 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             
         s9_report = _build_spot_s9(data)
         bot2_reports.append(("👑 مصفوفة التداول السريعة والاسكالبينج الاحترافي (Spot)", s9_report or f"مصفوفة التداول: السعر {data.get('gold',0):.2f}$", None))
-        bot2_reports.append(("🎯 المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
-        bot2_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
-        bot2_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
-        bot2_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
-        bot2_reports.append(("⏰ تنبيه مبكر — انعكاس مرتقب", _build_early_warning_alert(data), None))
-        bot2_reports.append(("🚨 رادار الأخبار العاجلة (Breaking News)", _build_sudden_news_alert(data), None))
-        bot2_reports.append(("🏦 رادار السيولة المؤسساتية (Smart Money)", _build_institutional_liquidity_map(data), None))
-        bot2_reports.append(("🌊 كاشف السيولة وأحجام العقود", _build_volume_contracts_tracker(data), None))
-        bot2_reports.append(("🎯 أهداف السيولة الزمنية (Targets)", _build_liquidity_time_targets(data), None))
-        bot2_reports.append(("📊 صناديق الذهب العالمية (ETF Flows)", _build_etf_flows_report(data), None))
-        bot2_reports.append(("📅 مصفوفة السكالبينج الشاملة (يومي/أسبوعي/شهري)", _build_scalping_weekly_monthly(data), None))
-
+        bot2_reports.append(("[16/16] المستهدف الأسبوعي (الجمعة)", _build_friday_target(data, False), None))
 
 
         # ── لا T6 خاص هنا ——  الخلاصة ستأتي مشتركة في الأسفل ──
 
         # ── تسطيح وإرسال ──
-        raw_reports.append(("👑 مسار القمة والقاع (اتجاه السيولة)", _build_spot_s14(data), None))
-        raw_reports.append(("👑 الرادار المؤسساتي (كشف التلاعب والسيولة)", _build_spot_s15(data), None))
-        raw_reports.append(("👑 الخطة التكتيكية (Full Lot Strategy)", _build_spot_s16(data), None))
-        raw_reports.append(("⏰ تنبيه مبكر — انعكاس مرتقب", _build_early_warning_alert(data), None))
-        raw_reports.append(("🚨 رادار الأخبار العاجلة (Breaking News)", _build_sudden_news_alert(data), None))
-        raw_reports.append(("🏦 رادار السيولة المؤسساتية (Smart Money)", _build_institutional_liquidity_map(data), None))
-        raw_reports.append(("🌊 كاشف السيولة وأحجام العقود", _build_volume_contracts_tracker(data), None))
-        raw_reports.append(("🎯 أهداف السيولة الزمنية (Targets)", _build_liquidity_time_targets(data), None))
-        raw_reports.append(("📊 صناديق الذهب العالمية (ETF Flows)", _build_etf_flows_report(data), None))
-        raw_reports.append(("📅 مصفوفة السكالبينج الشاملة (يومي/أسبوعي/شهري)", _build_scalping_weekly_monthly(data), None))
-
-        # ── تسطيح القوالب مع حفظ رقم القالب لضمان ثبات العدد ──
-        total_templates = len(raw_reports)  # عدد القوالب الثابت (مش الشانكس)
         flat_chunks = []
-        for tmpl_idx, (title, txt, chat_id) in enumerate(raw_reports, 1):
+        for title, txt, chat_id in raw_reports:
             for chunk in _split_message(txt):
-                flat_chunks.append((tmpl_idx, title, chunk, chat_id))
+                flat_chunks.append((title, chunk, chat_id))
+        total = len(flat_chunks)
 
-        total_templates_2 = len(bot2_reports) if 'bot2_reports' in locals() else 0
         flat_chunks_2 = []
         if 'bot2_reports' in locals():
-            for tmpl_idx2, (title, txt, chat_id) in enumerate(bot2_reports, 1):
+            for title, txt, chat_id in bot2_reports:
                 for chunk in _split_message(txt):
-                    flat_chunks_2.append((tmpl_idx2, title, chunk, chat_id))
-
-        # ── القوالب الجديدة — البوت الرابع @Boonnii_bot ──
-        BOT4_TOTAL = 12  # عدد ثابت دائماً
-        bot4_reports = []
-        bot4_reports.append(("🔬 [1] كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector(data), None))
-        bot4_reports.append(("🐋 [2] رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker(data), None))
-        bot4_reports.append(("🎯 [3] الأهداف السعرية الديناميكية", _build_dynamic_price_targets(data), None))
-        bot4_reports.append(("⚡ [4] رصد السيولة اللحظية المفاجئة", _build_live_liquidity_spike(data), None))
-        bot4_reports.append(("🧲 [5] خريطة ارتكاز السيولة المؤسساتية (Volume Profile)", _build_liquidity_concentration_zones(data), None))
-        bot4_reports.append(("🌍 [6] رادار عقود الخيارات العالمي", _build_global_options_radar(data), None))
-        bot4_reports.append(("🕵️ [7] مراقب محافظ الحيتان (Block Trades & Dark Pools)", _build_whale_wallet_monitor(data), None))
-        bot4_reports.append(("💥 [8] مراقب محافظ الحيتان والسيولة الهجومية (Momentum Block Trades)", _build_aggressive_whale_monitor(data), None))
-        bot4_reports.append(("🧮 [9] خزانة السيولة الكلية وتدفق العقود", _build_total_liquidity_flow_matrix(data), None))
-        bot4_reports.append(("⚖️ [10] ميزان قوى الحيتان مقابل القطيع", _build_smart_money_vs_retail(data), None))
-        bot4_reports.append(("🧠 [11] محرك القرار الخوارزمي النهائي", _build_ultimate_quant_score(data), None))
-        bot4_reports.append(("⏳ [12] مصفوفة التأثير الزمني الشامل", _build_timeframe_impact_matrix(data), None))
-
-        flat_chunks_4 = []
-        for tmpl_idx4, (title4, txt4, cid4) in enumerate(bot4_reports, 1):
-            if txt4:
-                for chunk4 in _split_message(txt4):
-                    flat_chunks_4.append((tmpl_idx4, title4, chunk4, cid4))
+                    flat_chunks_2.append((title, chunk, chat_id))
+        total_2 = len(flat_chunks_2)
 
         global LAST_PUBLIC_REPORT_TIME, LAST_4H_REPORT_TIME
         now = time.time()
@@ -8766,172 +5808,65 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             send_to_4h_channel = True
             LAST_4H_REPORT_TIME = now
 
-        def _inject_live_price(chunk_text):
-            if "⏱️ السعر الفوري وقت بناء هذا القسم:" not in chunk_text:
-                return chunk_text
-            
-            live_p = None
-            try:
-                import requests
-                _td_r = requests.get(f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}", timeout=4)
-                if _td_r.status_code == 200 and _td_r.json().get('price'):
-                    live_p = round(float(_td_r.json().get('price')), 2)
-            except:
-                pass
-                
-            if not live_p:
-                try:
-                    import requests
-                    r = requests.get("https://api.metals.live/v1/spot/gold", timeout=4)
-                    if r.status_code == 200:
-                        _j = r.json()
-                        _p = _j.get('price') or _j.get('gold') or (_j[0].get('gold') if isinstance(_j, list) else None)
-                        if _p: live_p = round(float(_p), 2)
-                except:
-                    pass
-            
-            if live_p:
-                now_cairo = cairo_now().strftime('%Y-%m-%d %H:%M:%S')
-                import re
-                chunk_text = re.sub(
-                    r"⏱️ السعر الفوري وقت بناء هذا القسم:.*$",
-                    f"⏱️ السعر الفوري (لحظة الإرسال): {live_p}$ — {now_cairo} القاهرة",
-                    chunk_text,
-                    flags=re.MULTILINE
-                )
-            return chunk_text
-
         log.info("⏳ [Spot] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
         with SEND_LOCK:
             log.info("🔒 [Spot] حصل على القفل — بدء إرسال الرسائل...")
-            log.info(f"📤 [Spot] إرسال {total_templates} قالب ({len(flat_chunks)} رسالة) للبوت الأول...")
+            log.info(f"📤 [Spot] إرسال {total} رسالة متسلسلة...")
 
-            for tmpl_idx, title, chunk, chat_id in flat_chunks:
-                chunk = _inject_live_price(chunk)
+            for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
                 subtitle = _get_subtitle(chunk, title)
                 final_text = (
-                    f"{prefix}[{tmpl_idx}/{total_templates}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
+                    f"{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
                     f"{subtitle}\n\n{chunk}"
                 )
                 ok = _send_single(final_text, is_public, chat_id)
                 
                 # Send to SovereignMaaregFund if 4 hours have passed
                 if send_to_4h_channel and not chat_id:
-                    pass # _send_single(final_text, is_public, "@Maaregsovereinefund")
+                    _send_single(final_text, is_public, "@SovereignMaaregFund")
                     
-                log.info(f"✅ قالب {tmpl_idx}/{total_templates} وصل." if ok else f"❌ فشل قالب {tmpl_idx}/{total_templates}.")
+                log.info(f"✅ رسالة {i}/{total} وصلت." if ok else f"❌ فشل رسالة {i}/{total}.")
                 time.sleep(2)
-
-            # ── خلاصة محورية 1 بعد انتهاء التقرير الأول ──
-            try:
-                _summary1_text = _build_group_summary(data, "التقرير الأول (الكمي الأساسي)", flat_chunks)
-                for c in BOT1_CHATS:
-                    send_summary_to_bot(TELEGRAM_BOT_TOKEN, _summary1_text, c)
-                log.info("✅ [Summary1] تم إرسال خلاصة التقرير الأول.")
-            except Exception as _e1:
-                log.error(f"❌ [Summary1] خطأ: {_e1}")
 
             # ── إرسال للبوت الجديد (القسم الثاني) ──
             if flat_chunks_2:
-                log.info(f"📤 إرسال {total_templates_2} قالب ({len(flat_chunks_2)} رسالة) للبوت الثاني...")
+                log.info(f"📤 إرسال {total_2} رسالة متسلسلة للبوت المستقل (الجزء الثاني)...")
+                import os
+                # استدعاء توكن البوت الجديد (مؤقتاً نستخدم نفس الإرسال المخصص إذا لم يتوفر التوكن، لكن يمكن للعميل تغييره)
+                bot2_token = os.environ.get('TELEGRAM_BOT_TOKEN_2', TELEGRAM_BOT_TOKEN) 
                 
-                for tmpl_idx2, title2, chunk2, chat_id2 in flat_chunks_2:
-                    chunk2 = _inject_live_price(chunk2)
+                for i2, (title2, chunk2, chat_id2) in enumerate(flat_chunks_2, 1):
                     subtitle2 = _get_subtitle(chunk2, title2)
                     final_text2 = (
-                        f"{prefix}[{tmpl_idx2}/{total_templates_2}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
+                        f"{prefix}[{i2}/{total_2}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n"
                         f"{subtitle2}\n\n{chunk2}"
                     )
+                    # For bot 2, we will send to TARGET_CHATS unless specified
                     ok2 = _send_single_bot2(final_text2, is_public, chat_id2)
                     
                     if send_to_4h_channel and not chat_id2:
-                        pass # _send_single_bot2(final_text2, is_public, "@Maaregsovereinefund")
+                        _send_single_bot2(final_text2, is_public, "@SovereignMaaregFund")
                         
-                    log.info(f"✅ قالب البوت الثاني {tmpl_idx2}/{total_templates_2} وصل." if ok2 else f"❌ فشل قالب البوت الثاني {tmpl_idx2}/{total_templates_2}.")
+                    log.info(f"✅ رسالة البوت الثاني {i2}/{total_2} وصلت." if ok2 else f"❌ فشل رسالة البوت الثاني {i2}/{total_2}.")
                     time.sleep(2)
-
-            # ── خلاصة محورية 2 بعد انتهاء التقرير الثاني ──
-            try:
-                _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", flat_chunks_2)
-                for c in BOT2_CHATS:
-                    send_summary_to_bot(TELEGRAM_BOT_TOKEN_2, _summary2_text, c)
-                log.info("✅ [Summary2] تم إرسال خلاصة التقرير الثاني.")
-            except Exception as _e2:
-                log.error(f"❌ [Summary2] خطأ: {_e2}")
 
             # ── البوت الثالث: القوالب الفورية S1-S12 (@Dsssoppp78_bot) ──
             if 'bot3_reports' in locals() and bot3_reports:
                 flat_chunks_3 = []
-                for tmpl_idx3, (title3, txt3, cid3) in enumerate(bot3_reports, 1):
+                for title3, txt3, cid3 in bot3_reports:
                     if txt3:
                         for chunk3 in _split_message(txt3):
-                            flat_chunks_3.append((tmpl_idx3, title3, chunk3, cid3))
-                total_templates_3 = len(bot3_reports)  # عدد ثابت دائماً 16
-                log.info(f"📤 [Bot3] ارسال {total_templates_3} قالب فوري عبر @Dsssoppp78_bot...")
-                for tmpl_idx3, title3, chunk3, cid3 in flat_chunks_3:
-                    chunk3 = _inject_live_price(chunk3)
+                            flat_chunks_3.append((title3, chunk3, cid3))
+                total_3 = len(flat_chunks_3)
+                log.info(f"📤 [Bot3] ارسال {total_3} قالب فوري عبر @Dsssoppp78_bot...")
+                for i3, (title3, chunk3, cid3) in enumerate(flat_chunks_3, 1):
                     final_text3 = (
-                        f"📊 [{tmpl_idx3}/{total_templates_3}] تقارير سوق الفوري (XAU/USD Spot)\n"
+                        f"📊 [{i3}/{total_3}] تقارير سوق الفوري (XAU/USD Spot)\n"
                         f"{title3}\n\n{chunk3}"
                     )
                     ok3 = _send_single_bot3(final_text3, cid3)
-                    
-                    if send_to_4h_channel and not cid3:
-                        pass # _send_single_bot3(final_text3, "@Maaregsovereinefund")
-                        
-                    log.info(f"{'✅' if ok3 else '❌'} [Bot3] {tmpl_idx3}/{total_templates_3}")
+                    log.info(f"{'✅' if ok3 else '❌'} [Bot3] {i3}/{total_3}")
                     time.sleep(2)
-
-                # ── خلاصة محورية 3 بعد انتهاء التقرير الثالث ──
-                try:
-                    _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", flat_chunks_3)
-                    for c in BOT3_CHATS:
-                        send_summary_to_bot(TELEGRAM_BOT_TOKEN_3, _summary3_text, c)
-                    log.info("✅ [Summary3] تم إرسال خلاصة التقرير الثالث.")
-                except Exception as _e3:
-                    log.error(f"❌ [Summary3] خطأ: {_e3}")
-
-            # ── البوت الرابع: القوالب الجديدة (@Boonnii_bot) ──
-            if flat_chunks_4:
-                log.info(f"📤 [Bot4] إرسال {BOT4_TOTAL} قالب جديد عبر @Boonnii_bot...")
-                for tmpl_idx4, title4, chunk4, cid4 in flat_chunks_4:
-                    chunk4 = _inject_live_price(chunk4)
-                    final_text4 = (
-                        f"🆕 [{tmpl_idx4}/{BOT4_TOTAL}] قوالب الذهب المتقدمة (XAU/USD)\n"
-                        f"{title4}\n\n{chunk4}"
-                    )
-                    ok4 = _send_single_bot4(final_text4, cid4)
-                    if send_to_4h_channel and not cid4:
-                        pass # _send_single_bot4(final_text4, "@Maaregsovereinefund")
-                    log.info(f"{'✅' if ok4 else '❌'} [Bot4] {tmpl_idx4}/{BOT4_TOTAL}")
-                    time.sleep(2)
-
-            # ── الخلاصة النهائية المجمعة من الثلاثة ──
-            try:
-                _summary4_text = _build_group_summary(data, "المجموعة الرابعة (الرادار الخوارزمي والمؤسسي)", flat_chunks_4)
-                for c in BOT4_CHATS:
-                    send_summary_to_bot(TELEGRAM_BOT_TOKEN_4, _summary4_text, c)
-                log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
-            except Exception as _e4:
-                log.error(f"❌ [Summary4] خطأ: {_e4}")
-
-            # إرسال الملخص العام والشامل الملكي (الجامع للملخصات الأربعة) إلى الجروب الخامس (@Summariesboot54_bot)
-            try:
-                _grand_summary_text = _build_grand_master_summary(
-                    data,
-                    locals().get('_summary1_text', ''),
-                    locals().get('_summary2_text', ''),
-                    locals().get('_summary3_text', ''),
-                    locals().get('_summary4_text', '')
-                )
-                if TELEGRAM_BOT_TOKEN_5 and BOT5_CHATS:
-                    for c in BOT5_CHATS:
-                        send_summary_to_bot(TELEGRAM_BOT_TOKEN_5, _grand_summary_text, c)
-                    log.info("✔️ [GrandSummary] تم إرسال الملخص العام الشامل للملخصات الأربعة إلى الجروب الخامس.")
-                else:
-                    log.warning("⚠️ [GrandSummary] تم تخطي الإرسال لأن توكن البوت الخامس أو قائمة المحادثات غير معرفة.")
-            except Exception as _e5:
-                log.error(f"❌ [GrandSummary] خطأ في إرسال الملخص الشامل: {_e5}")
 
             log.info("🔓 [Spot] تم الارسال، تحرير القفل لانتظار الخلاصة...")
 
@@ -8997,7 +5932,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     f.write(t6)
  
 
-                send_summary_to_bot(TELEGRAM_BOT_TOKEN, t6, '@spotGol')
+                send_summary_to_bot('8784019564:AAF1XBrGTb5QU_wmOcvYQQ49Vb7dpLWZnm4', t6, '@spotGol')
  
 
         except Exception as e:
@@ -9028,491 +5963,144 @@ def run_bot():
     day_names = ["اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت","أحد"]
 
     while True:
-        try:
-            now_cairo  = cairo_now()
-            today      = now_cairo.date()
-            hour_cairo = now_cairo.hour
-            weekday    = now_cairo.weekday()
-    
-            if last_report_date != today:
-                for m in ['futures', 'spot']:
-                    morning_sent_today[m]   = False
-                    closing_sent_today[m]   = False
-                    heartbeat_sent_today[m] = False
-                all_models_notified  = False
-    
-            if not is_market_open() and has_sent_initial:
-                if not market_closed_notified:
-                    now_c    = cairo_now()
-                    wday     = now_c.weekday()
-                    hr       = now_c.hour
-                    if wday in (5, 6):
-                        reason   = "عطلة نهاية الأسبوع"
-                        reopen   = "الاثنين 01:00 بتوقيت القاهرة"
-                        details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
-                    elif wday == 0 and hr < MARKET_OPEN_HOUR:
-                        reason   = "ما زلنا في ساعات الإغلاق"
-                        reopen   = f"الاثنين {MARKET_OPEN_HOUR:02d}:00 بتوقيت القاهرة"
-                        details  = "أسواق الذهب تبدأ جلستها الأسبوعية يوم الاثنين فجراً."
-                    else:
-                        reason   = "السوق خارج ساعات التداول"
-                        reopen   = "قريباً"
-                        details  = "تُتداول أسواق الذهب من الاثنين حتى الجمعة."
-    
-                    closed_msg = (
-                        f"🛌 سوق الذهب مغلق حالياً\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"📅 السبب: {reason}\n"
-                        f"📖 التفاصيل: {details}\n"
-                        f"⏰ موعد الفتح: {reopen}\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"🕐 {now_c.strftime('%Y-%m-%d %H:%M')} بتوقيت القاهرة\n"
-                        f"✅ البوت يعمل وسيُرسل التقرير فور فتح السوق."
-                    )
-                    send_to_telegram(closed_msg)
-                    market_closed_notified = True
-                    log.info("📢 تم إرسال إشعار إغلاق السوق للقناة.")
-    
-                log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
-                for m in ['futures', 'spot']: last_gold_price[m] = None
-                time.sleep(30 * 60)
-                continue
-    
-            market_closed_notified = False
-    
-            for mode in ['spot']:
-                data = get_full_market_data(mode=mode)
-                if data and data["gold"]:
-                    consec_failures[mode] = 0
-                    all_models_notified = False
-                    current_gold = data["gold"]
-    
-                    if last_gold_price[mode] is None and last_report_date != today:
-                        log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
-                        report = generate_report(data, is_alert=False)
-                        send_reports(data, report)
-                        last_gold_price[mode] = current_gold
-                        last_report_date = today
-                        minutes_counter[mode] = 0
-                        has_sent_initial = True
-                        log.info("✅ تم إرسال التقرير الافتتاحي. البوت جاهز لمنطق 'سوق مغلق'.")  # noqa
-    
-                    elif hour_cairo == HEARTBEAT_HOUR and not heartbeat_sent_today[mode]:
-                        conf = data['confluence']
-                        send_to_telegram(
-                            f"💚 [Goldbot Heartbeat - {mode.upper()}] البوت يعمل بشكل طبيعي ✔️\n"
-                            f"💰 السعر: {current_gold:.2f}$\n"
-                            f"🎯 {conf['verdict']}\n"
-                            f"🕐 {now_cairo.strftime('%H:%M قاهرة')}"
-                        )
-                        heartbeat_sent_today[mode] = True
-    
-                    elif hour_cairo == MORNING_HOUR_CAI and not morning_sent_today[mode]:
-                        log.info(f"🌅 إرسال تقرير الصباح ({mode})...")
-                        report = generate_report(data, is_alert=False, is_morning=True)
-                        if report:
-                            send_reports(data, report)
-                            morning_sent_today[mode] = True
-                            last_gold_price[mode] = current_gold
-                            minutes_counter[mode] = 0
-    
-                    elif hour_cairo == CLOSING_HOUR_CAI and not closing_sent_today[mode]:
-                        log.info(f"🌙 إرسال ملخص الجلسة ({mode})...")
-                        report = generate_report(data, is_alert=False)
-                        if report:
-                            send_reports(data, report, f"🌙 [ملخص جلسة اليوم - {mode.upper()}]\n")
-                            closing_sent_today[mode] = True
-                            last_gold_price[mode] = current_gold
-                            minutes_counter[mode] = 0
-    
-                    else:
-                        price_diff = current_gold - (last_gold_price[mode] or current_gold)
-                        if abs(price_diff) >= ALERT_THRESHOLD:
-                            log.info(f"🚨 تحرك حاد {price_diff:+.2f}$ ({mode})")
-                            report = generate_report(data, is_alert=True, price_diff=price_diff)
-                            if report:
-                                send_reports(data, report)
-                                last_gold_price[mode] = current_gold
-                                minutes_counter[mode] = 0
-                        elif minutes_counter[mode] >= ROUTINE_MINUTES:
-                            log.info(f"⏰ مرت {ROUTINE_MINUTES} دقيقة — تقرير دوري ({mode})...")
-                            report = generate_report(data, is_alert=False)
-                            if report:
-                                send_reports(data, report)
-                                last_gold_price[mode] = current_gold
-                                minutes_counter[mode] = 0
+        now_cairo  = cairo_now()
+        today      = now_cairo.date()
+        hour_cairo = now_cairo.hour
+        weekday    = now_cairo.weekday()
+
+        if last_report_date != today:
+            for m in ['futures', 'spot']:
+                morning_sent_today[m]   = False
+                closing_sent_today[m]   = False
+                heartbeat_sent_today[m] = False
+            all_models_notified  = False
+
+        if not is_market_open() and has_sent_initial:
+            if not market_closed_notified:
+                now_c    = cairo_now()
+                wday     = now_c.weekday()
+                hr       = now_c.hour
+                if wday in (5, 6):
+                    reason   = "عطلة نهاية الأسبوع"
+                    reopen   = "الاثنين 01:00 بتوقيت القاهرة"
+                    details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
+                elif wday == 0 and hr < MARKET_OPEN_HOUR:
+                    reason   = "ما زلنا في ساعات الإغلاق"
+                    reopen   = f"الاثنين {MARKET_OPEN_HOUR:02d}:00 بتوقيت القاهرة"
+                    details  = "أسواق الذهب تبدأ جلستها الأسبوعية يوم الاثنين فجراً."
                 else:
-                    consec_failures[mode] += 1
-                    log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
-                    if consec_failures[mode] >= 3 and not all_models_notified:
-                        send_to_telegram(
-                            f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
-                            "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
-                        )
-                        all_models_notified = True
-    
-                minutes_counter[mode] += 1
-                
-            time.sleep(60)
-        except Exception as e:
-            import traceback
-            log.error(f'❌ [CRITICAL LOOP ERROR] {e}\n{traceback.format_exc()}')
-            time.sleep(60)
+                    reason   = "السوق خارج ساعات التداول"
+                    reopen   = "قريباً"
+                    details  = "تُتداول أسواق الذهب من الاثنين حتى الجمعة."
+
+                closed_msg = (
+                    f"🛌 سوق الذهب مغلق حالياً\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📅 السبب: {reason}\n"
+                    f"📖 التفاصيل: {details}\n"
+                    f"⏰ موعد الفتح: {reopen}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🕐 {now_c.strftime('%Y-%m-%d %H:%M')} بتوقيت القاهرة\n"
+                    f"✅ البوت يعمل وسيُرسل التقرير فور فتح السوق."
+                )
+                send_to_telegram(closed_msg)
+                market_closed_notified = True
+                log.info("📢 تم إرسال إشعار إغلاق السوق للقناة.")
+
+            log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
+            for m in ['futures', 'spot']: last_gold_price[m] = None
+            time.sleep(30 * 60)
             continue
 
+        market_closed_notified = False
 
+        for mode in ['spot']:
+            data = get_full_market_data(mode=mode)
+            if data and data["gold"]:
+                consec_failures[mode] = 0
+                all_models_notified = False
+                current_gold = data["gold"]
 
-def _build_group_summary(data: dict, group_name: str, flat_chunks: list) -> str:
-    """خلاصة محورية مخصصة لكل مجموعة تقارير — مبنية على بيانات السوق الحية وتوليد الذكاء الاصطناعي"""
-    nums = _s_nums(data)
-    gold   = nums['gold']
-    atr    = nums['atr']
-    pivot  = nums['pivot']
-    rsi    = nums['rsi']
-    macd   = nums['macd']
-    r1, r2 = nums['r1'], nums['r2']
-    s1, s2 = nums['s1'], nums['s2']
-    sh, sl = nums['swing_h'], nums['swing_l']
-    confluence = data.get('confluence', {}) or {}
-    verdict = confluence.get('verdict', 'محايد')
-    dxy_pct = float(data.get('dxy_pct', 0) or 0)
-    vix_p   = float(data.get('vix_p', 20) or 20)
-    interest  = float(data.get('interest_rate', 5.25) or 5.25)
-    inflation = float(data.get('inflation_est', 3.5) or 3.5)
-    ry = round(interest - inflation, 2)
+                if last_gold_price[mode] is None and last_report_date != today:
+                    log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
+                    report = generate_report(data, is_alert=False)
+                    send_reports(data, report)
+                    last_gold_price[mode] = current_gold
+                    last_report_date = today
+                    minutes_counter[mode] = 0
+                    has_sent_initial = True
+                    log.info("✅ تم إرسال التقرير الافتتاحي. البوت جاهز لمنطق 'سوق مغلق'.")  # noqa
 
-    if rsi > 57 and macd > 0:
-        dir_text = "🟢 صاعد (Bullish)"
-        best_action = f"الشراء من {s1:.2f}$ هدف {r1:.2f}$"
-    elif rsi < 43 and macd < 0:
-        dir_text = "🔴 هابط (Bearish)"
-        best_action = f"البيع من {r1:.2f}$ هدف {s1:.2f}$"
-    else:
-        dir_text = "⚪ محايد / متذبذب"
-        best_action = f"الانتظار بين {s1:.2f}$ و{r1:.2f}$"
+                elif hour_cairo == HEARTBEAT_HOUR and not heartbeat_sent_today[mode]:
+                    conf = data['confluence']
+                    send_to_telegram(
+                        f"💚 [Goldbot Heartbeat - {mode.upper()}] البوت يعمل بشكل طبيعي ✔️\n"
+                        f"💰 السعر: {current_gold:.2f}$\n"
+                        f"🎯 {conf['verdict']}\n"
+                        f"🕐 {now_cairo.strftime('%H:%M قاهرة')}"
+                    )
+                    heartbeat_sent_today[mode] = True
 
-    conf_score = 0
-    if rsi > 55 or rsi < 45: conf_score += 1
-    if macd != 0: conf_score += 1
-    if abs(dxy_pct) > 0.3: conf_score += 1
-    conf_label = ["ضعيفة ⚠️", "متوسطة 🟡", "عالية 🟢", "قوية جداً 🎯"][min(conf_score, 3)]
-    risk_note = "ارتفاع VIX ⚠️ تداول بحذر" if vix_p > 25 else "VIX مستقر ✅ بيئة مناسبة"
+                elif hour_cairo == MORNING_HOUR_CAI and not morning_sent_today[mode]:
+                    log.info(f"🌅 إرسال تقرير الصباح ({mode})...")
+                    report = generate_report(data, is_alert=False, is_morning=True)
+                    if report:
+                        send_reports(data, report)
+                        morning_sent_today[mode] = True
+                        last_gold_price[mode] = current_gold
+                        minutes_counter[mode] = 0
 
-    from datetime import datetime
-    import pytz
-    now_str = datetime.now(pytz.timezone('Africa/Cairo')).strftime("%d/%m/%Y %H:%M")
+                elif hour_cairo == CLOSING_HOUR_CAI and not closing_sent_today[mode]:
+                    log.info(f"🌙 إرسال ملخص الجلسة ({mode})...")
+                    report = generate_report(data, is_alert=False)
+                    if report:
+                        send_reports(data, report, f"🌙 [ملخص جلسة اليوم - {mode.upper()}]\n")
+                        closing_sent_today[mode] = True
+                        last_gold_price[mode] = current_gold
+                        minutes_counter[mode] = 0
 
-    unique_templates = []
-    seen_idx = set()
-    for item in flat_chunks:
-        if len(item) >= 4 and isinstance(item[0], int):
-            idx, title = item[0], item[1]
-        else:
-            idx, title = len(unique_templates) + 1, item[0]
-        if idx not in seen_idx:
-            seen_idx.add(idx)
-            unique_templates.append((idx, title))
-    total_tmpl = len(unique_templates)
+                else:
+                    price_diff = current_gold - (last_gold_price[mode] or current_gold)
+                    if abs(price_diff) >= ALERT_THRESHOLD:
+                        log.info(f"🚨 تحرك حاد {price_diff:+.2f}$ ({mode})")
+                        report = generate_report(data, is_alert=True, price_diff=price_diff)
+                        if report:
+                            send_reports(data, report)
+                            last_gold_price[mode] = current_gold
+                            minutes_counter[mode] = 0
+                    elif minutes_counter[mode] >= ROUTINE_MINUTES:
+                        log.info(f"⏰ مرت {ROUTINE_MINUTES} دقيقة — تقرير دوري ({mode})...")
+                        report = generate_report(data, is_alert=False)
+                        if report:
+                            send_reports(data, report)
+                            last_gold_price[mode] = current_gold
+                            minutes_counter[mode] = 0
+            else:
+                consec_failures[mode] += 1
+                log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
+                if consec_failures[mode] >= 3 and not all_models_notified:
+                    send_to_telegram(
+                        f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
+                        "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
+                    )
+                    all_models_notified = True
 
-    fallback_lines = [
-        f"👑 الخلاصة المحورية — {group_name}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"📅 التوقيت: {now_str} | عدد القوالب: {total_tmpl}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"💰 السعر الحالي: {gold:.2f}$",
-        f"🧭 الاتجاه المهيمن: {dir_text}",
-        f"🎯 الحكم النهائي: {verdict}",
-        f"💯 درجة الثقة: {conf_label}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "📊 الأرقام الجوهرية:",
-        f"▪️ RSI: {rsi:.2f} | MACD: {macd:.4f} | ATR: {atr:.2f}$",
-        f"▪️ محور: {pivot:.2f}$ | R1: {r1:.2f}$ | S1: {s1:.2f}$",
-        f"▪️ قمة السوينج: {sh:.2f}$ | قاع السوينج: {sl:.2f}$",
-        f"▪️ DXY: {dxy_pct:+.2f}% | VIX: {vix_p:.2f} | العائد الحقيقي: {ry:.2f}%",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"🏆 أفضل صفقة الآن: {best_action}",
-        f"⚠️ المخاطر: {risk_note}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "🤖 هذه الخلاصة محسوبة رياضياً وتلقائياً.",
-    ]
-    fallback_text = "\n".join(fallback_lines)
-
-    # ── توليد الذكاء الاصطناعي لجعل الخلاصة احترافية ومخصصة ──
-    try:
-        import random, requests
-        titles_list = [f"[{idx}] {title}" for idx, title in unique_templates]
-        titles_str = "\n".join(f"- {t}" for t in titles_list)
-        
-        prompt = f"""أنت كبير المحللين الماليين في سوق الذهب.
-قم بكتابة "خلاصة محورية احترافية جداً" مخصصة حصرياً لـ ({group_name}).
-هذه المجموعة التي أنهيناها للتو تغطي المواضيع التالية:
-{titles_str}
-
-البيانات الحية للسوق الآن للربط معها:
-السعر: {gold}$
-RSI: {rsi}
-MACD: {macd}
-محور الارتكاز (Pivot): {pivot}$
-المقاومات: {r1}$, {r2}$
-الدعوم: {s1}$, {s2}$
-الحكم الفني: {verdict}
-
-المطلوب:
-اكتب خلاصة قوية من 4-5 أسطر مكثفة جداً وواثقة ومكتوبة بلغة احترافية، تتحدث عن اتجاه الذهب الحالي بناءً على الأرقام أعلاه، وتبرز أهمية المواضيع والزوايا التي تم تغطيتها في هذه المجموعة تحديداً (اربط الأرقام بمواضيع المجموعة بطريقة عبقرية).
-تجنب التكرار تماماً مع أي مجموعات أخرى، اجعلها مخصصة لهذه المجموعة واسمها.
-لا تكتب مقدمات، فقط الخلاصة القوية المباشرة.
-استخدم الرموز التعبيرية 🟢🔴⚪ للتعبير عن الاتجاه والاحترافية.
-"""
-        try:
-            from Goldbot.ai_client import generate_robust_ai_response
-        except ImportError:
-            from ai_client import generate_robust_ai_response
-
-        ai_summary = generate_robust_ai_response(
-            system_prompt="",
-            user_prompt=prompt,
-            max_tokens=600,
-            temperature=0.3
-        ).strip()
-        
-        if "فشل توليد التقرير" in ai_summary:
-            raise Exception("All AI keys exhausted or invalid.")
-        
-        return f"👑 الخلاصة المحورية — {group_name}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📅 التوقيت: {now_str} | عدد القوالب: {total_tmpl}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n{ai_summary}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🤖 تم توليد هذه الخلاصة بالذكاء الاصطناعي بناءً على القوالب والبيانات الحية."
-    except Exception as e:
-        log.error(f"[AI Summary] Failed to generate AI summary for {group_name}, using fallback. Error: {e}")
-        return fallback_text
-
-
-def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text: str, s4_text: str) -> str:
-    """الملخص الشامل والنهائي الملكي الجامع للملخصات الأربعة ولـ 50 قالباً خوارزمياً"""
-    nums = _s_nums(data)
-    gold   = nums['gold']
-    atr    = nums['atr']
-    pivot  = nums['pivot']
-    rsi    = nums['rsi']
-    macd   = nums['macd']
-    r1, r2 = nums['r1'], nums['r2']
-    s1, s2 = nums['s1'], nums['s2']
-    vwap   = float(data.get('vwap', 0) or 0) or gold
-    ema50  = float(data.get('ema50', 0) or 0) or gold
-    ema200 = float(data.get('ema200', 0) or 0) or gold
-    obv_val = float(data.get('obv_val', 0) or 0)
-    rel_vol = float(data.get('rel_vol', 1.0) or 1.0)
-    confluence = data.get('confluence', {}) or {}
-    verdict = confluence.get('verdict', 'محايد')
-    vix_p   = float(data.get('vix_p', 20) or 20)
-
-    # حساب ميزان القوى الخوارزمي الموحد (Supreme Quant Decision Engine)
-    bull_points = 0.0
-    bear_points = 0.0
-    if gold > vwap: bull_points += 2.0
-    else: bear_points += 2.0
-    if gold > ema50: bull_points += 2.0
-    else: bear_points += 2.0
-    if gold > ema200: bull_points += 1.0
-    else: bear_points += 1.0
-    if obv_val > 0: bull_points += 2.0
-    else: bear_points += 2.0
-    if rsi > 53: bull_points += 1.5
-    elif rsi < 47: bear_points += 1.5
-    if macd > 0: bull_points += 1.5
-    else: bear_points += 1.5
-
-    total_pts = bull_points + bear_points
-    bull_pct = round((bull_points / max(0.1, total_pts)) * 100, 1)
-    bear_pct = round((bear_points / max(0.1, total_pts)) * 100, 1)
-
-    if bull_pct >= 65:
-        grand_verdict = "🟢 شراء قوي ومستمر (Strong Institutional Buy)"
-        grand_action = f"🎯 تمركز شرائي مع التراجع نحو الدعم ({s1:.2f}$) باستهداف ({r1:.2f}$) ثم ({r2:.2f}$)"
-        dom_text = f"🔥 سيادة شرائية مطلقة ({bull_pct}% قوة صعودية مقابل {bear_pct}% هبوطية)"
-    elif bear_pct >= 65:
-        grand_verdict = "🔴 بيع مكثف وتصريف مؤسسي (Strong Institutional Sell)"
-        grand_action = f"🔻 استغلال الارتدادات للبيع من المقاومة ({r1:.2f}$) باستهداف ({s1:.2f}$) ثم ({s2:.2f}$)"
-        dom_text = f"🔻 هيمنة بيعية مطلقة ({bear_pct}% قوة هبوطية مقابل {bull_pct}% صعودية)"
-    elif bull_pct > bear_pct:
-        grand_verdict = "🟢 ميل صعودي مضاربي (Bullish Bias)"
-        grand_action = f"⚖️ تداول مضاربي صاعد بحذر أعلى الارتكاز ({pivot:.2f}$) باستهداف ({r1:.2f}$)"
-        dom_text = f"↗️ تفوق شرائي نسبي ({bull_pct}% مقابل {bear_pct}%)"
-    elif bear_pct > bull_pct:
-        grand_verdict = "🔴 ميل هبوطي مضاربي (Bearish Bias)"
-        grand_action = f"⚖️ تداول مضاربي هابط بحذر أدنى الارتكاز ({pivot:.2f}$) باستهداف ({s1:.2f}$)"
-        dom_text = f"↘️ تفوق بيعي نسبي ({bear_pct}% مقابل {bull_pct}%)"
-    else:
-        grand_verdict = "⚪ توازن وحياد تام (Neutral / Range-Bound)"
-        grand_action = f"⚖️ تداول عرضي داخل النطاق ({s1:.2f}$ ↔ {r1:.2f}$)"
-        dom_text = "⚖️ توازن القوى المؤسسية والفنية (50% لكل اتجاه)"
-
-    from datetime import datetime
-    import pytz
-    now_str = datetime.now(pytz.timezone('Africa/Cairo')).strftime("%d/%m/%Y %H:%M")
-    risk_note = "⚠️ VIX مرتفع — احذر التذبذب العالي" if vix_p > 25 else "🛡️ بيئة سيولة مستقرة ومواتية"
-
-    fallback_lines = [
-        "👑🏆 الملخص العام والشامل للمنظومة الخوارزمية (Grand Master Summary) 🏆👑",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"📅 التوقيت: {now_str}",
-        f"⚡ تم دمج وربط نتائج 50 قالباً تحليلياً من البوتات الأربعة (@spotGol, Bot2, @Dsssoppp78_bot, @Boonnii_bot)",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "🎯 الحكم الخوارزمي والمؤسسي الموحد:",
-        f"   ├ 🏆 القرار النهائي للمنظومة: {grand_verdict}",
-        f"   ├ 📊 ميزان القوى الكلية: {dom_text}",
-        f"   └ 💡 خطة التداول الموصى بها: {grand_action}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "📍 مستويات الحسم والارتكاز الموحدة (Single Source of Truth):",
-        f"   ├ 💰 السعر الحالي: {gold:.2f}$ | VWAP المؤسسي: {vwap:.2f}$ | ATR: {atr:.2f}$",
-        f"   ├ 🟢 مناطق الطلب والدعم: S1 = {s1:.2f}$ | S2 = {s2:.2f}$",
-        f"   ├ 🔴 مناطق العرض والمقاومة: R1 = {r1:.2f}$ | R2 = {r2:.2f}$",
-        f"   └ 🛡️ نقطة الارتكاز المحورية (Pivot): {pivot:.2f}$",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "📋 محصلة الركائز الأربعة للمنظومة:",
-        "   🔹 البوت 1 (الكمي الأساسي): تحديد الاتجاه العام وبيئة الاقتصاد الكلي.",
-        "   🔹 البوت 2 (المتخصص المتقدم): خوارزميات السيولة، المؤسسات، ومناطق الارتكاز المغناطيسية.",
-        "   🔹 البوت 3 (الفوري الدقيق): التحليل اللحظي ومناطق الصفقات الفورية المضاربية.",
-        "   🔹 البوت 4 (الرادار ومحافظ الحيتان): صفقات البلوك تريز، مصفوفة الزمن، وهيمنة الحيتان.",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"⚠️ تنبيه المخاطر: {risk_note} — الالتزام بالارتكاز أمر إلزامي.",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "🤖 تم توليد هذا الحكم النهائي عبر محرك القرار الخوارزمي الشامل لمنظومة Goldbot الملكية."
-    ]
-    fallback_text = "\n".join(fallback_lines)
-
-    try:
-        import random, requests
-        prompt = f"""أنت كبير المحللين الاقتصاديين وخبير الخوارزميات المؤسسية لمنظومة Goldbot الملكية.
-مطلوب منك كتابة "خلاصة تنفيذية عليا" موجزة في 4-5 أسطر تربط بين ملخصات البوتات الأربعة التالية للذهب (XAU/USD) لتكون وثيقة واحدة متناغمة دون أي تعارض أو تناقض.
-
-البيانات الفنية الموحدة لجميع البوتات:
-السعر الحالي: {gold}$
-القرار الموحد للنظام: {grand_verdict}
-ميزان القوى: {dom_text}
-نقطة الارتكاز (Pivot): {pivot}$
-الدعم الأول (S1): {s1}$
-المقاومة الأولى (R1): {r1}$
-متوسط التكلفة المؤسسي (VWAP): {vwap}$
-
-ملخص البوت الأول:
-{s1_text[:400]}
-
-ملخص البوت الثاني:
-{s2_text[:400]}
-
-ملخص البوت الثالث:
-{s3_text[:400]}
-
-ملخص البوت الرابع:
-{s4_text[:400]}
-
-التعليمات:
-1. اكتب فقرة متصلة احترافية جداً وموجزة (4 إلى 5 أسطر فقط) تلخص المشهد العام للذهب وتربط الاتجاه اللحظي واليومي بنظرة الحيتان المؤسسية.
-2. اعتمد على الأرقام الموحدة المذكورة بالأعلى فقط (الدعم {s1} والمقاومة {r1} والارتكاز {pivot}) ولا تذكر أي أرقام أخرى منعاً للتعارض.
-3. وجه كلامك للمتداول بوضوح حول أفضل خطة للتعامل مع السوق في الجلسة الحالية.
-"""
-        try:
-            from Goldbot.ai_client import generate_robust_ai_response
-        except ImportError:
-            from ai_client import generate_robust_ai_response
-
-        ai_summary = generate_robust_ai_response(
-            system_prompt="",
-            user_prompt=prompt,
-            max_tokens=500,
-            temperature=0.3
-        ).strip()
-        
-        if "فشل توليد التقرير" not in ai_summary:
-            ai_lines = [
-                "👑🏆 الملخص العام والشامل للمنظومة الخوارزمية (Grand Master Summary) 🏆👑",
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    f"📅 التوقيت: {now_str}",
-                    f"⚡ تم دمج وربط نتائج 50 قالباً تحليلياً من البوتات الأربعة (@spotGol, Bot2, @Dsssoppp78_bot, @Boonnii_bot)",
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    "🎯 الحكم الخوارزمي والمؤسسي الموحد:",
-                    f"   ├ 🏆 القرار النهائي للمنظومة: {grand_verdict}",
-                    f"   ├ 📊 ميزان القوى الكلية: {dom_text}",
-                    f"   └ 💡 خطة التداول الموصى بها: {grand_action}",
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    "🧠 الخلاصة التنفيذية الشاملة (AI Master Synthesis):",
-                    f"{ai_summary}",
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    "📍 مستويات الحسم والارتكاز الموحدة (Single Source of Truth):",
-                    f"   ├ 💰 السعر الحالي: {gold:.2f}$ | VWAP المؤسسي: {vwap:.2f}$ | ATR: {atr:.2f}$",
-                    f"   ├ 🟢 مناطق الطلب والدعم: S1 = {s1:.2f}$ | S2 = {s2:.2f}$",
-                    f"   ├ 🔴 مناطق العرض والمقاومة: R1 = {r1:.2f}$ | R2 = {r2:.2f}$",
-                    f"   └ 🛡️ نقطة الارتكاز المحورية (Pivot): {pivot:.2f}$",
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    "📋 محصلة الركائز الأربعة للمنظومة:",
-                    "   🔹 البوت 1 (الكمي الأساسي): تحديد الاتجاه العام وبيئة الاقتصاد الكلي.",
-                    "   🔹 البوت 2 (المتخصص المتقدم): خوارزميات السيولة، المؤسسات، ومناطق الارتكاز المغناطيسية.",
-                    "   🔹 البوت 3 (الفوري الدقيق): التحليل اللحظي ومناطق الصفقات الفورية المضاربية.",
-                    "   🔹 البوت 4 (الرادار ومحافظ الحيتان): صفقات البلوك تريز، مصفوفة الزمن، وهيمنة الحيتان.",
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    f"⚠️ تنبيه المخاطر: {risk_note} — الالتزام بالارتكاز أمر إلزامي.",
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    "🤖 تم توليد هذا الحكم النهائي عبر محرك القرار الخوارزمي الشامل لمنظومة Goldbot الملكية."
-            ]
-            return "\n".join(ai_lines)
-    except Exception as e:
-        log.error(f"[AI Grand Summary] Failed, using fallback. Error: {e}")
-    return fallback_text
-def send_summary_to_bot(token, message, chat_id):
-    import asyncio
-    from telethon import TelegramClient
-    
-    async def _send_via_telethon() -> bool:
-        session_name = f"summary_bot_{token[:10]}"
-        client = TelegramClient(session_name, API_ID, API_HASH)
-        
-        chunks = []
-        msg = message
-        while len(msg) > 4000:
-            split_idx = msg.rfind('\n', 0, 4000)
-            if split_idx == -1: split_idx = 4000
-            chunks.append(msg[:split_idx])
-            msg = msg[split_idx:]
-        if msg:
-            chunks.append(msg)
+            minutes_counter[mode] += 1
             
-        success = True
-        try:
-            await client.start(bot_token=token)
-            for chunk in chunks:
-                chunk_ok = False
-                for attempt in range(3):
-                    try:
-                        target_chat = _resolve_peer(int(chat_id) if str(chat_id).lstrip('-').isdigit() else chat_id)
-                        await client.send_message(target_chat, chunk)
-                        log.info(f"✅ [Summary Telethon] Sent summary chunk to {target_chat}")
-                        chunk_ok = True
-                        break
-                    except Exception as e:
-                        wait = 2 ** attempt
-                        log.warning(f"⚠️ [Summary Telethon Fallback] {attempt+1}/3 — Failed to send summary: {e} — waiting {wait}s")
-                        await asyncio.sleep(wait)
-                if not chunk_ok:
-                    success = False
-        except Exception as e:
-            log.warning(f"⚠️ [Summary Telethon Exception] {e}")
-            success = False
-        finally:
-            await client.disconnect()
-        return success
-
-    try:
-        loop = asyncio.new_event_loop()
-        ok = loop.run_until_complete(_send_via_telethon())
-        loop.close()
-        if not ok:
-            log.warning("⚠️ [Summary] Telethon failed or incomplete — trying HTTP fallback...")
-            _http_fallback_send(message, token, [], chat_id)
-    except Exception as e:
-        log.error(f"❌ [Summary Error] Failed Telethon loop: {e} — trying HTTP fallback...")
-        _http_fallback_send(message, token, [], chat_id)
-
+        time.sleep(60)
 
 if __name__ == "__main__":
     try:
         run_bot()
     except KeyboardInterrupt:
         print("\nBot stopped by user.")
+
+import requests
+
+def send_summary_to_bot(token, message, chat_id):
+    import requests
+    try:
+        send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(send_url, json={'chat_id': chat_id, 'text': message}, timeout=10)
+    except Exception as e:
+        print(f"Failed to send summary: {e}")

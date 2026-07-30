@@ -1,0 +1,30 @@
+def _build_summary_template(d: dict, report_text: str, mode_label: str) -> str:
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return ''
+    gold = d.get('gold', 0)
+    rsi = d.get('tf_daily', {}).get('rsi', 50)
+    macd_val = d.get('tf_daily', {}).get('macd', 0)
+    ry = d.get('real_yield', 0)
+    bias_d = d.get('tf_daily', {}).get('bias', '┘à╪ص╪د┘è╪»')
+    bias_w = d.get('tf_weekly', {}).get('bias', '┘à╪ص╪د┘è╪»')
+    pivot = d.get('pivot', 0)
+    atr = d.get('atr', 20)
+    s1, s2 = (round(gold - atr * 0.8, 2), round(gold - atr * 1.5, 2))
+    r1, r2 = (round(gold + atr * 0.8, 2), round(gold + atr * 1.5, 2))
+    adv = d.get('adv_trades', {})
+    best_buy = adv.get('monthly_buy') or adv.get('swing_buy') or adv.get('rev_buy') or adv.get('weekly_buy')
+    best_sell = adv.get('monthly_sell') or adv.get('swing_sell') or adv.get('rev_sell') or adv.get('weekly_sell')
+
+    def format_trade(t):
+        if not t:
+            return '╪║┘è╪▒ ┘à╪ز┘ê┘\x81╪▒ ╪ص╪د┘\x84┘è╪د┘ï.'
+        return f"╪»╪«┘ê┘\x84: {t['entry']}$ | ┘ç╪»┘\x81: {t['t2']}$ | ┘ê┘é┘\x81: {t['sl']}$"
+    prompt = f"╪ث┘\x86╪ز ╪«╪ذ┘è╪▒ ┘à╪د┘\x84┘è ┘â┘à┘è. ╪ذ┘\x86╪د╪ة┘ï ╪╣┘\x84┘ë ┘ç╪░┘ç ╪د┘\x84╪ث╪▒┘é╪د┘à ╪د┘\x84┘\x84╪ص╪╕┘è╪ر╪î ╪د╪│╪ز╪«╪▒╪ش '╪د┘\x84╪«┘\x84╪د╪╡╪ر ╪د┘\x84┘à╪ص┘ê╪▒┘è╪ر' ┘\x84╪│┘ê┘é {mode_label}.\n╪د┘\x84╪│╪╣╪▒: {gold}$ | ╪د┘\x84┘à╪ص┘ê╪▒(Pivot): {pivot}$ | ╪د┘\x84╪د╪ز╪ش╪د┘ç ╪د┘\x84┘è┘ê┘à┘è: {bias_d} | ╪د┘\x84╪ث╪│╪ذ┘ê╪╣┘è: {bias_w}\nRSI: {rsi} | MACD: {macd_val} | ╪د┘\x84╪╣╪د╪خ╪» ╪د┘\x84╪ص┘é┘è┘é┘è: {ry}%\n\n╪ث┘é┘ê┘ë ╪╡┘\x81┘é╪ر ╪┤╪▒╪د╪ة: {format_trade(best_buy)}\n╪ث┘é┘ê┘ë ╪╡┘\x81┘é╪ر ╪ذ┘è╪╣: {format_trade(best_sell)}\n╪»╪╣┘ê┘à: S1={s1}, S2={s2}\n┘à┘é╪د┘ê┘à╪د╪ز: R1={r1}, R2={r2}\n\n╪د╪│╪ز╪«╪▒╪ش ┘ê┘\x86╪│┘é ╪د┘\x84╪ذ┘è╪د┘\x86╪د╪ز ╪ذ┘\x86┘\x81╪│ ┘ç╪░╪د ╪د┘\x84┘é╪د┘\x84╪ذ ╪ذ╪د┘\x84╪╢╪ذ╪╖ ╪ذ╪»┘ê┘\x86 ╪ث┘è ╪»┘è╪ذ╪د╪ش╪ر ╪ح╪╢╪د┘\x81┘è╪ر (╪ث╪▒┘é╪د┘à ┘\x81┘é╪╖ ┘â╪د┘\x84┘à╪╖┘\x84┘ê╪ذ):\n\n╪د┘\x84╪«┘\x84╪د╪╡╪ر ╪د┘\x84┘à╪ص┘ê╪▒┘è╪ر\n\n≡ا\x8e» ╪«┘\x84╪د╪╡╪ر ╪د┘\x86╪ص┘è╪د╪▓ ╪د┘\x84╪░┘ç╪ذ | {mode_label} | ╪د┘\x84╪ز╪ص╪»┘è╪س ╪د┘\x84┘à╪ذ╪د╪┤╪▒\n\n≡اôê ┘\x86╪│╪ذ╪ر ╪د┘\x84╪╡╪╣┘ê╪»: [╪ز┘ê┘é╪╣┘â ┘â┘\x86╪│╪ذ╪ر]%\n≡اôë ┘\x86╪│╪ذ╪ر ╪د┘\x84┘ç╪ذ┘ê╪╖: [╪ز┘ê┘é╪╣┘â ┘â┘\x86╪│╪ذ╪ر]%\n\n≡ادص ╪د┘\x84╪«┘\x84╪د╪╡╪ر:\n[┘\x81┘é╪▒╪ر ┘é╪╡┘è╪▒╪ر ╪ش╪»╪د┘ï ┘à┘\x86 ╪│╪╖╪▒┘è┘\x86 ╪ز┘\x84╪«╪╡ ┘ê╪╢╪╣ ╪د┘\x84╪│┘ê┘é ┘ê╪د┘\x84┘é╪▒╪د╪▒ ╪د┘\x84┘à┘\x86╪د╪│╪ذ ╪ذ┘\x86╪د╪ة ╪╣┘\x84┘ë ╪د┘\x84╪ث╪▒┘é╪د┘à ╪ث╪╣┘\x84╪د┘ç]\n\n≡اô\x8d ┘\x86┘é╪╖╪ر ╪د┘\x84┘\x81╪╡┘\x84 ╪د┘\x84┘è┘ê┘à┘è╪ر (Pivot):\n{pivot}$ [╪ز╪╣┘\x84┘è┘é ┘é╪╡┘è╪▒]\n\n≡اôî ┘à╪│╪ز┘ê┘è╪د╪ز ╪د┘\x84╪ز╪»╪د┘ê┘\x84 ╪د┘\x84╪ص╪د┘\x84┘è╪ر:\n≡اات ┘à╪│╪ز┘ê┘è╪د╪ز ╪د┘\x84╪┤╪▒╪د╪ة {mode_label}: S1={s1}$ | S2={s2}$\n≡ا¤┤ ┘à╪│╪ز┘ê┘è╪د╪ز ╪د┘\x84╪ذ┘è╪╣ {mode_label}: R1={r1}$ | R2={r2}$\n\nظ£à ╪ث┘é┘ê┘ë ╪╡┘\x81┘é╪ر ╪┤╪▒╪د╪ة {mode_label}:\n{format_trade(best_buy)}\n   ╪د┘\x84╪س┘é╪ر: [╪ز┘é┘è┘è┘à]% | ╪د┘\x84╪│╪ذ╪ذ: [╪│╪ذ╪ذ ┘\x81┘\x86┘è ┘é╪╡┘è╪▒]\n\nظ£à ╪ث┘é┘ê┘ë ╪╡┘\x81┘é╪ر ╪ذ┘è╪╣ {mode_label}:\n{format_trade(best_sell)}\n   ╪د┘\x84╪س┘é╪ر: [╪ز┘é┘è┘è┘à]% | ╪د┘\x84╪│╪ذ╪ذ: [╪│╪ذ╪ذ ┘\x81┘\x86┘è ┘é╪╡┘è╪▒]"
+    for model_name in GROQ_MODELS:
+        try:
+            resp = client.chat.completions.create(messages=[{'role': 'system', 'content': MASTER_SYSTEM_PROMPT + '╪ث┘\x86╪ز ┘à╪ص┘\x84┘\x84 ┘â┘à┘è. ╪د┘\x84╪ز╪▓┘à ╪ذ╪د┘\x84┘é╪د┘\x84╪ذ ╪د┘\x84╪ص╪▒┘\x81┘è ┘\x84┘\x84╪ث╪▒┘é╪د┘à ╪ذ╪»┘ê┘\x86 ╪ث┘è ╪»┘è╪ذ╪د╪ش╪ر.'}, {'role': 'user', 'content': prompt}], model=model_name, temperature=0.1, max_tokens=600)
+            return resp.choices[0].message.content
+        except:
+            pass
+    return 'ظأبي╕\x8f ╪ز╪╣╪░╪▒ ╪ز┘ê┘\x84┘è╪» ╪د┘\x84╪«┘\x84╪د╪╡╪ر ╪د┘\x84┘à╪ص┘ê╪▒┘è╪ر ╪ذ╪│╪ذ╪ذ ╪د┘\x84╪╢╪║╪╖ ╪╣┘\x84┘ë ╪د┘\x84╪│┘è╪▒┘\x81╪▒.'

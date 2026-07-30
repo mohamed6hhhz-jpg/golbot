@@ -1,0 +1,116 @@
+def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
+    conf = d['confluence']
+    ent = d['entries']
+    ctx = d['hist_ctx']
+    rn = d['round_numbers']
+    gold = d['gold']
+    date_now = cairo_now().strftime('%Y-%m-%d %H:%M القاهرة')
+    bias = conf['bias']
+    bias_ar = {'bull': 'صعودي', 'bear': 'هبوطي', 'neutral': 'متذبذب'}.get(bias, 'متذبذب')
+    futures_label = f"{d['gold_futures']:.2f}$  ⏱ {d['futures_date']}"
+    if d['gold_spot']:
+        spot_label = f"{d['gold_spot']:.2f}$  ⏱ {d['spot_date']}"
+    else:
+        spot_label = f'غير متاح (آخر معلوم: راجع الآجل)'
+    contango_str = f"  (+{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0 else f"  ({d['contango']:.2f}$)" if d['contango'] else ''
+    score_table = '  '.join((f"{('🟢' if v > 0 else '🔴' if v < 0 else '⚪')}{name.split()[0]}" for name, v in conf['scores'].items()))
+    hist_parts = []
+    if ctx.get('chg_1d') is not None:
+        hist_parts.append(f"24h:{ctx['chg_1d']:+.1f}$({ctx['pct_1d']:+.1f}%)")
+    if ctx.get('chg_7d') is not None:
+        hist_parts.append(f"7d:{ctx['chg_7d']:+.1f}$({ctx['pct_7d']:+.1f}%)")
+    if ctx.get('chg_30d') is not None:
+        hist_parts.append(f"30d:{ctx['chg_30d']:+.1f}$({ctx['pct_30d']:+.1f}%)")
+    hist_line = '  '.join(hist_parts) if hist_parts else 'غير متاح'
+    refs = ent['refs']
+    nums = ('1️⃣', '2️⃣', '3️⃣')
+    market_suffix = '(آجل GC=F)' if d.get('mode') == 'futures' else '(فوري XAUUSD)'
+    bias_section = {'bull': f'🎯 صفقات الاتجاه الصعودي {market_suffix}', 'bear': f'🎯 صفقات الاتجاه الهبوطي {market_suffix}', 'neutral': f'⚡ صفقات الاختراق المتذبذب {market_suffix}'}.get(ent['bias'], f'🎯 الصفقات {market_suffix}')
+
+    def fmt_block(trades, dir_label):
+        lines = []
+        count = 1
+        for t in trades:
+            pct, lbl, reason = calc_trade_confidence(d, t)
+            if pct < 65:
+                continue
+            if pct >= 75:
+                entry_rule = f'✅ ادخل بثقة — (فرصة قوية مدعومة بالترند والسيولة)'
+            elif pct >= 60:
+                entry_rule = f'⚠️ دخول بحذر (نصف عقد) — (مخاطرة متوسطة، يُفضل الانتظار لتأكيد الاتجاه)'
+            elif pct >= 45:
+                entry_rule = f'⛔ لا تدخل — (السوق متضارب والعائد لا يبرر المخاطرة الحالية)'
+            else:
+                entry_rule = f'❌ خطر مرتفع — (يفضل تجاهل الصفقة ما لم يكن السعر مغرياً جداً)'
+            lines.append(f"\n   ╭─────────────────────────────╮\n   │ {nums[count - 1]} {t['dir']}  ·  {t['style']}\n   ├─────────────────────────────┤\n   │ 🏪 السوق  : {t['market']}\n   │ 📊 الثقة  : {pct}%  {lbl}\n   │ 🔔 القرار : {entry_rule}\n   │ 💡 السبب  : {reason}\n   ├─────────────────────────────┤\n   │ 📍 دخول   : {t['entry']}$\n   │ 🛡️  وقف   : {t['sl']}$  (خطر: {t['risk']}$)\n   │ 🎯 الأهداف:\n   │    T1 ← {t['t1']}$  (R: {t['rr1']}x)\n   │    T2 ← {t['t2']}$  (R: {t['rr2']}x)\n   │    T3 ← {t['t3']}$  (R: {t['rr3']}x)\n   ╰─────────────────────────────╯")
+            count += 1
+            if count > len(nums):
+                break
+        if not lines:
+            return f'\n   ❌ لا توجد صفقات {dir_label} مطابقة حالياً حتى بنسبة ضعيفة.\n'
+        return '\n'.join(lines)
+    buy_block = fmt_block(ent['buys'], 'شراء')
+    sell_block = fmt_block(ent['sells'], 'بيع')
+    fib = d['fib']
+    fib_line = f"فيبوناتشي (آجل): 78.6%={fib['78.6%']}$ | 61.8%={fib['61.8%']}$ | 50.0%={fib['50.0%']}$ | 38.2%={fib['38.2%']}$ | 23.6%={fib['23.6%']}$"
+    exp_low = round(gold - d['atr'] * 0.65, 2)
+    exp_high = round(gold + d['atr'] * 0.65, 2)
+    range_line = f'نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$'
+    fixed = f"""👑 📊 التقرير الكمي الشامل للذهب\n🕐 {date_now}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📍 السعر الحالي\n   سوق الآجل (Futures) : {futures_label}{contango_str}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 ملخص السوق\n   الزخم        : {ent['momentum']} {('→ تسارع بيع، الذهب عرضة للهبوط' if 'هابط' in ent['momentum'] else '→ تسارع شراء، الذهب في دعم' if 'صاعد' in ent['momentum'] else '→ حركة غير محددة')}\n   الاتجاه العام : {ent['trend']} {('→ الاتجاه السائد للأسفل' if 'هبوطي' in ent['trend'] else '→ الاتجاه السائد للأعلى' if 'صعودي' in ent['trend'] else '→ الاتجاه غير محدد')}\n   السيولة       : {ent['liquidity']} {('→ الحركات موثوقة ✅' if 'مرتفعة' in ent['liquidity'] else '→ انتبه: حركات وهمية محتملة ⚠️')}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 حكم السوق: {conf['verdict']}\n{score_table}\n   ∑ {conf['total']:+d}/±{conf['n']}  ▪ 🟢{conf['bullish']} 🔴{conf['bearish']} ⚪{conf['neutral']}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🕐 الاتجاه العام (متعدد الإطارات): {d['tf_label']}\n   ⚡ {d.get('tf_5m', {}).get('bias', '—')} | RSI={d.get('tf_5m', {}).get('rsi', '—')} | {tf_gold_impact(d.get('tf_5m', {}).get('score', 0), d.get('tf_5m', {}).get('rsi', 50))} [5د]\n   🎯 {d.get('tf_10m', {}).get('bias', '—')} | RSI={d.get('tf_10m', {}).get('rsi', '—')} | {tf_gold_impact(d.get('tf_10m', {}).get('score', 0), d.get('tf_10m', {}).get('rsi', 50))} [10د]\n   ⋆ {d['tf_15m'].get('bias', '—')} | RSI={d['tf_15m'].get('rsi', '—')} | {tf_gold_impact(d['tf_15m'].get('score', 0), d['tf_15m'].get('rsi', 50))} [15د]\n   ⏱️ {d.get('tf_30m', {}).get('bias', '—')} | RSI={d.get('tf_30m', {}).get('rsi', '—')} | {tf_gold_impact(d.get('tf_30m', {}).get('score', 0), d.get('tf_30m', {}).get('rsi', 50))} [30د]\n   ⏳ {d['tf_hourly'].get('bias', '—')} | RSI={d['tf_hourly'].get('rsi', '—')} | {tf_gold_impact(d['tf_hourly'].get('score', 0), d['tf_hourly'].get('rsi', 50))} [1س]\n   ⏰ {d['tf_4h'].get('bias', '—')} | RSI={d['tf_4h'].get('rsi', '—')} | {tf_gold_impact(d['tf_4h'].get('score', 0), d['tf_4h'].get('rsi', 50))} [4س]\n   📅 {d['tf_daily'].get('bias', '—')} | RSI={d['tf_daily'].get('rsi', '—')} | {tf_gold_impact(d['tf_daily'].get('score', 0), d['tf_daily'].get('rsi', 50))} [1ي]\n   📆 {d['tf_weekly'].get('bias', '—')} | RSI={d['tf_weekly'].get('rsi', '—')} | {tf_gold_impact(d['tf_weekly'].get('score', 0), d['tf_weekly'].get('rsi', 50))} [أسبوعي]\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📈 حركة السعر: {hist_line}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📡 الأسواق\n   DXY:{d['dxy']:.1f}({d['dxy_bias']}) {('→🟢دعم ذهب' if d['dxy'] < 101 else '→🔴ضغط' if d['dxy'] > 104 else '→⚪محايد')} | 2Y:{(f"{d['twy']:.2f}%" if d['twy'] else '—')} | 10Y:{d['tnx']:.2f}% | 30Y:{(f"{d['tty']:.2f}%" if d['tty'] else '—')} | Spread(10Y-2Y):{(f"{d['yield_curve']:+.2f}%({d['yield_curve_label']})" if d['yield_curve'] is not None else '—')}\n   VIX:{(f"{d['vix']:.1f}" if d['vix'] else '—')}({(d['vix_label'] if d['vix'] else '—')}) {('→🟢خوف=طلب ملاذء' if d['vix'] and d['vix'] > 25 else '→🔴هدوء=تراجع ملاذء' if d['vix'] else '')} | 🥈{(f"{d['silver']:.2f}$" if d['silver'] else '—')} | 🛢️{(f"{d['oil']:.1f}$" if d['oil'] else '—')} | 📊S&P:{(f"{d['sp500']:.0f}" if d['sp500'] else '—')}\n   🎯 نسبة P/C:{(f"{d['gld_pcr']}({d['pcr_source']})" if d['gld_pcr'] else '—')} {('→تشاؤم (بيع سائد)' if d['gld_pcr'] and d['gld_pcr'] > 1.2 else '→تفاؤل (شراء سائد)' if d['gld_pcr'] and d['gld_pcr'] < 0.8 else '→توازن' if d['gld_pcr'] else '')}\n   {d['real_yield_brief']}\n{d['real_yield_signal']}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🧮 المؤشرات وتأثيرها على الذهب\n   RSI:{d['rsi']}({d['rsi_label'].split()[0]}) | {_rsi_gold_impact(d['rsi'])}\n   MACD:{d['macd_hist']} | {_macd_gold_impact(d['macd_hist'])}\n   StochK:{d['stoch_k']} | BB:{d['bb_label'].split()[0]}{d['ind_bb_i']} | EMA:{d['ema_label']}{d['ind_ema_i']}\n   ADX:{d['adx']}(DI+{d['di_plus']}/DI-{d['di_minus']}) | {_adx_gold_impact(d['adx'], d['di_plus'], d['di_minus'])}\n   OBV:{d['obv_trend']} | {_obv_gold_impact(d['obv_trend'])}\n   CCI:{d['cci']}({d['cci_label'].split()[0]}) | W%R:{d['williams_r']} | ATR:{d['atr']}$\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔢 المستويات (مبنية على الـ {market_suffix})\n   🟣 مقاومة نفسية:{rn['nearest_resistance']}$(+{rn['dist_to_resistance']}$) | دعم نفسي:{rn['nearest_support']}$(-{rn['dist_to_support']}$)\n   📍 Swing H:{d['swing_high']}$ / L:{d['swing_low']}$ | VWAP:{(f"{d['vwap']}$" if d['vwap'] else '—')}\n   📅 PrevWk H:{(f"{d['prev_wk_high']}$" if d['prev_wk_high'] else '—')} / L:{(f"{d['prev_wk_low']}$" if d['prev_wk_low'] else '—')} | PrevMo H:{(f"{d['prev_mo_high']}$" if d['prev_mo_high'] else '—')} / L:{(f"{d['prev_mo_low']}$" if d['prev_mo_low'] else '—')}\n   🔴 R1:{d['r1']}$ R2:{d['r2']}$ | Pivot:{d['pivot']}$ | 🟢 S1:{d['s1']}$ S2:{d['s2']}$\n   🟡 {fib_line}\n   📊 {range_line}\n   🔍 تباين:{d['divergence']} | طلب:{(f"{d['sd_demand']}$" if d['sd_demand'] else '—')} | عرض:{(f"{d['sd_supply']}$" if d['sd_supply'] else '—')}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n{bias_section}\n🛒 صفقات الشراء:\n{buy_block}\n━━\n📉 صفقات البيع:\n{sell_block}\n   ↑ مراقبة: {refs['above']}$ | ↓ مراقبة: {refs['below']}$"""
+    adv = d['adv_trades']
+    pred = d['price_pred']
+
+    def _fmt_adv(t: dict) -> str:
+        arr = '🛒' if t['dir'] == 'buy' else '📉'
+        gain = abs(t['t1'] - t['entry'])
+        rr = round(gain / t['risk'], 1) if t['risk'] > 0 else 0
+        t2 = dict(t)
+        t2['is_buy'] = t['dir'] == 'buy'
+        t2['rr1'] = rr
+        pct, lbl, rsn = calc_trade_confidence(d, t2)
+        if pct < 65:
+            return None
+        if t['typ'] in ['لوت عالي 💰', 'زيرو انعكاس 🔄'] and pct < 50:
+            return None
+        if pct >= 75:
+            dec = '✅ ادخل بثقة'
+        elif pct >= 60:
+            dec = '⚠️ دخول بحذر'
+        elif pct >= 45:
+            dec = '⛔ لا تدخل'
+        else:
+            dec = '❌ تجاهل'
+        return f"\n   ╭───────────────────────────╮\n   │ {arr} {t['typ']} | {t['market']} | {t['tf']}\n   ├───────────────────────────┤\n   │ 📊 الثقة : {pct}%  {lbl}\n   │ 🔔 القرار : {dec}\n   │ 💡 السبب  : {rsn}\n   ├───────────────────────────┤\n   │ 📍 دخول  : {t['entry']}$\n   │ 🛡️  وقف   : {t['sl']}$  (خطر: {t['risk']}$)\n   │ 🎯 الأهداف:\n   │    T1 ← {t['t1']}$  (R: {rr}x)\n   │    T2 ← {t['t2']}$\n   │    T3 ← {t['t3']}$\n   ╰───────────────────────────╯"
+    tgt15 = adv.get('target_15m', {})
+    if tgt15:
+        dir15_ar = 'صعود' if tgt15.get('dir') == 'buy' else 'هبوط' if tgt15.get('dir') == 'sell' else 'محايد'
+        tgt15_block = f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n⏳ هدف الـ 15 دقيقة القادمة\n   الاتجاه المتوقع: {dir15_ar} | السعر المستهدف: {tgt15.get('center', '--')}$\n   نطاق متوقع: {tgt15.get('low', '--')}$ ↔ {tgt15.get('high', '--')}$"
+    else:
+        tgt15_block = ''
+    adv_lines = []
+    order_groups = [('🛒 صفقات سكالبينج سريع', ['scalp_5m_buy', 'scalp_5m_sell', 'tight_scalp_buy', 'tight_scalp_sell']), ('📅 صفقات يومية وأسبوعية', ['daily_buy', 'daily_sell', 'weekly_buy', 'weekly_sell']), ('🌊 سوينج طويل وشهري', ['long_swing_buy', 'long_swing_sell', 'monthly_buy', 'monthly_sell', 'swing_buy', 'swing_sell']), ('💰 صفقات لوت عالي (بالميلي - جودة > 90%)', ['high_lot_buy', 'high_lot_sell']), ('🔄 صفقات زيرو انعكاس (Counter-trend - جودة > 90%)', ['rev_buy', 'rev_sell'])]
+    adv_blocks = []
+    for grp_title, keys in order_groups:
+        grp_lines = []
+        for k in keys:
+            if k in adv:
+                formatted_trade = _fmt_adv(adv[k])
+                if formatted_trade is not None:
+                    grp_lines.append(formatted_trade)
+        if grp_lines:
+            adv_blocks.append(f'\n{grp_title}:\n' + '\n'.join(grp_lines))
+    adv_lines = adv_blocks
+    adv_block = '\n'.join(adv_lines) if adv_lines else '   لا توجد صفقات متقدمة متاحة'
+    d_forecast = d['tf_forecasts']['1d']
+    daily_range = round(d_forecast['high'] - d_forecast['low'], 2)
+    variance_val = d.get('variance', 0.0)
+    part2 = f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📈 توقعات السعر (إغلاق · قمة · قاع)\n   📌 مبني على: ATR={d['atr']}$ × √زمن مُعدَّل بالاتجاه\n   ─────────────────────────\n   ⏱️ ساعة   │ إغلاق: {d['tf_forecasts']['1h']['close']}$  │  قمة: {d['tf_forecasts']['1h']['high']}$  │  قاع: {d['tf_forecasts']['1h']['low']}$  │ جودة:{d['tf_forecasts']['1h'].get('quality', '—')}%\n   ⏰ 4 ساعات│ إغلاق: {d['tf_forecasts']['4h']['close']}$  │  قمة: {d['tf_forecasts']['4h']['high']}$  │  قاع: {d['tf_forecasts']['4h']['low']}$  │ جودة:{d['tf_forecasts']['4h'].get('quality', '—')}%\n   📅 يوم    │ إغلاق: {d['tf_forecasts']['1d']['close']}$  │  قمة: {d['tf_forecasts']['1d']['high']}$  │  قاع: {d['tf_forecasts']['1d']['low']}$  │ جودة:{d['tf_forecasts']['1d'].get('quality', '—')}%\n   📆 أسبوع  │ إغلاق: {d['tf_forecasts']['1w']['close']}$  │  قمة: {d['tf_forecasts']['1w']['high']}$  │  قاع: {d['tf_forecasts']['1w']['low']}$  │ جودة:{d['tf_forecasts']['1w'].get('quality', '—')}%\n   🗓️ شهر    │ إغلاق: {d['tf_forecasts']['1mo']['close']}$ │  قمة: {d['tf_forecasts']['1mo']['high']}$ │  قاع: {d['tf_forecasts']['1mo']['low']}$ │ جودة:{d['tf_forecasts']['1mo'].get('quality', '—')}%\n   ─────────────────────────\n   📖 شرح النطاق والتباين:\n   • النطاق اليومي المتوقع ({daily_range}$): هو المسافة بين القمة والقاع المتوقعين لليوم، ويُحسب بدمج متوسط الحركة (ATR) مع قوة الاتجاه (ADX). معناه: الذهب مرشح للتحرك صعوداً وهبوطاً ضمن هذا الهامش اليوم.\n   • التباين / الانحراف المعياري ({variance_val}$): يقيس درجة التشتت السعري لآخر 14 يوم. معناه: كلما زاد الرقم، دلّ على سيولة عنيفة واضطراب شديد للذهب، وكلما قل دلّ على تجميع وهدوء.\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 صفقات متقدمة (آجل وفوري)\n{adv_block}\n━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    gold_strength = _build_gold_strength_section(d)
+    today_ohlc = _build_today_ohlc_section(d)
+    fixed = fixed + gold_strength + part2 + tgt15_block + today_ohlc
+    prob_floor = 'سيناريو الصعود لا يقل عن 50%' if bias == 'bull' else 'سيناريو الهبوط لا يقل عن 50%' if bias == 'bear' else 'سيناريو التذبذب لا يقل عن 40%'
+
+    def _fmt_ai(trades):
+        return '\n'.join((f"   [{t['style']}] {t['market']}: دخول {t['entry']}$ | وقف {t['sl']}$ ({t['risk']}$) | T1:{t['t1']}$ T2:{t['t2']}$ T3:{t['t3']}$" for t in trades))
+    ai_instructions = f"""أنت محلل ذهب كمي محترف. اكتب بالعربية الفصحى فقط.\n\n🔴 قواعد صارمة لا تُكسر:\n1. اكتب الأرقام بالأرقام الإنجليزية فقط: اكتب "45.18" لا "خمسة وأربعين"\n2. الفاصلة العشرية = نقطة (.) وليس "درهم" أو كلمة أخرى: "45.18" صحيح\n3. النسب المئوية بالأرقام: "50%" لا "خمسون بالمئة"\n4. السيناريوهات الثلاثة مجموعها 100% — كل سيناريو لا يقل عن 15% مطلقا بدون استثناء — مثال صحيح: صعود(20%) هبوط(55%) تذبذب(25%) — مثال خاطئ: تذبذب(0%) او تذبذب(10%)\n5. {prob_floor} — حد ادنى للسيناريو الرئيسي، والباقيان لا يقل اي منهم عن 15%\n6. لا تكرر اي جملة او فكرة — كل جملة تضيف معلومة جديدة بالارقام\n7. اذكر مستويات سعرية محددة ($) في كل قسم — ممنوع الكلام العام بدون ارقام\n8. قاموس RSI: اقل من 30=تشبع بيع | 30-40=ضغط بيع | 40-50=محايد مع ميل هبوطي | 50-60=محايد مع ميل صعودي | 60-70=ضغط شراء | اكثر من 70=تشبع شراء\n9. في الخلاصة لا تذكر الاحتمالية مرتين — اكتب الاحتمالية مرة واحدة فقط وتطابق السيناريو الرئيسي: اذا هبوط(55%) في السيناريوهات اكتب في الخلاصة "احتمالية هبوط 55%" فقط\n\nبيانات السوق:\nسعر الذهب = {gold:.2f}$ | RSI={d['rsi']} | ADX={d['adx']} | MACD={d['macd_hist']}\nالإطارات: أسبوعي RSI={d['tf_weekly']['rsi']} | يومي RSI={d['tf_daily']['rsi']} | ساعي RSI={d['tf_hourly'].get('rsi', '--')}\nفيبوناتشي (آجل): 78.6%={d['fib']['78.6%']}$ | 61.8%={d['fib']['61.8%']}$ | 50%={d['fib']['50.0%']}$\nالدعم القريب={d['s1']}$ | المقاومة={d['r1']}$ | ATR={d['atr']}$\nالتباين: {d['divergence']}\nالتوافق: {d['tf_label']}\nحكم السوق: {conf['verdict']}\n\nصفقات الشراء:\n{_fmt_ai(ent['buys'])}\nصفقات البيع:\n{_fmt_ai(ent['sells'])}\n\nاكتب هذه الأقسام فقط بالترتيب:\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🤖 التحليل الكمي\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n**📌 خلاصة:** [جملة واحدة — {bias_ar} + احتمالية + اذكر مستوى الدعم/المقاومة الأقرب]\n\n**🔍 الإطارات الزمنية:** [جملتان بالأرقام. الأولى: ما الذي يقوله الأسبوعي (RSI={d['tf_weekly']['rsi']}) مقارنة بالساعي؟ الثانية: ما المستوى المحدد الذي يجب كسره لتأكيد هذا الاتجاه؟]\n\n**📉 السيناريوهات (100%):**\n   📈 صعود (X%): كسر {refs['above']}$ → الهدف [رقم]$ — فوري (Spot) أو آجل (Futures)\n   📉 هبوط (Y%): كسر {refs['below']}$ → الهدف [رقم]$ — فوري (Spot) أو آجل (Futures)\n   ⚡ تذبذب (Z%): النطاق [رقم]$-[رقم]$ — فوري (Spot) أو آجل (Futures)"""
+    return (fixed, ai_instructions)

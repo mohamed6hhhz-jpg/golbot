@@ -1,0 +1,25 @@
+        bot2_reports = []
+        bot2_reports.append(("💧 سيولة اليومي", daily_liquidity_block, None))
+        bot2_reports.append(("⏳ الأوامر المعلقة اللحظية", limits_block, None))
+        bot2_reports.append(("⚡ صفقات الاختراق اللحظي", breakout_5m_block, None))
+        
+        # القالب الجديد للمستويات
+        bot2_reports.append(("📍 مستويات واتجاهات اليوم", _build_all_tf_levels(data), None))
+        # القوالب الذكية T0-T4 (نفس البوت الأول)
+        bot2_reports.append(("🎯 الصفقات المتقدمة والزيرو انعكاس", t0 if t0 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        bot2_reports.append(("📊 التقرير الفني المتقدم", t1 if t1 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        bot2_reports.append(("🌍 تقرير الاقتصاد الكلي", t2 if t2 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        bot2_reports.append(("⚠️ تقرير شهية المخاطرة", t3 if t3 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        bot2_reports.append(("📈 تقرير عوائد السندات", t4 if t4 else "⚠️ تعذر توليد القالب بسبب الضغط، يرجى المحاولة لاحقاً.", None))
+        # القالب الذكي الجديد CFTC (t11)
+        bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(data), None))
+        t13_src = t13 if t13 and 'تعذر' not in str(t13) else _build_template_13(data)
+        if not t13_src:
+            t13_src = "━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + "\n".join([str(c) for c in _build_template_13.__code__.co_consts if isinstance(c, str) and len(c) > 5])
+        
+        import re
+        t13_clean = re.sub(r'\[.*?\]', '', t13_src, flags=re.DOTALL)
+        t13_clean = re.sub(r'\n\s*\n', '\n\n', t13_clean).strip()
+        bot2_reports.append(("📊⚡ تحليل عقود الأوبشن الاحترافي", t13_clean, None))
+
+        # القوالب الفورية S1-S12 — البوت الثالث @Dsssoppp78_bot

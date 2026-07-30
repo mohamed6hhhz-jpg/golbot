@@ -1,0 +1,15 @@
+def send_reports(data: dict, report_text: str, prefix: str = ""):
+    from Goldbot.send_lock import SEND_LOCK, _futures_cache
+
+    log.info("🤖 [Spot] بدء توليد التقارير (خارج القفل)...")
+    raw_reports = []
+
+    # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
+    if report_text:
+        for label, part in _split_fixed_report(report_text, "الفوري - Spot"):
+            raw_reports.append((label, part, None))
+
+        # ── القوالب الذكية T0-T5 (بالتوازي لتوفير الوقت) ──
+        t0, t1, t2, t3, t4, t5 = "", "", "", "", "", ""
+        
+        async 

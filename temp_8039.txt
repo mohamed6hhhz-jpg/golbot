@@ -1,0 +1,15 @@
+*(يمثل الهدف الماكرو-اقتصادي للسيولة المؤسساتية الاستراتيجية)*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ *ملاحظة كمية: هذه الأرقام ديناميكية وتتحدث فورياً مع تحرك مؤشرات التذبذب (ATR) وتدفقات الفوليوم.*
+"""
+    return template.strip()
+
+
+def send_reports(data: dict, report_text: str, prefix: str = ""):
+    from Goldbot.send_lock import SEND_LOCK, _futures_cache
+
+    log.info("🤖 [Spot] بدء توليد التقارير (خارج القفل)...")
+    raw_reports = []
+
+    # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
+    if report_text:

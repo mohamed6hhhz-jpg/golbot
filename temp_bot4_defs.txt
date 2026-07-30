@@ -1,0 +1,2 @@
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199\scratch\test_all_templates.py: bot4.append(bot_spot._build_liquidity_breakout_detector(data))
+C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199\scratch\test_all_templates.py: bot4.append(bot_spot._build_institutional_whale_tracker(data))

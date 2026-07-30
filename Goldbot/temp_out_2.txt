@@ -1,0 +1,33 @@
+def _build_template_2(d: dict) -> str:
+    """بناء القالب الثاني (مؤشر صحة الاقتصاد الأمريكي) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ لا يمكن توليد تقرير الاقتصاد الكلي لعدم توفر مفتاح Groq.'
+    dxy = d.get('dxy', 0)
+    dxy_pct = d.get('dxy_pct', 0.0)
+    tnx = d.get('tnx', 0)
+    twy = d.get('twy', 0)
+    vix = d.get('vix', 0)
+    vix_pct = d.get('vix_pct', 0.0)
+    sp500_pct = d.get('sp500_pct', 0.0)
+    nasdaq_pct = d.get('nasdaq_pct', 0.0)
+    inflation = d.get('cpi_yoy', 2.5)
+    interest_rate = d.get('interest_rate', 5.5)
+    real_yield = d.get('real_yield', round(interest_rate - inflation, 2))
+    yield_curve = round(tnx - twy, 2) if tnx and twy else 0
+    dxy_bias = 'قوي' if dxy > 104 else 'ضعيف' if dxy < 101 else 'محايد'
+    ry_bias = 'مرتفع ↑ (ضغط على الذهب)' if real_yield > 1.5 else 'متوسط' if real_yield > 0 else 'سالب ↓ (دعم للذهب)'
+    vix_state = 'مرتفع (خوف)' if vix > 25 else 'منخفض (هدوء)' if vix < 18 else 'متوسط'
+    eq_state = 'أسهم ترتفع (Risk-On)' if sp500_pct > 0.3 else 'أسهم تهبط (Risk-Off)' if sp500_pct < -0.3 else 'أسهم مستقرة'
+    yc_state = 'منحنى مقلوب (مخاوف ركود)' if yield_curve < -0.1 else 'منحنى طبيعي' if yield_curve > 0.1 else 'منحنى شبه مسطح'
+    prompt = f'أنت خبير اقتصادي كمي متخصص. اكتب تقرير صحة الاقتصاد الأمريكي بالعربية ملتزماً بهذا القالب حرفياً:\n\n📊 مؤشر صحة الاقتصاد الأمريكي | اليوم\n\n🇺🇸 الحالة العامة:\n[جملة واحدة دقيقة تصف الحالة الاقتصادية بناءً على: {eq_state}، DXY={dxy:.1f}({dxy_bias})]\n\n📈 النمو والاستهلاك:\n[تحليل 2 جملة: منحنى العوائد ({yc_state}، فارق {yield_curve:+.2f}%) وتأثيره على الائتمان والنمو]\n\n🏦 التضخم والفائدة:\n[تحليل 2 جملة: التضخم {inflation:.2f}%، معدل الفائدة={interest_rate:.2f}%، العائد الحقيقي={real_yield:+.2f}% ({ry_bias})]\n\n👷 سوق العمل:\n[جملة واحدة عن دلالة الأسواق الحالية على سوق العمل: VIX={vix:.1f}({vix_state})، أسهم {sp500_pct:+.2f}%]\n\n🟡 التأثير على الذهب:\n[جملتان محددتان: كيف يؤثر العائد الحقيقي {real_yield:+.2f}% والدولار {dxy:.1f} على الذهب الآن مع حكم صعودي أو هبوطي]\n\n💲 التأثير على الدولار:\n[جملة واحدة: DXY عند {dxy:.1f}({dxy_pct:+.2f}%) واتجاهه بناءً على العوائد والأسهم]\n\n🧭 النظرة العامة:\n[خلاصة في جملتين: الصورة الكاملة للبيئة الاقتصادية وتأثيرها على الذهب اليوم]\n\nالقاعدة: لا تكتب مقدمة. لا تضف نصاً خارج القالب. كل أرقام في القالب يجب أن تكون من البيانات المعطاة فقط.'
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f'🤖 جاري توليد القالب الثاني (الاقتصاد الكلي) عبر {model_name}...')
+            resp = client.chat.completions.create(messages=[{'role': 'system', 'content': MASTER_SYSTEM_PROMPT + 'أنت خبير اقتصادي كمي. اكتب تحليلاً مالياً دقيقاً محدداً. استخدم فقط الأرقام المعطاة. لا تكتب خارج القالب.'}, {'role': 'user', 'content': prompt}], model=model_name, temperature=0.15, max_tokens=900)
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f'⚠️ [{model_name}] فشل في توليد القالب الثاني: {e}')
+            time.sleep(10)
+            continue
+    return '⚠️ تعذر توليد تقرير الاقتصاد الكلي بسبب ضغط على سيرفرات الذكاء الاصطناعي.'

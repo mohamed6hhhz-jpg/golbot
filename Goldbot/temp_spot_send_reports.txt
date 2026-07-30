@@ -1,0 +1,194 @@
+def send_reports(data: dict, report_text: str, prefix: str=''):
+    from Goldbot.send_lock import SEND_LOCK, _futures_cache
+    log.info('🤖 [Spot] بدء توليد التقارير (خارج القفل)...')
+    raw_reports = []
+    if report_text:
+        for label, part in _split_fixed_report(report_text, 'الفوري - Spot'):
+            raw_reports.append((label, part, None))
+        t0, t1, t2, t3, t4, t5 = ('', '', '', '', '', '')
+
+        async def _gen_t0():
+            return _build_template_0(data)
+
+        async def _gen_t1():
+            return _build_template_1(data)
+
+        async def _gen_t2():
+            return _build_template_2(data)
+
+        async def _gen_t3():
+            return _build_template_3(data)
+
+        async def _gen_t4():
+            return _build_template_4(data)
+
+        async def _gen_t5():
+            return _build_template_5(data)
+
+        async def _generate_all():
+
+            async def wrap(idx, func, *args):
+                await asyncio.sleep(idx * 25)
+                for attempt in range(3):
+                    try:
+                        res = await asyncio.to_thread(func, *args)
+                        if 'تعذر توليد' in str(res) or '⚠️' in str(res):
+                            log.warning(f'Rate limit or failure hit for T{idx}, attempt {attempt + 1}/3. Waiting 25s...')
+                            await asyncio.sleep(25)
+                            continue
+                        return res
+                    except Exception as e:
+                        if '429' in str(e):
+                            log.warning(f'Exception 429 hit for T{idx}, waiting 25s...')
+                            await asyncio.sleep(25)
+                        else:
+                            return f'⚠️ خطأ: {e}'
+                return '⚠️ تعذر توليد التقرير بسبب الضغط على السيرفر.'
+            return await asyncio.gather(wrap(0, _build_template_0, data), wrap(1, _build_template_1, data), wrap(2, _build_template_2, data), wrap(3, _build_template_3, data), wrap(4, _build_template_4, data), wrap(5, _build_template_5, data), wrap(7, _build_template_7, data), wrap(8, _build_template_8, data), wrap(9, _build_template_9, data), wrap(10, _build_template_10, data), wrap(11, _build_template_11, data), wrap(12, _build_template_12, data), wrap(13, _build_template_13, data), wrap(6, _build_summary_template, data, report_text, 'الفوري'), return_exceptions=True)
+        log.info('🤖 [Spot] جاري توليد القوالب الذكية الستة بالتوازي...')
+        loop = asyncio.new_event_loop()
+        results = loop.run_until_complete(_generate_all())
+        loop.close()
+        for i, res in enumerate(results):
+            if isinstance(res, Exception):
+                log.error(f'Error T{i}: {res}')
+                results[i] = ''
+        t0, t1, t2, t3, t4, t5, t7, t8, t9, t10, t11, t12, t13, t6 = results
+        if t0:
+            raw_reports.append(('🎯 الصفقات المتقدمة والزيرو انعكاس (الفوري)', t0, None))
+        if t1:
+            raw_reports.append(('📊 التقرير الفني المتقدم (الفوري)', t1, None))
+        if t2:
+            raw_reports.append(('🌍 تقرير الاقتصاد الكلي (الفوري)', t2, None))
+        if t3:
+            raw_reports.append(('⚠️ تقرير شهية المخاطرة (الفوري)', t3, None))
+        if t4:
+            raw_reports.append(('📈 تقرير عوائد السندات (الفوري)', t4, None))
+        if t5:
+            raw_reports.append(('💱 تقرير قوة العملات (الفوري)', t5, None))
+        from datetime import datetime
+        import pytz
+        from datetime import timedelta
+        CAIRO_TZ_LOCAL = pytz.timezone('Africa/Cairo')
+        today_str = datetime.now(CAIRO_TZ_LOCAL).strftime('%d/%m/%Y')
+        atr_val = data.get('atr', 20)
+        gld = data.get('gold', 2000)
+        buy_lvl = round(gld + atr_val * 0.4, 2)
+        buy_t1 = round(buy_lvl + atr_val * 0.5, 2)
+        buy_t2 = round(buy_lvl + atr_val * 1.0, 2)
+        buy_t3 = round(buy_lvl + atr_val * 1.5, 2)
+        sell_lvl = round(gld - atr_val * 0.4, 2)
+        sell_t1 = round(sell_lvl - atr_val * 0.5, 2)
+        sell_t2 = round(sell_lvl - atr_val * 1.0, 2)
+        sell_t3 = round(sell_lvl - atr_val * 1.5, 2)
+        daily_liquidity_block = f'\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n💧 سيولة اليومي {today_str}\n\n✅ مستوى شراء بعد كسر وثبات {buy_lvl}\nالهدف:\n{buy_t1}\n{buy_t2}\n{buy_t3}\n\n🛑 مستوى البيع بعد كسر وثبات {sell_lvl}\nالهدف:\n{sell_t1}\n{sell_t2}\n{sell_t3}\n\n✅ الدخول بعد كسر + ثبات\n'
+        buy_limit_price = round(data.get('s2', gld - atr_val * 1.5), 2)
+        buy_limit_sl = round(buy_limit_price - atr_val * 0.6, 2)
+        buy_limit_tp = round(buy_limit_price + atr_val * 1.2, 2)
+        sell_limit_price = round(data.get('r2', gld + atr_val * 1.5), 2)
+        sell_limit_sl = round(sell_limit_price + atr_val * 0.6, 2)
+        sell_limit_tp = round(sell_limit_price - atr_val * 1.2, 2)
+        limits_block = f'\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n⏳ الأوامر المعلقة اللحظية (Limit Orders)\n(جودة وتمركز > 65% | تحديث ديناميكي)\n\n🟢 Buy Limit:\nدخول: {buy_limit_price}\nهدف: {buy_limit_tp}\nوقف: {buy_limit_sl}\n\n🔴 Sell Limit:\nدخول: {sell_limit_price}\nهدف: {sell_limit_tp}\nوقف: {sell_limit_sl}\n'
+        b5_buy = round(gld + atr_val * 0.25, 2)
+        b5_buy_tp = round(b5_buy + atr_val * 0.6, 2)
+        b5_sell = round(gld - atr_val * 0.25, 2)
+        b5_sell_tp = round(b5_sell - atr_val * 0.6, 2)
+        breakout_5m_block = f'\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚡ صفقات الاختراق اللحظي (Breakout)\n\nشراء\nكسر {b5_buy}\nهدف {b5_buy_tp}\n\nبيع\nكسر {b5_sell}\nهدف {b5_sell_tp}\n\nإغلاق بجسم فريم 5 دقائق.\nشرط أساسي:\nلا يتم الدخول في أي صفقة، سواء شراء أو بيع، إلا بعد تحقق شرط:\nالإغلاق بجسم شمعة إطار الـ5 دقائق فوق مستوى الكسر في الشراء، أو أسفل مستوى الكسر في البيع.\n'
+        bot2_reports = []
+        bot2_reports.append(('💧 سيولة اليومي', daily_liquidity_block, None))
+        bot2_reports.append(('⏳ الأوامر المعلقة اللحظية', limits_block, None))
+        bot2_reports.append(('⚡ صفقات الاختراق اللحظي', breakout_5m_block, None))
+        bot2_reports.append(('📍 مستويات واتجاهات اليوم', _build_all_tf_levels(data), None))
+        if 't11' in locals() and t11:
+            bot2_reports.append(('📰 تقرير CFTC', t11, None))
+        if 't12' in locals() and t12:
+            bot2_reports.append(('🏦 تقرير المشتقات وصناديق الاستثمار', t12, None))
+        if 't13' in locals() and t13:
+            bot2_reports.append(('📊⚡ تحليل عقود الأوبشن الاحترافي', t13, None))
+        bot3_reports = []
+        try:
+            bot3_reports.append(('[فوري] 1/12 الاسعار والفيبوناتشي', _build_spot_s1(data), None))
+            bot3_reports.append(('[فوري] 2/12 الاطارات الزمنية', _build_spot_s2(data), None))
+            bot3_reports.append(('[فوري] 3/12 زيرو انعكاس', _build_spot_s3(data), None))
+            bot3_reports.append(('[فوري] 4/12 السكالبينج', _build_spot_s4(data), None))
+            bot3_reports.append(('[فوري] 5/12 السوينج', _build_spot_s5(data), None))
+            bot3_reports.append(('[فوري] 6/12 اللوت العالي', _build_spot_s6(data), None))
+            bot3_reports.append(('[فوري] 7/12 التحليل الفني والزخم', _build_spot_s7(data), None))
+            bot3_reports.append(('[فوري] 8/12 الاقتصاد الكلي', _build_spot_s8(data), None))
+            bot3_reports.append(('[فوري] 9/12 شهية المخاطرة', _build_spot_s9(data), None))
+            bot3_reports.append(('[فوري] 10/12 عوائد السندات', _build_spot_s10(data), None))
+            bot3_reports.append(('[فوري] 11/12 قوة العملات DXY', _build_spot_s11(data), None))
+            bot3_reports.append(('[فوري] 12/12 الخلاصة المحورية', _build_spot_s12(data), None))
+            log.info(f'[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي')
+        except Exception as _se:
+            log.warning(f'[S1-S12] خطا في توليد القوالب الفورية: {_se}')
+        if t7:
+            bot2_reports.append(('🎯 الصفقات المتخصصة والفريمات (الفوري)', t7, None))
+        if t8:
+            bot2_reports.append(('🐋 تاثير الاسواق والمؤسسات (الفوري)', t8, None))
+        if t9:
+            bot2_reports.append(('📊 تقرير اتجاه الذهب اليومي (الفوري)', t9, None))
+        if t10:
+            bot2_reports.append(('📆 التقرير الاسبوعي الشامل (الفوري)', t10, None))
+        if t6:
+            bot2_reports.append(('الخلاصة المحورية', t6, None))
+        flat_chunks = []
+        for title, txt, chat_id in raw_reports:
+            for chunk in _split_message(txt):
+                flat_chunks.append((title, chunk, chat_id))
+        total = len(flat_chunks)
+        flat_chunks_2 = []
+        if 'bot2_reports' in locals():
+            for title, txt, chat_id in bot2_reports:
+                for chunk in _split_message(txt):
+                    flat_chunks_2.append((title, chunk, chat_id))
+        total_2 = len(flat_chunks_2)
+        global LAST_PUBLIC_REPORT_TIME, LAST_4H_REPORT_TIME
+        now = time.time()
+        is_public = False
+        if now - LAST_PUBLIC_REPORT_TIME >= 14000:
+            is_public = True
+            LAST_PUBLIC_REPORT_TIME = now
+        send_to_4h_channel = False
+        if now - LAST_4H_REPORT_TIME >= 4 * 3600:
+            send_to_4h_channel = True
+            LAST_4H_REPORT_TIME = now
+        log.info('⏳ [Spot] التقارير جاهزة، انتظار القفل المشترك للإرسال...')
+        with SEND_LOCK:
+            log.info('🔒 [Spot] حصل على القفل — بدء إرسال الرسائل...')
+            log.info(f'📤 [Spot] إرسال {total} رسالة متسلسلة...')
+            for i, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
+                subtitle = _get_subtitle(chunk, title)
+                final_text = f'{prefix}[{i}/{total}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n{subtitle}\n\n{chunk}'
+                ok = _send_single(final_text, is_public, chat_id)
+                if send_to_4h_channel and (not chat_id):
+                    _send_single(final_text, is_public, '@SovereignMaaregFund')
+                log.info(f'✅ رسالة {i}/{total} وصلت.' if ok else f'❌ فشل رسالة {i}/{total}.')
+                time.sleep(2)
+            if flat_chunks_2:
+                log.info(f'📤 إرسال {total_2} رسالة متسلسلة للبوت المستقل (الجزء الثاني)...')
+                import os
+                bot2_token = os.environ.get('TELEGRAM_BOT_TOKEN_2', TELEGRAM_BOT_TOKEN)
+                for i2, (title2, chunk2, chat_id2) in enumerate(flat_chunks_2, 1):
+                    subtitle2 = _get_subtitle(chunk2, title2)
+                    final_text2 = f'{prefix}[{i2}/{total_2}] 👑 التقرير الكمي الشامل للذهب (الفوري - Spot)\n{subtitle2}\n\n{chunk2}'
+                    ok2 = _send_single_bot2(final_text2, is_public, chat_id2)
+                    if send_to_4h_channel and (not chat_id2):
+                        _send_single_bot2(final_text2, is_public, '@SovereignMaaregFund')
+                    log.info(f'✅ رسالة البوت الثاني {i2}/{total_2} وصلت.' if ok2 else f'❌ فشل رسالة البوت الثاني {i2}/{total_2}.')
+                    time.sleep(2)
+            if 'bot3_reports' in locals() and bot3_reports:
+                flat_chunks_3 = []
+                for title3, txt3, cid3 in bot3_reports:
+                    if txt3:
+                        for chunk3 in _split_message(txt3):
+                            flat_chunks_3.append((title3, chunk3, cid3))
+                total_3 = len(flat_chunks_3)
+                log.info(f'📤 [Bot3] ارسال {total_3} قالب فوري عبر @Dsssoppp78_bot...')
+                for i3, (title3, chunk3, cid3) in enumerate(flat_chunks_3, 1):
+                    final_text3 = f'📊 [{i3}/{total_3}] تقارير سوق الفوري (XAU/USD Spot)\n{title3}\n\n{chunk3}'
+                    ok3 = _send_single_bot3(final_text3, cid3)
+                    log.info(f"{('✅' if ok3 else '❌')} [Bot3] {i3}/{total_3}")
+                    time.sleep(2)
+            log.info('🔓 [Spot] تم الارسال، تحرير القفل لانتظار الخلاصة...')
+        log.info('🔓 [Spot] أطلق القفل — انتهى الدورة الكاملة.')

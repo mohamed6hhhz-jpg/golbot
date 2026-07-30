@@ -1,0 +1,39 @@
+def _build_template_0(d: dict) -> str:
+    """بناء القالب التمهيدي 0 (الصفقات المتقدمة والاتجاهات) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ لا يمكن توليد تقرير الصفقات المتقدمة لعدم توفر مفتاح Groq.'
+    adv = d.get('adv_trades', {})
+
+    def _format_trade(t):
+        if not t:
+            return 'غير متوفر حالياً'
+        return f"دخول: {t['entry']} | هدف: {t['t2']} | وقف: {t['sl']} | ({('شراء 🟢' if t['dir'] == 'buy' else 'بيع 🔴')})"
+    scalp = adv.get('scalp_5m_buy') or adv.get('scalp_5m_sell') or adv.get('scalp_buy') or adv.get('scalp_sell')
+    gold_now = d.get('gold', 0)
+    sw_b = adv.get('swing_buy')
+    sw_s = adv.get('swing_sell')
+    if sw_b and sw_s:
+        swing = sw_b if abs(sw_b['entry'] - gold_now) < abs(sw_s['entry'] - gold_now) else sw_s
+    else:
+        swing = sw_b or sw_s
+    rev = adv.get('rev_buy') or adv.get('rev_sell')
+    scalp_str = _format_trade(scalp)
+    swing_str = _format_trade(swing)
+    rev_str = _format_trade(rev)
+    bias_1h = d.get('tf_hourly', {}).get('bias', '—')
+    bias_1d = d.get('tf_daily', {}).get('bias', '—')
+    score_1h = d.get('tf_hourly', {}).get('score', 0)
+    first_hit = 'القمة (مقاومة) أولاً 📈' if score_1h > 0 else 'القاع (دعم) أولاً 📉' if score_1h < 0 else 'متذبذب - لا مسار واضح ⚖️'
+    template = f'🎯 التقرير التمهيدي: صفقات ذكية واتجاهات الذهب\n\n⏱️ الاتجاه خلال ساعة: [ترجم إلى العربية بدقة: {bias_1h}]\n📅 الاتجاه خلال يوم: [ترجم إلى العربية بدقة: {bias_1d}]\n🏁 الأقرب للضرب أولاً: {first_hit}\n\n🔥 صفقات السكالبينج (خطف سريع):\n{scalp_str}\n\n🌊 صفقات السوينج (مدى أبعد):\n{swing_str}\n\n🎯 صفقات زيرو انعكاس (قناص):\n{rev_str}'
+    prompt = f'أنت مستشار تداول آلي خبير. طلب مني العميل تقريراً عن "الصفقات المتقدمة والاتجاهات" يطابق هذا القالب بالضبط:\n\n{template}\n\nالمطلوب:\nمهمتك هي صياغة هذا التقرير بلمسة احترافية خفيفة. \n- في خانة "الاتجاه"، ترجم كلمة (bullish إلى صاعد، bearish إلى هابط، neutral إلى عرضي).\n- بالنسبة للصفقات (سكالبينج، سوينج، زيرو انعكاس)، اترك البيانات والأرقام والاتجاهات كما هي تماماً. إذا كانت "غير متوفر حالياً" اتركها كما هي.\n- التزم بالقالب تماماً ولا تكتب أي نصوص إضافية أو مقدمات.'
+    for model_name in GROQ_MODELS:
+        try:
+            log.info(f'🤖 جاري توليد القالب التمهيدي 0 (الصفقات المتقدمة) عبر {model_name}...')
+            resp = client.chat.completions.create(messages=[{'role': 'system', 'content': MASTER_SYSTEM_PROMPT + 'أنت خبير أسواق. التزم بالقالب الحرفي ولا تضف مقدمات. لا تغير الأرقام نهائياً.'}, {'role': 'user', 'content': prompt}], model=model_name, temperature=0.2, max_tokens=400)
+            return resp.choices[0].message.content
+        except Exception as e:
+            log.warning(f'⚠️ [{model_name}] فشل في توليد القالب 0: {e}')
+            time.sleep(2)
+            continue
+    return '⚠️ تعذر توليد تقرير الصفقات المتقدمة.'

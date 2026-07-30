@@ -1,0 +1,112 @@
+_build_template_1:
+def _build_template_1(d: dict) -> str:
+    """بناء القالب الأول (الموجز الكلاسيكي المنفصل)"""
+    w_bias = d['tf_weekly'].get('bias', 'متذبذب')
+    w_icon = '📈' if 'صاعد' in w_bias else '📉' if 'هابط' in w_bias else '↔️'
+    d_bias = d['tf_daily'].get('bias', 'متذبذب')
+...
+
+_build_template_2:
+def _build_template_2(d: dict) -> str:
+    """بناء القالب الثاني (مؤشر صحة الاقتصاد الأمريكي) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ لا يمكن توليد تقرير الاقتصاد الكلي لعدم توفر مفتاح Groq.'
+...
+
+_build_template_3:
+def _build_template_3(d: dict) -> str:
+    """بناء القالب الثالث (تقرير شهية المخاطرة) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ لا يمكن توليد تقرير المخاطرة لعدم توفر مفتاح Groq.'
+...
+
+_build_template_4:
+def _build_template_4(d: dict) -> str:
+    """بناء القالب الرابع (تقرير عوائد السندات الأمريكية) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ لا يمكن توليد تقرير عوائد السندات لعدم توفر مفتاح Groq.'
+...
+
+_build_template_5:
+def _build_template_5(d: dict) -> str:
+    """بناء القالب الخامس (تقرير قوة العملات) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ لا يمكن توليد تقرير قوة العملات لعدم توفر مفتاح Groq.'
+...
+
+_build_template_6:
+def _build_template_6(d: dict, fixed_rep: str, t0: str, t1: str, t2: str, t3: str, t4: str, t5: str) -> str:
+    """بناء القالب السادس والأخير (الخلاصة الذكية) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ لا يمكن توليد تقرير الخلاصة لعدم توفر مفتاح Groq.'
+...
+
+_build_template_0:
+def _build_template_0(d: dict) -> str:
+    """بناء القالب التمهيدي 0 (الصفقات المتقدمة والاتجاهات) عبر الذكاء الاصطناعي"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ لا يمكن توليد تقرير الصفقات المتقدمة لعدم توفر مفتاح Groq.'
+...
+
+_build_template_7:
+def _build_template_7(d: dict) -> str:
+    """قالب الصفقات المتخصصة والفريمات الزمنية (اللوت العالي وزيرو انعكاس)"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ تعذر توليد التقرير.'
+...
+
+_build_template_8:
+def _build_template_8(d: dict) -> str:
+    """قالب تأثير الأسواق والمؤسسات (الحيتان)"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ تعذر توليد التقرير.'
+...
+
+_build_template_9:
+def _build_template_9(d: dict) -> str:
+    """تقرير اتجاه الذهب اليومي (قالب رياضي ثابت)"""
+    tf_15 = d.get('tf_15m', {}).get('bias', '—')
+    tf_1h = d.get('tf_hourly', {}).get('bias', '—')
+    tf_4h = d.get('tf_4h', {}).get('bias', '—')
+...
+
+_build_template_10:
+def _build_template_10(d: dict) -> str:
+    """التقرير الأسبوعي الشامل"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return '⚠️ تعذر توليد التقرير.'
+...
+
+_build_template_11:
+def _build_template_11(d: dict) -> str:
+    """بناء قالب تقرير CFTC لمراكز المضاربين"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return ''
+...
+
+_build_template_12:
+def _build_template_12(d: dict) -> str:
+    """بناء قالب تقرير المشتقات وصناديق الذهب (العناصر المفقودة)"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return ''
+...
+
+_build_template_13:
+def _build_template_13(d: dict) -> str:
+    """بناء قالب تحليل عقود الأوبشن الاحترافي الشامل (T13)"""
+    client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
+    if not client:
+        return ''
+...
+

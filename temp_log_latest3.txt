@@ -1,0 +1,5 @@
+1: 2026-07-27 04:55:11,433 [INFO] httpx: HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2: 2026-07-27 04:55:39,262 [INFO] httpx: HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+3: 2026-07-27 04:56:46,697 [INFO] __main__: [Bot3] �: 16 � � �
+4: 2026-07-27 04:57:00,490 [INFO] httpx: HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 413 Payload Too Large"
+5: 2026-07-27 04:57:07,253 [INFO] httpx: HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 400 Bad Request"

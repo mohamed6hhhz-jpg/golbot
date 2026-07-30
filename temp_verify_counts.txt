@@ -1,0 +1,9 @@
+8231:         bot2_reports = []
+8256:         bot3_reports = []
+8319:         total_templates = len(raw_reports)  # عدد القوالب الثابت (مش الشانكس)
+8325:         total_templates_2 = len(bot2_reports) if 'bot2_reports' in locals() else 0
+8333:         BOT4_TOTAL = 11  # عدد ثابت دائماً
+8428:                 total_templates_3 = len(bot3_reports)  # عدد ثابت دائماً 16
+8454:                 log.info(f"📤 [Bot4] إرسال {BOT4_TOTAL} قالب جديد عبر @Boonnii_bot...")
+8457:                         f"🆕 [{tmpl_idx4}/{BOT4_TOTAL}] قوالب الذهب المتقدمة (XAU/USD)\n"
+8463:                     log.info(f"{'✅' if ok4 else '❌'} [Bot4] {tmpl_idx4}/{BOT4_TOTAL}")

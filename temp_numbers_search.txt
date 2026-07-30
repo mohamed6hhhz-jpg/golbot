@@ -1,0 +1,500 @@
+C:/Users/lenovo/Desktop/alltoools\apply_early_warning_fix.py:13: elif rsi <= 30:
+C:/Users/lenovo/Desktop/alltoools\apply_patch.py:33: log.warning(f"⚠️ [{model_name}] 429 — الانتقال للتالي...")
+C:/Users/lenovo/Desktop/alltoools\apply_patch.py:83: log.warning(f"⚠️ [{model_name}] 429 — الانتقال للتالي...")
+C:/Users/lenovo/Desktop/alltoools\apply_volume.py:31: if atr > 30 or rsi > 70 or rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\apply_volume.py:33: relative_strength = int(120 + (atr - 30) * 2)
+C:/Users/lenovo/Desktop/alltoools\count_futures.txt:15: bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(d
+C:/Users/lenovo/Desktop/alltoools\count_spot.txt:15: bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(d
+C:/Users/lenovo/Desktop/alltoools\diff.txt:28: +        10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر"
+C:/Users/lenovo/Desktop/alltoools\do_patch2.py:30: if rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\do_patch2.py:150: f"مؤشر الزخم القياسي (RSI {rsid:.2f}): **{'منطقة خطرة (انعكاس مرتقب) 🚨' if rsid < 30 or rsid > 70 el
+C:/Users/lenovo/Desktop/alltoools\do_patch2.py:170: rsi_read = ('حالة تشبع بيعي مفرط (Oversold) — ارتداد شرائي متوقع بقوة 📈' if rsi < 30
+C:/Users/lenovo/Desktop/alltoools\do_s16.py:9: s2 = data.get('s2', current - 30)
+C:/Users/lenovo/Desktop/alltoools\do_s16.py:12: r2 = data.get('r2', current + 30)
+C:/Users/lenovo/Desktop/alltoools\fix.py:66: elif rsi_d < 40: gld_pcr = round(1.30 - (rsi_d - 30)*0.01, 2)
+C:/Users/lenovo/Desktop/alltoools\format_spot.py:6: # We need to enhance the formatting of s4 to s11 without altering logic.
+C:/Users/lenovo/Desktop/alltoools\gen_all.txt:3: await asyncio.sleep(idx * 25)  # Stagger by 18 seconds to safely avoid 429 rate limit
+C:/Users/lenovo/Desktop/alltoools\gen_all.txt:14: log.warning(f"Exception 429 hit for T{idx}, waiting 25s...")
+C:/Users/lenovo/Desktop/alltoools\gen_all.txt:167: # القالب الذكي الجديد CFTC (t11)
+C:/Users/lenovo/Desktop/alltoools\gen_all.txt:168: bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_template_11(d
+C:/Users/lenovo/Desktop/alltoools\gen_all.txt:191: bot3_reports.append(("[فوري] 11/12 قوة العملات DXY",             _build_spot_s11(data), None))
+C:/Users/lenovo/Desktop/alltoools\gen_all.txt:334: #             # لو بيانات الآجل مش موجودة، ننتظر حتى 15 دقيقة ريحة 30 ثانية
+C:/Users/lenovo/Desktop/alltoools\gen_all.txt:337: #                 for _ in range(30):  # 30 × 30 ثانية = 15 دقيقة
+C:/Users/lenovo/Desktop/alltoools\gen_all.txt:465: log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
+C:/Users/lenovo/Desktop/alltoools\gen_all.txt:467: time.sleep(30 * 60)
+C:/Users/lenovo/Desktop/alltoools\inject_scalping.py:5: old = '        bot2_reports.append(("\U0001f4ca \u0635\u0646\u0627\u062f\u064a\u0642 \u0627\u0644\u0
+C:/Users/lenovo/Desktop/alltoools\inject_scalping.py:6: new = old + '\n        bot2_reports.append(("\U0001f4c5 \u0645\u0635\u0641\u0648\u0641\u0629 \u0627\
+C:/Users/lenovo/Desktop/alltoools\inject_scalping.py:15: old2 = '        raw_reports.append(("\U0001f4ca \u0635\u0646\u0627\u062f\u064a\u0642 \u0627\u0644\u0
+C:/Users/lenovo/Desktop/alltoools\inject_scalping.py:16: new2 = old2 + '\n        raw_reports.append(("\U0001f4c5 \u0645\u0635\u0641\u0648\u0641\u0629 \u0627
+C:/Users/lenovo/Desktop/alltoools\inject_summaries.py:140: AFTER_R1 = '''                log.info(f"\\u2705 \\u0631\\u0633\\u0627\\u0644\\u0629 {i}/{total} \\u
+C:/Users/lenovo/Desktop/alltoools\inject_summaries.py:145: AFTER_R1_NEW = '''                log.info(f"\\u2705 \\u0631\\u0633\\u0627\\u0644\\u0629 {i}/{total}
+C:/Users/lenovo/Desktop/alltoools\inject_summaries.py:164: idx = text.find('log.info(f"\\u2705 \\u0631\\u0633\\u0627\\u0644\\u0629 {i}/{total}')
+C:/Users/lenovo/Desktop/alltoools\inject_summaries.py:168: AFTER_R2 = '''                    log.info(f"\\u2705 \\u0631\\u0633\\u0627\\u0644\\u0629 \\u0627\\u0
+C:/Users/lenovo/Desktop/alltoools\inject_summaries.py:173: AFTER_R2_NEW = '''                    log.info(f"\\u2705 \\u0631\\u0633\\u0627\\u0644\\u0629 \\u0627
+C:/Users/lenovo/Desktop/alltoools\new_templates.txt:25: if rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\new_templates.txt:145: f"مؤشر الزخم القياسي (RSI {rsid:.2f}): **{'منطقة خطرة (انعكاس مرتقب) 🚨' if rsid < 30 or rsid > 70 el
+C:/Users/lenovo/Desktop/alltoools\new_templates.txt:165: rsi_read = ('حالة تشبع بيعي مفرط (Oversold) — ارتداد شرائي متوقع بقوة 📈' if rsi < 30
+C:/Users/lenovo/Desktop/alltoools\patch_etf.py:26: 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر"
+C:/Users/lenovo/Desktop/alltoools\patch_s1s3.py:31: if rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\patch_s1s3.py:151: f"مؤشر الزخم القياسي (RSI {rsid:.2f}): **{'منطقة خطرة (انعكاس مرتقب) 🚨' if rsid < 30 or rsid > 70 el
+C:/Users/lenovo/Desktop/alltoools\patch_s1s3.py:171: rsi_read = ('حالة تشبع بيعي مفرط (Oversold) — ارتداد شرائي متوقع بقوة 📈' if rsi < 30
+C:/Users/lenovo/Desktop/alltoools\patch_s1s3_pure.py:31: if rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\patch_s1s3_pure.py:151: f"مؤشر الزخم القياسي (RSI {rsid:.2f}): **{'منطقة خطرة (انعكاس مرتقب) 🚨' if rsid < 30 or rsid > 70 el
+C:/Users/lenovo/Desktop/alltoools\patch_s1s3_pure.py:171: rsi_read = ('حالة تشبع بيعي مفرط (Oversold) — ارتداد شرائي متوقع بقوة 📈' if rsi < 30
+C:/Users/lenovo/Desktop/alltoools\patch_s1s3_safe.py:34: if rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\patch_s1s3_safe.py:154: f"مؤشر الزخم القياسي (RSI {rsid:.2f}): **{'منطقة خطرة (انعكاس مرتقب) 🚨' if rsid < 30 or rsid > 70 el
+C:/Users/lenovo/Desktop/alltoools\patch_s1s3_safe.py:174: rsi_read = ('حالة تشبع بيعي مفرط (Oversold) — ارتداد شرائي متوقع بقوة 📈' if rsi < 30
+C:/Users/lenovo/Desktop/alltoools\patch_s6.py:8: ("30 دقيقة", 0.17),
+C:/Users/lenovo/Desktop/alltoools\patch_t7.py:12: ('30 دقيقة', 'tf_30m', 0.25),
+C:/Users/lenovo/Desktop/alltoools\patch_t7.py:24: ('30 دقيقة', 'tf_30m', 0.25),
+C:/Users/lenovo/Desktop/alltoools\s4_s6.py:18: rsi_zone = ("تشبع بيعي 📉" if rsi < 30 else "منطقة بيع 📉" if rsi < 45
+C:/Users/lenovo/Desktop/alltoools\t1.txt:116: log.warning(f"⚠️ [{model_name}] 429 — الانتقال للتالي...")
+C:/Users/lenovo/Desktop/alltoools\t1.txt:233: log.warning(f"⚠️ [Telethon Bot (Spot)] فشل الإرسال للجروب {chat}: {inner_e}")
+C:/Users/lenovo/Desktop/alltoools\t1.txt:252: log.warning(f"[Bot2 Telethon] فشل الإرسال للجروب {chat}: {inner_e}")
+C:/Users/lenovo/Desktop/alltoools\t1.txt:294: log.warning(f"[Bot3 Telethon] فشل الارسال للجروب {chat}: {inner_e}")
+C:/Users/lenovo/Desktop/alltoools\t7.txt:33: ('30 دقيقة', 'tf_30m', 0.25),
+C:/Users/lenovo/Desktop/alltoools\t7_val.txt:33: ('30 دقيقة', 'tf_30m', 0.25),
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_defs.txt:1: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199\scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_defs.txt:2: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199\scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:17: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:18: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:19: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:20: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:21: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:22: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:23: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:24: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:25: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:26: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:27: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:28: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:29: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:30: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:32: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_bot4_search.txt:33: C:/Users/lenovo/.gemini/antigravity/brain/246c8914-bbdd-42e4-8c6e-e856bb482199/scratch\test_all_temp
+C:/Users/lenovo/Desktop/alltoools\temp_early.txt:11: elif rsi <= 30:
+C:/Users/lenovo/Desktop/alltoools\temp_reports_futures.txt:15: 4153: bot2_reports.append(("📰 تقرير CFTC", t11 if t11 and 'تعذر' not in str(t11) else _build_templat
+C:/Users/lenovo/Desktop/alltoools\temp_s4.txt:18: rsi_zone = ("تشبع بيعي 📉" if rsi < 30 else "منطقة بيع 📉" if rsi < 45
+C:/Users/lenovo/Desktop/alltoools\temp_s4.txt:144: ("30 دقيقة", 0.17),
+C:/Users/lenovo/Desktop/alltoools\temp_s4.txt:300: f"- ATR: **{atr:.2f}$** (المدى اليومي المتوقع — تقلبات {'عالية' if atr > 60 else 'متوسطة' if atr > 3
+C:/Users/lenovo/Desktop/alltoools\temp_s4.txt:671: if rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\temp_s4.txt:685: atr_note = (f"ATR={atr:.2f}$ — تقلبات {'كبيرة جداً' if atr > 100 else 'عالية' if atr > 60 else 'متوس
+C:/Users/lenovo/Desktop/alltoools\temp_s4.txt:696: elif is_bearish and rsi > 30:
+C:/Users/lenovo/Desktop/alltoools\temp_s4.txt:704: elif gold < pivot and rsi <= 30:
+C:/Users/lenovo/Desktop/alltoools\temp_s4.txt:863: ("30 دقيقة", 0.35),
+C:/Users/lenovo/Desktop/alltoools\temp_summary_spot.txt:7: 🔀 احتمالية التذبذب: 17% (حول 3992.81$)
+C:/Users/lenovo/Desktop/alltoools\temp_tfs.txt:5: ('30 دقيقة', 'tf_30m', 0.25),
+C:/Users/lenovo/Desktop/alltoools\test_bot3_output.txt:250: 💠 **فريم 30 دقيقة**
+C:/Users/lenovo/Desktop/alltoools\test_bot3_output.txt:295: 🟢 شراء: الدخول 3136.75$ | الهدف 3487.48$ | الوقف 3049.07$
+C:/Users/lenovo/Desktop/alltoools\test_bot3_output.txt:435: - 🚨 **VIX (مؤشر الخوف):** 17.05 (منخفض — جشع)
+C:/Users/lenovo/Desktop/alltoools\test_bot3_output.txt:510: --- S11 ---
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:24: بُعد عن S1   : 116.43$ (149% من ATR)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:51: │  Puts  OI :        9,629 عقد (بيع مؤسسي)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:68: │  Puts  OI :       17,228 عقد (بيع مؤسسي)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:84: │  Calls OI :       13,830 عقد (شراء مؤسسي)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:102: صافي التدفق        : 297.1M$ 🟢
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:103: ذهب  : شراء 617.7M$ | بيع 442.4M$ | صافي 175.3M$ 🟢
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:115: 📊 VIX: 17.0 → 🟢 استقرار — المؤسسات واثقة (Calls مهيمنة)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:137: 📆 أسبوع (7 يوم) — حتى 29 Jul 2026
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:143: 🗓️ شهر (30 يوم) — حتى 21 Aug 2026
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:152: ↓ أدنى متوقع   : 1797.04$  (-56.37%)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:161: 🎯 نهاية 2026 (161 يوم) — حتى 30 Dec 2026
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:177: توزيع Up/Down  : 50% ± (TBI × 30%)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:239: 2. 4031.36$ — حجم: 23,529 عقد (متوسطة 🛡️)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:325: ├ التوقيت: 21 Jul 20:30 UTC
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:357: 🟢 عقود الشراء (Longs) : 113,686 عقد (39.5%)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:358: 🔴 عقود البيع (Shorts) : 173,863 عقد (60.5%)
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:398: هذا القالب هو المحصلة الرياضية النهائية לـ 29 قالب وتقييم سابق.
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:418: --- TEMPLATE 11 ---
+C:/Users/lenovo/Desktop/alltoools\test_bot4_output.txt:424: بناءً على نتائج الإحصائيات والأرقام (للقوالب الـ 29 السابقة)،
+C:/Users/lenovo/Desktop/alltoools\test_reports_spot.txt:34: - الفريمات المدعومة: [5د - 10د - 15د - 30د]
+C:/Users/lenovo/Desktop/alltoools\update_orders.py:10: ('🏹 صفقات السكالبينج الممتد (15 - 30 دقيقة)',
+C:/Users/lenovo/Desktop/alltoools\update_orders2.py:13: ('🏹 صفقات السكالبينج الممتد (15 - 30 دقيقة)',
+C:/Users/lenovo/Desktop/alltoools\update_s123.py:30: if rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\update_s123.py:151: f"حالة مؤشر RSI ({rsi:.2f}): **{'خطورة عالية (انعكاس وشيك) 🚨' if rsi < 30 or rsi > 70 else 'استقرار 
+C:/Users/lenovo/Desktop/alltoools\update_s123.py:170: rsi_read = ('حالة تشبع بيعي حاد (Oversold) — ارتداد شرائي قوي متوقع 📈' if rsi < 30
+C:/Users/lenovo/Desktop/alltoools\update_spot_s123.py:30: if rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\update_spot_s123.py:151: f"حالة مؤشر RSI ({rsi:.2f}): **{'خطورة عالية (انعكاس وشيك) 🚨' if rsi < 30 or rsi > 70 else 'استقرار 
+C:/Users/lenovo/Desktop/alltoools\update_spot_s123.py:170: rsi_read = ('حالة تشبع بيعي حاد (Oversold) — ارتداد شرائي قوي متوقع 📈' if rsi < 30
+C:/Users/lenovo/Desktop/alltoools\update_spot_s123_fixed.py:30: if rsi < 30:
+C:/Users/lenovo/Desktop/alltoools\update_spot_s123_fixed.py:151: f"حالة مؤشر RSI ({rsi:.2f}): **{'خطورة عالية (انعكاس وشيك) 🚨' if rsi < 30 or rsi > 70 else 'استقرار 
+C:/Users/lenovo/Desktop/alltoools\update_spot_s123_fixed.py:170: rsi_read = ('حالة تشبع بيعي حاد (Oversold) — ارتداد شرائي قوي متوقع 📈' if rsi < 30
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:15: 🔹 عائد السندات (10 و 30 سنة):
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:16: - العائد 10 سنوات: غير متوفر | العائد 30 سنة: 4.84%
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:17: - تأثير السندات على الذهب: العائد 30 سنة أعلى من العائد الحقيقي، مما يشير إلى أن السوق قد يكون متأرج
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:116: - الدخول: شراء عند السعر الفوري 1700$
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:117: - الهدف: الهدف هو الوصول إلى السعر 1725$
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:118: - الوقف: الوقف عند الوصول إلى السعر 1715$ أو عند حدوث تغيير في الاتجاه الفني
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:119: - الفريمات المدعومة: [5د - 10د - 15د - 30د]
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:148: 🔹 عائد السندات (10 و 30 سنة):
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:149: - العائد 10 سنوات: لا توجد بيانات متاحة | العائد 30 سنة: 4.84%
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:150: - تأثير السندات على الذهب: يعتبر العائد 30 سنة أعلى من العائد الحالي، مما يعني أن هناك فرصة لزيادة أ
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:203: - الفريمات المدعومة: [5د - 10د - 15د - 30د - 1س - 4س - يوم - أسبوع - شهر]
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:218: الفريمات المدعومة: [5د - 10د - 15د - 30د - 1س - 4س - يوم - أسبوع - شهر]
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT.txt:237: - الفريمات المدعومة: [5د - 10د - 15د - 30د]
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT_FUTURES.txt:15: 🔹 عائد السندات (10 و 30 سنة):
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT_FUTURES.txt:16: - العائد 10 سنوات: 4.37% | العائد 30 سنة: 4.84%
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT_FUTURES.txt:17: - تأثير السندات على الذهب: يعتبر العائد على السندات مؤشراً على التوقعات الاقتصادية. مع العائد على ال
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT_SPOT.txt:15: 🔹 عائد السندات (10 و 30 سنة):
+C:/Users/lenovo/Desktop/alltoools\V5_GRAND_REPORT_SPOT.txt:16: - العائد 10 سنوات: 4.37% | العائد 30 سنة: 4.84%
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\click\formatting.py:213: col_max: int = 30,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\click\termui.py:33: "black": 30,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\click\termui.py:648: bits.append(f"\033[{9 if strikethrough else 29}m")
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\click\_termui_impl.py:61: width: int = 30,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\colorama\ansi.py:50: BLACK           = 30
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\colorama\tests\ansitowin32_test.py:230: [33, 11, 22] )
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\flask\app.py:448: 308 status which tells the browser to resend the method and
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\flask\app.py:452: Don't intercept 307 and 308 redirects.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\flask\app.py:460: or request.routing_exception.code in {307, 308}
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\flask\debughelpers.py:54: 307 or 308.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\flask\debughelpers.py:73: " Send requests to the canonical URL, or use 307 or 308 for"
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\flask\helpers.py:231: location: str, code: int = 302, Response: type[BaseResponse] | None = None
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\flask\sansio\app.py:893: def redirect(self, location: str, code: int = 302) -> BaseResponse:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\itsdangerous-2.2.0.dist-info\LICENSE.txt:1: Copyright 2011 Pallets
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:38: use_pep517 - Has the user requested PEP 517 processing? None
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:49: name of PEP 517 backend,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:73: # We check for use_pep517 being non-None and falsy because that means
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:79: if use_pep517 is not None and not use_pep517:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:81: "Disabling PEP 517 processing is invalid: "
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:84: use_pep517 = True
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:86: if use_pep517 is not None and not use_pep517:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:88: "Disabling PEP 517 processing is invalid: "
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:92: use_pep517 = True
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:94: # If we haven't worked out whether to use PEP 517 yet,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:99: # We fallback to PEP 517 when without setuptools or without the wheel package,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:104: elif use_pep517 is None:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:105: use_pep517 = (
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\pyproject.py:112: assert use_pep517 is not None
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:816: help="Check the build dependencies when PEP517 is used.",
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:824: Process a value provided for the --no-use-pep517 option.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:826: This is an optparse.Option callback for the no_use_pep517 option.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:828: # Since --no-use-pep517 doesn't accept arguments, the value argument
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:829: # will be None if --no-use-pep517 is passed via the command-line.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:834: probably using either the PIP_NO_USE_PEP517 environment variable
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:836: of the PIP_USE_PEP517 environment variable or the "use-pep517"
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:846: f"It is not possible to use --no-use-pep517 "
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:851: # Otherwise, --no-use-pep517 was passed via the command-line.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:852: parser.values.use_pep517 = False
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:861: help="Use PEP 517 for building source distributions "
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:862: "(use --no-use-pep517 to force legacy behaviour).",
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\cmdoptions.py:904: help="Configuration settings to be passed to the PEP 517 build backend. "
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\cli\parser.py:26: kwargs["max_help_position"] = 30
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\distributions\sdist.py:23: generated, either using PEP 517 or using the legacy `setup.py egg_info`.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\distributions\sdist.py:41: # Load pyproject.toml, to determine whether PEP 517 is to be used
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\distributions\sdist.py:45: should_isolate = self.req.use_pep517 and build_isolation
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\distributions\sdist.py:61: should_check_deps = self.req.use_pep517 and check_build_deps
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\metadata\base.py:552: all currently available PEP 517 backends, although not standardized.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\metadata\__init__.py:50: if sys.version_info < (3, 11):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\metadata\__init__.py:61: if sys.version_info < (3, 11):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\metadata\__init__.py:62: # All pip versions supporting Python<=3.11 will support pkg_resources,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\models\link.py:180: # urlunsplit() contains an empty netloc (file://) as per RFC 1738.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\operations\build\wheel.py:19: """Build one InstallRequirement using the PEP 517 build process.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:177: # The PEP 517 backend we should use to build the project
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:180: # Are we using PEP 517 for this requirement?
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:185: self.use_pep517 = use_pep517
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:189: if self.use_pep517 is False:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:191: "--no-use-pep517 ignored for %s "
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:195: self.use_pep517 = True
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:512: use_pep517 attribute can be used to determine whether we should
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:513: follow the PEP 517 or legacy (setup.py) code path.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:521: self.use_pep517 = False
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:524: self.use_pep517 = True
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\req\req_install.py:559: Under PEP 517 and PEP 660, call the backend hook to prepare the metadata.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\utils\compat.py:56: # The importlib.resources.open_text function was deprecated in 3.11 with suggested
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\utils\compat.py:58: if sys.version_info < (3, 11):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\utils\compat.py:70: if sys.version_info >= (3, 11):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\utils\misc.py:288: If pyproject.toml exists, this is a PEP 517 project. Otherwise we look for
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\utils\unpacking.py:213: (3, 9, 17),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\utils\unpacking.py:215: (3, 11, 4),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_internal\vcs\git.py:284: if self.get_git_version() >= (2, 17):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\__init__.py:114: if sys.version_info < (3, 11):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\cachecontrol\adapter.py:102: if response.status == 304:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\cachecontrol\adapter.py:123: # We always cache the 301 responses
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\cachecontrol\controller.py:36: PERMANENT_REDIRECT_STATUSES = (301, 308)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\cachecontrol\controller.py:63: self.cacheable_status_codes = status_codes or (200, 203, 300, 301, 308)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\cachecontrol\controller.py:474: """On a 304 we will get a new set of headers that we want to
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\cachecontrol\controller.py:478: gotten a 304 as the response.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\cachecontrol\heuristics.py:33: The response is provided too allow warnings like 113
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\cachecontrol\heuristics.py:115: 300,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\cachecontrol\heuristics.py:116: 301,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\certifi\core.py:14: if sys.version_info >= (3, 11):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\distlib\compat.py:3: # Copyright (C) 2013-2017 Vinay Sajip.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\distlib\resources.py:3: # Copyright (C) 2013-2017 Vinay Sajip.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\distlib\util.py:1264: # See Python issue 17153. If the dest path contains Unicode,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\metadata.py:27: if sys.version_info >= (3, 11):  # pragma: no cover
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\tags.py:435: # Prior to Mac OS 11, each yearly release of Mac OS bumped the
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\tags.py:445: # Starting with Mac OS 11, each yearly release bumps the major version
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\tags.py:455: # Mac OS 11 on x86_64 is compatible with binaries from previous releases.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\tags.py:456: # Arm64 support was introduced in 11.0, so no Arm binaries from previous
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\tags.py:460: # macOS version earlier than 11.0 when the x86_64 part of the binary supports
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\tags.py:526: for major in range(version[0] - 1, 11, -1):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\_manylinux.py:201: if version == _GLibCVersion(2, 17):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\_manylinux.py:208: # CentOS 7 w/ glibc 2.17 (PEP 599)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\_manylinux.py:209: (2, 17): "manylinux2014",
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\packaging\_manylinux.py:230: # Oldest glibc to be supported regardless of architecture is (2, 17).
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pkg_resources\__init__.py:16: .zip files and with custom PEP 302 loaders that support the ``get_data()``
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pkg_resources\__init__.py:409: `loader_type` is the type or class of a PEP 302 ``module.__loader__``,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pkg_resources\__init__.py:1634: """Try to implement resources and metadata for arbitrary PEP 302 loaders"""
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pkg_resources\__init__.py:2237: `importer_type` is the type or class of a PEP 302 "Importer" (sys.path item
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pkg_resources\__init__.py:2421: `importer_type` is the type or class of a PEP 302 "Importer" (sys.path item
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pkg_resources\__init__.py:2443: # use find_spec (PEP 451) and fall-back to find_module (PEP 302)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pygments\console.py:29: x = 30
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pygments\lexer.py:958: print('=' * 110)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pygments\lexer.py:960: print('-' * 110)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pygments\lexer.py:963: print('=' * 110)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\pygments\unistring.py:80: # Generated from unidata 11.0.0
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\models.py:72: codes.moved,  # 301
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\models.py:73: codes.found,  # 302
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\models.py:74: codes.other,  # 303
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\models.py:75: codes.temporary_redirect,  # 307
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\models.py:76: codes.permanent_redirect,  # 308
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\models.py:79: DEFAULT_REDIRECT_LIMIT = 30
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\sessions.py:344: # First, turn 302s into GETs.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\sessions.py:348: # Second, if a POST is responded to with a 301, turn it into a GET.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\sessions.py:349: # This bizarre behaviour is explained in Issue 1704.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\sessions.py:433: #: 30.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:10: 307
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:41: 300: ("multiple_choices",),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:42: 301: ("moved_permanently", "moved", "\\o-"),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:43: 302: ("found",),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:44: 303: ("see_other", "other"),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:45: 304: ("not_modified",),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:46: 305: ("use_proxy",),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:47: 306: ("switch_proxy",),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:48: 307: ("temporary_redirect", "temporary_moved", "temporary"),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\status_codes.py:49: 308: (
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\requests\__init__.py:37: :copyright: (c) 2017 by Kenneth Reitz.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\ansi.py:77: 29: "not strike",
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\ansi.py:78: 30: "color(0)",
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:61: "bright_yellow": 11,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:68: "navy_blue": 17,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:77: "spring_green4": 29,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:78: "turquoise4": 30,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:117: "pale_green3": 114,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:121: "chartreuse2": 112,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:143: "light_sky_blue3": 110,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:144: "sky_blue2": 111,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:146: "dark_slate_gray3": 116,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:147: "sky_blue1": 117,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:148: "chartreuse1": 118,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:162: "light_salmon3": 173,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:167: "gold3": 178,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:185: "orchid": 170,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:187: "orange3": 172,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:188: "light_pink3": 174,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:189: "pink3": 175,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:190: "plum3": 176,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:191: "violet": 177,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\color.py:192: "light_goldenrod3": 179,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\console.py:70: JUPYTER_DEFAULT_COLUMNS = 115
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\console.py:2669: "options": [10, 11, 12, 13],
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\control.py:12: 11,  # Vertical tab
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\control.py:23: 11: "\\v",
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\highlighter.py:169: # Hours and minutes (e.g., 17:21). The colon is optional
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\highlighter.py:171: # Hours, minutes, and seconds w/o colons (e.g., 172159)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\highlighter.py:175: # Hours, minutes, and seconds with time zone designator (e.g., 17:21:59+07:00).
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\highlighter.py:181: # Calendar date with hours, minutes, and seconds (e.g., 2008-08-30 17:21:59 or 20080830 172159).
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\highlighter.py:189: # Date, with optional time zone (e.g., 2008-08-30 or 2008-08-30+07:00).
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\progress.py:1068: speed_estimate_period: (float, optional): Period (in seconds) used to calculate the speed estimate. 
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\progress.py:1083: speed_estimate_period: float = 30.0,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\segment.py:48: CURSOR_FORWARD = 11
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\style.py:93: 11: "52",
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\style.py:316: if bits & (1 << 11):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:89: (79, 118, 161),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:97: (15, 114, 47),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:98: (196, 112, 51),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:101: (46, 112, 109),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:112: (218, 170, 1),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:113: (72, 118, 214),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:120: (247, 110, 110),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:124: (105, 112, 152),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:126: (152, 159, 177),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:137: (208, 179, 68),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:138: (96, 138, 177),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:139: (152, 114, 159),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\terminal_theme.py:140: (104, 160, 179),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\traceback.py:469: if sys.version_info >= (3, 11):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\traceback.py:521: if sys.version_info >= (3, 11):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:7: (173, 173, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:9: (1155, 1161, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:20: (1750, 1757, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:21: (1759, 1764, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:22: (1767, 1768, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:23: (1770, 1773, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:70: (2901, 2903, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:71: (2914, 2915, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:72: (2946, 2946, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:73: (3006, 3010, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:74: (3014, 3016, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:75: (3018, 3021, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:76: (3031, 3031, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:77: (3072, 3076, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:198: (11035, 11036, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:199: (11088, 11088, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:200: (11093, 11093, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:201: (11503, 11505, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:202: (11647, 11647, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:203: (11744, 11775, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:204: (11904, 11929, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:365: (110576, 110579, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:366: (110581, 110587, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:367: (110589, 110590, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:368: (110592, 110882, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:369: (110898, 110898, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:370: (110928, 110930, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:371: (110933, 110933, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:372: (110948, 110951, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:373: (110960, 111355, 2),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:374: (113821, 113822, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:375: (113824, 113827, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:376: (118528, 118573, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:377: (118576, 118598, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:378: (119141, 119145, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:379: (119149, 119170, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:380: (119173, 119179, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:381: (119210, 119213, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_cell_widths.py:382: (119362, 119364, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:15: (118, 118, 118),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:31: (0, 170, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:33: (0, 0, 170),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:34: (170, 0, 170),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:35: (0, 170, 170),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:36: (170, 170, 170),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:71: (0, 0, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:77: (0, 95, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:83: (0, 135, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:86: (0, 175, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:87: (0, 175, 95),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:88: (0, 175, 135),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:89: (0, 175, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:90: (0, 175, 215),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:91: (0, 175, 255),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:95: (0, 215, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:101: (0, 255, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:107: (95, 0, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:113: (95, 95, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:119: (95, 135, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:122: (95, 175, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:123: (95, 175, 95),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:124: (95, 175, 135),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:125: (95, 175, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:126: (95, 175, 215),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:127: (95, 175, 255),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:131: (95, 215, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:137: (95, 255, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:143: (135, 0, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:149: (135, 95, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:155: (135, 135, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:158: (135, 175, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:159: (135, 175, 95),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:160: (135, 175, 135),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:161: (135, 175, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:162: (135, 175, 215),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:163: (135, 175, 255),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:167: (135, 215, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:173: (135, 255, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:179: (175, 0, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:185: (175, 95, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:191: (175, 135, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:194: (175, 175, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:195: (175, 175, 95),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:196: (175, 175, 135),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:197: (175, 175, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:198: (175, 175, 215),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:199: (175, 175, 255),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:203: (175, 215, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:209: (175, 255, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:215: (215, 0, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:221: (215, 95, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:227: (215, 135, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:230: (215, 175, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:231: (215, 175, 95),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:232: (215, 175, 135),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:233: (215, 175, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:234: (215, 175, 215),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:235: (215, 175, 255),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:239: (215, 215, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:245: (215, 255, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:251: (255, 0, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:257: (255, 95, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:263: (255, 135, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:266: (255, 175, 0),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:267: (255, 175, 95),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:268: (255, 175, 135),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:269: (255, 175, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:270: (255, 175, 215),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:271: (255, 175, 255),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:275: (255, 215, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:281: (255, 255, 175),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:295: (118, 118, 118),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_palettes.py:301: (178, 178, 178),
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_ratio.py:19: with a minimum size of 20 each and `total` is 30 then the returned list will be
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_spinners.py:165: "toggle6": {"interval": 300, "frames": "ဝ၀"},
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_spinners.py:218: "monkey": {"interval": 300, "frames": ["🙈 ", "🙈 ", "🙉 ", "🙊 "]},
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_spinners.py:239: "interval": 17,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_win32_console.py:82: handle (int): Integer identifier for the handle. Defaults to -11 (stdout).
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\rich\_win32_console.py:358: 11,  # bright cyan
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\tomli\_parser.py:749: return (0 <= codepoint <= 55295) or (57344 <= codepoint <= 1114111)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\truststore\_macos.py:34: # Big Sur is technically 11 but we use 10.16 due to the Big Sur
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\connectionpool.py:600: If True, automatically handle redirects (status codes 301, 302,
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\connectionpool.py:601: 303, 307, 308). Each redirect counts as a retry. Disabling retries
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\connectionpool.py:849: if response.status == 303:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\poolmanager.py:385: if response.status == 303:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\response.py:193: REDIRECT_STATUSES = [301, 302, 303, 307, 308]
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\response.py:331: "by RFC 7230 sec 3.3.2. Ignoring Content-Length and "
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\response.py:338: # RFC 7230 section 3.3.2 specifies multiple content lengths can
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\response.py:364: if status in (204, 304) or 100 <= status < 200 or request_method == "HEAD":
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\_collections.py:342: # in RFC-7230 S3.2.4. This indicates a multiline header, but
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\contrib\appengine.py:200: if http_response.status == 303:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\contrib\_securetransport\bindings.py:68: # Big Sur is technically 11 but we use 10.16 due to the Big Sur
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\contrib\_securetransport\bindings.py:442: kTLSProtocol11 = 7
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\packages\six.py:1055: __path__ = []  # required for PEP 302 and PEP 451
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\util\retry.py:145: A redirect is a HTTP response with a status code 301, 302, 303, 307 or
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pip\_vendor\urllib3\util\retry.py:146: 308.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pyasn1\codec\cer\decoder.py:37: # BER allows any non-zero value as TRUE; cf. sections 8.2.2. and 11.1
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pyasn1\type\char.py:268: tag.Tag(tag.tagClassUniversal, tag.tagFormatSimple, 30)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\pyasn1\type\univ.py:1060: id-bp ID ::= { id-edims 11 }
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\asn1.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\cli.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\common.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\common.py:38: 11
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\common.py:40: 11
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\common.py:162: >>> crt([2, 3, 0], [7, 11, 15])
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\core.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\key.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\key.py:392: >>> PrivateKey(3247, 65537, 833, 191, 17)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\key.py:393: PrivateKey(3247, 65537, 833, 191, 17)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\parallel.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\pem.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\pkcs1.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\pkcs1.py:109: max_msglength = target_length - 11
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\pkcs1.py:158: max_msglength = target_length - 11
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\pkcs1_v2.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\prime.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\randnum.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\transform.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\util.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\rsa\__init__.py:1: #  Copyright 2011 Sybren A. Stüvel <sybren@stuvel.eu>
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\chats.py:1025: 30 seconds, the ban will be forever. Defaults to ``0`` (ban forever).
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\downloads.py:365: as they are available since layer 116 and are bigger than
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\downloads.py:748: # last while this is the smallest (layer 116). Ensure we have the
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\messages.py:166: self.wait_time = 1 if self.limit > 3000 else 0
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\messages.py:292: # 30s flood wait every 300 messages (3 requests of 100 each, 30 of 10, etc.)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\messages.py:294: self.wait_time = 10 if self.limit > 300 else 0
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\messages.py:377: be around 30 seconds per 10 requests, therefore a sleep of 1
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\messages.py:395: the API retrieving more than 3000 messages will take longer
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\messages.py:436: default to 1 second only if the limit is higher than 3000.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\messages.py:439: to 10 seconds only if the amount of IDs is higher than 300.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\client\telegrambaseclient.py:163: ``FloodWaitError`` for 17s occurs and `flood_sleep_threshold`
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\crypto\rsa.py:76: # rsa module rsa.encrypt adds 11 bits for padding which we don't want
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\errors\common.py:119: 17:
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\errors\rpcbaseerrors.py:46: code = 303
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\errors\rpcerrorlist.py:3565: super(Exception, self).__init__('Slow mode only supports certain values (e.g. 0, 10s, 30s, 1m, 5m, 1
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\events\userupdate.py:308: `True` if the user was seen within 30 days.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\network\mtprotosender.py:762: bad_msg_notification#a7eff811 bad_msg_id:long bad_msg_seqno:int
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\network\mtprotosender.py:769: if bad_msg.error_code in (16, 17):
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\network\mtprotostate.py:20: MSG_TOO_NEW_DELTA = 30
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\network\mtprotostate.py:21: MSG_TOO_OLD_DELTA = 300
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\network\connection\tcpmtproxy.py:35: is_dd = (len(secret) == 17) and (secret[0] == 0xDD)
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\telethon\tl\custom\message.py:247: # (layer 119+), but the sender can only be the chat we're in.
+C:/Users/lenovo/Desktop/alltoools\auto-copy\venv\Lib\site-packages\werkzeug\http.py:70: 300: "Multiple Choices",

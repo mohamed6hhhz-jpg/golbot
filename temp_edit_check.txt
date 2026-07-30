@@ -1,0 +1,35 @@
+--- AROUND 8696 ---
+            minutes_counter[mode] += 1
+            
+        time.sleep(60)
+
+if __name__ == "__main__":
+    try:
+        run_bot()
+    except KeyboardInterrupt:
+        print("\nBot stopped by user.")
+
+import requests
+
+
+
+def _build_group_summary(data: dict, group_name: str, flat_chunks: list) -> str:
+    """خلاصة محورية مخصصة لكل مجموعة تقارير — مبنية على بيانات السوق الحية وتوليد الذكاء الاصطناعي"""
+    nums = _s_nums(data)
+    gold   = nums['gold']
+    atr    = nums['atr']
+--- END OF FILE ---                        log.info(f"✅ [Summary Telethon] Sent summary chunk to {target_chat}")
+                        break
+                    except Exception as e:
+                        wait = 2 ** attempt
+                        log.warning(f"⚠️ [Summary Telethon Fallback] {attempt+1}/4 — Failed to send summary: {e} — waiting {wait}s")
+                        await asyncio.sleep(wait)
+        finally:
+            await client.disconnect()
+
+    try:
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(_send_via_telethon())
+        loop.close()
+    except Exception as e:
+        log.error(f"[Summary Error] Failed to start telethon loop: {e}")

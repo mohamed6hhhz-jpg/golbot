@@ -1,0 +1,30 @@
+        while len(msg) > 4000:
+            split_idx = msg.rfind('\n', 0, 4000)
+            if split_idx == -1: split_idx = 4000
+            chunks.append(msg[:split_idx])
+            msg = msg[split_idx:]
+        if msg:
+            chunks.append(msg)
+            
+        try:
+            await client.start(bot_token=token)
+            for chunk in chunks:
+                for attempt in range(4):
+                    try:
+                        target_chat = int(chat_id) if str(chat_id).lstrip('-').isdigit() else chat_id
+                        await client.send_message(target_chat, chunk)
+                        log.info(f"✅ [Summary Telethon] Sent summary chunk to {target_chat}")
+                        break
+                    except Exception as e:
+                        wait = 2 ** attempt
+                        log.warning(f"⚠️ [Summary Telethon Fallback] {attempt+1}/4 — Failed to send summary: {e} — waiting {wait}s")
+                        await asyncio.sleep(wait)
+        finally:
+            await client.disconnect()
+
+    try:
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(_send_via_telethon())
+        loop.close()
+    except Exception as e:
+        log.error(f"[Summary Error] Failed to start telethon loop: {e}")

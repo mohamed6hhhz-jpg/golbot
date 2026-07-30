@@ -1,0 +1,22 @@
+def _build_all_tf_levels(data: dict) -> str:
+    """بناء قالب مستويات واتجاهات اليوم الشامل رياضياً"""
+    gld = data.get('gold', 2000)
+    atr = data.get('atr', 20)
+    tfs = [('5 دقائق', 0.15), ('10 دقائق', 0.2), ('15 دقيقة', 0.25), ('30 دقيقة', 0.35), ('ساعة', 0.5), ('4 ساعات', 0.75), ('يوم', 1.0), ('أسبوع', 2.2), ('شهر', 4.5)]
+    lines = ['━━━━━━━━━━━━━━━━━━━━━━━━━━\n📍📊 مستويات واتجاهات الذهب الشاملة لكل الفريمات الزمنية\n━━━━━━━━━━━━━━━━━━━━━━━━━━']
+    for name, factor in tfs:
+        tf_atr = atr * factor
+        pivot = gld
+        high = gld + tf_atr * 1.5
+        low = gld - tf_atr * 1.5
+        _bias_dir = 1 if 'صاعد' in data.get('tf_daily', {}).get('bias', '') or 'bull' in str(data.get('confluence', {}).get('bias', '')) else -1
+        close = gld + _bias_dir * tf_atr * 0.2
+        buy_zone = gld - tf_atr * 0.5
+        sell_zone = gld + tf_atr * 0.5
+        break_up = gld + tf_atr * 0.8
+        break_down = gld - tf_atr * 0.8
+        rev_up = gld - tf_atr * 1.2
+        rev_down = gld + tf_atr * 1.2
+        block = f'\n⏱️ إطار: [{name}]\n🟢 منطقة الشراء: {round(buy_zone, 2)}\n🔴 منطقة البيع: {round(sell_zone, 2)}\n📈 القمة المتوقعة: {round(high, 2)}\n📉 القاع المتوقع: {round(low, 2)}\n🎯 الإغلاق المتوقع: {round(close, 2)}\n🔼 النقطة الفاصلة للصعود (اختراق وثبات): {round(break_up, 2)}\n🔽 النقطة الفاصلة للهبوط (كسر وثبات): {round(break_down, 2)}\n🔄 نقطة الانعكاس للصعود (ارتداد ارتكازي): {round(rev_up, 2)}\n🔄 نقطة الانعكاس للهبوط (ارتداد ارتكازي): {round(rev_down, 2)}\n📍 النقطة المحورية (الفاصلة): {round(pivot, 2)}\n─────────────────────────'
+        lines.append(block.strip())
+    return '\n'.join(lines)

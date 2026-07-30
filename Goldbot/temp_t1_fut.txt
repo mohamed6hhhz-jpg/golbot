@@ -1,0 +1,35 @@
+def _build_template_1(d: dict) -> str:
+    """بناء القالب الأول (الموجز الكلاسيكي المنفصل)"""
+    w_rsi = d.get('tf_weekly', {}).get('rsi', 50)
+    w_bias = 'صاعد 📈' if w_rsi >= 50 else 'هابط 📉'
+    d_rsi = d.get('tf_daily', {}).get('rsi', 50)
+    d_bias = 'صاعد 📈' if d_rsi >= 50 else 'هابط 📉'
+    gold = d['gold']
+    pivot = d.get('pivot', gold)
+    atr = d.get('atr', 20)
+    r1 = d.get('r1', pivot + atr)
+    s1 = d.get('s1', pivot - atr)
+    if gold >= pivot:
+        zone_color = '🟢'
+        zone_name = 'مستوى الدعم الحيوي'
+        exact_zone = round(pivot, 2)
+        t1 = round(r1, 2)
+        t2 = round(d.get('r2', r1 + atr), 2)
+        cont_action = 'الصعود لاستهداف قمم أعلى'
+        rev_color = '🔴'
+        rev_zone = round(s1, 2)
+        rev_dir = 'الهبوط السلبي'
+        break_dir = 'أسفله'
+    else:
+        zone_color = '🔴'
+        zone_name = 'مستوى المقاومة المحوري'
+        exact_zone = round(pivot, 2)
+        t1 = round(s1, 2)
+        t2 = round(d.get('s2', s1 - atr), 2)
+        cont_action = 'الهبوط لاستهداف قيعان أدنى'
+        rev_color = '🟢'
+        rev_zone = round(r1, 2)
+        rev_dir = 'الصعود الإيجابي'
+        break_dir = 'أعلاه'
+    template = f'تحليل الذهب 🟡\n\n1W (الأسبوعي)\nالتحيز الأسبوعي: {w_bias}\n\n1D (اليومي)\nالتحيز اليومي: {d_bias}\n\n{zone_color} {zone_name}: {exact_zone}$\n\nفي حال احترام المستوى، نتوقع استهداف:\n🎯 {t1}$\n🎯 {t2}$\n\nوفي حالة كسر {t2}$، سيستمر {cont_action}.\n\n{rev_color} أما إذا لم يحترم السعر مستوى {exact_zone}$ وتمكن من كسره، فسيستهدف {rev_zone}$.\nوتعتبر النقطة {rev_zone}$ هي النقطة الذهبية الفاصلة، وباختراقها والثبات {break_dir} يتغير الاتجاه نحو {rev_dir}.'
+    return template

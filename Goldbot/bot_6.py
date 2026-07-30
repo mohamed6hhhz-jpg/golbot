@@ -19,7 +19,7 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 TELEGRAM_BOT6_TOKEN = "8607967462:AAGJ649TsE3fdp7Z-7q0Pmk4N0ut27IToVk"
-TELEGRAM_BOT6_CHAT = "-5584357836"
+TELEGRAM_BOT6_CHAT = "-1004335538720"
 
 import requests
 import socket

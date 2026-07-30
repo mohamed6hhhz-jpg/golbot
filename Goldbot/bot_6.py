@@ -26,27 +26,58 @@ import socket
 import requests.packages.urllib3.util.connection as urllib3_cn
 
 def allowed_gai_family():
-    """إجبار بايثون على استخدام IPv4 فقط لتفادي مشاكل تعليق شبكات IPv6 في HuggingFace عند الاتصال بـ api.telegram.org"""
     return socket.AF_INET
 
 urllib3_cn.allowed_gai_family = allowed_gai_family
+
 def send_to_bot6_telegram(text: str):
     if not text:
         return
+    import httpx
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT6_TOKEN}/sendMessage"
+    ip_url = f"https://149.154.167.220/bot{TELEGRAM_BOT6_TOKEN}/sendMessage"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    ip_headers = dict(headers)
+    ip_headers["Host"] = "api.telegram.org"
+    
     payload = {
         "chat_id": TELEGRAM_BOT6_CHAT,
         "text": text,
         "parse_mode": "HTML"
     }
-    try:
-        r = requests.post(url, json=payload, timeout=10)
-        if r.status_code != 200:
-            log.error(f"❌ [Bot 6] فشل الإرسال للتيليجرام: {r.text}")
-        else:
-            log.info("✅ [Bot 6] تم إرسال التقرير للتيليجرام بنجاح!")
-    except Exception as e:
-        log.error(f"❌ [Bot 6] خطأ أثناء الإرسال: {e}")
+    
+    chat_success = False
+    for attempt in range(3):
+        try:
+            with httpx.Client(timeout=15.0, headers=headers) as client:
+                r = client.post(url, json=payload)
+                r.raise_for_status()
+                chat_success = True
+                log.info("✅ [Bot 6] تم إرسال التقرير للتيليجرام بنجاح (httpx)!")
+                break
+        except Exception as e:
+            log.warning(f"⚠️ [Bot 6] {attempt+1}/3 محاولة httpx فشلت: {e}")
+            try:
+                r = requests.post(ip_url, json=payload, headers=ip_headers, timeout=15.0, verify=False)
+                r.raise_for_status()
+                chat_success = True
+                log.info("✅ [Bot 6] تم الإرسال للتيليجرام بنجاح (Direct IPv4)!")
+                break
+            except Exception as e2:
+                log.warning(f"⚠️ [Bot 6] {attempt+1}/3 محاولة Direct IPv4 فشلت: {e2}")
+                try:
+                    r = requests.post(url, json=payload, headers=headers, timeout=15.0)
+                    r.raise_for_status()
+                    chat_success = True
+                    log.info("✅ [Bot 6] تم الإرسال للتيليجرام بنجاح (requests)!")
+                    break
+                except Exception as e3:
+                    log.error(f"❌ [Bot 6] {attempt+1}/3 جميع محاولات الإرسال فشلت: {e3}")
+                    import time
+                    time.sleep(2)
 
 def run_bot6():
     """

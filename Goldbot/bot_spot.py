@@ -9020,131 +9020,138 @@ def run_bot():
     day_names = ["اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت","أحد"]
 
     while True:
-        now_cairo  = cairo_now()
-        today      = now_cairo.date()
-        hour_cairo = now_cairo.hour
-        weekday    = now_cairo.weekday()
-
-        if last_report_date != today:
-            for m in ['futures', 'spot']:
-                morning_sent_today[m]   = False
-                closing_sent_today[m]   = False
-                heartbeat_sent_today[m] = False
-            all_models_notified  = False
-
-        if not is_market_open() and has_sent_initial:
-            if not market_closed_notified:
-                now_c    = cairo_now()
-                wday     = now_c.weekday()
-                hr       = now_c.hour
-                if wday in (5, 6):
-                    reason   = "عطلة نهاية الأسبوع"
-                    reopen   = "الاثنين 01:00 بتوقيت القاهرة"
-                    details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
-                elif wday == 0 and hr < MARKET_OPEN_HOUR:
-                    reason   = "ما زلنا في ساعات الإغلاق"
-                    reopen   = f"الاثنين {MARKET_OPEN_HOUR:02d}:00 بتوقيت القاهرة"
-                    details  = "أسواق الذهب تبدأ جلستها الأسبوعية يوم الاثنين فجراً."
-                else:
-                    reason   = "السوق خارج ساعات التداول"
-                    reopen   = "قريباً"
-                    details  = "تُتداول أسواق الذهب من الاثنين حتى الجمعة."
-
-                closed_msg = (
-                    f"🛌 سوق الذهب مغلق حالياً\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"📅 السبب: {reason}\n"
-                    f"📖 التفاصيل: {details}\n"
-                    f"⏰ موعد الفتح: {reopen}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"🕐 {now_c.strftime('%Y-%m-%d %H:%M')} بتوقيت القاهرة\n"
-                    f"✅ البوت يعمل وسيُرسل التقرير فور فتح السوق."
-                )
-                send_to_telegram(closed_msg)
-                market_closed_notified = True
-                log.info("📢 تم إرسال إشعار إغلاق السوق للقناة.")
-
-            log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
-            for m in ['futures', 'spot']: last_gold_price[m] = None
-            time.sleep(30 * 60)
-            continue
-
-        market_closed_notified = False
-
-        for mode in ['spot']:
-            data = get_full_market_data(mode=mode)
-            if data and data["gold"]:
-                consec_failures[mode] = 0
-                all_models_notified = False
-                current_gold = data["gold"]
-
-                if last_gold_price[mode] is None and last_report_date != today:
-                    log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
-                    report = generate_report(data, is_alert=False)
-                    send_reports(data, report)
-                    last_gold_price[mode] = current_gold
-                    last_report_date = today
-                    minutes_counter[mode] = 0
-                    has_sent_initial = True
-                    log.info("✅ تم إرسال التقرير الافتتاحي. البوت جاهز لمنطق 'سوق مغلق'.")  # noqa
-
-                elif hour_cairo == HEARTBEAT_HOUR and not heartbeat_sent_today[mode]:
-                    conf = data['confluence']
-                    send_to_telegram(
-                        f"💚 [Goldbot Heartbeat - {mode.upper()}] البوت يعمل بشكل طبيعي ✔️\n"
-                        f"💰 السعر: {current_gold:.2f}$\n"
-                        f"🎯 {conf['verdict']}\n"
-                        f"🕐 {now_cairo.strftime('%H:%M قاهرة')}"
+        try:
+            now_cairo  = cairo_now()
+            today      = now_cairo.date()
+            hour_cairo = now_cairo.hour
+            weekday    = now_cairo.weekday()
+    
+            if last_report_date != today:
+                for m in ['futures', 'spot']:
+                    morning_sent_today[m]   = False
+                    closing_sent_today[m]   = False
+                    heartbeat_sent_today[m] = False
+                all_models_notified  = False
+    
+            if not is_market_open() and has_sent_initial:
+                if not market_closed_notified:
+                    now_c    = cairo_now()
+                    wday     = now_c.weekday()
+                    hr       = now_c.hour
+                    if wday in (5, 6):
+                        reason   = "عطلة نهاية الأسبوع"
+                        reopen   = "الاثنين 01:00 بتوقيت القاهرة"
+                        details  = "أسواق الذهب والعملات والمعادن تغلق كل جمعة مساءً وتعود مطلع الأسبوع."
+                    elif wday == 0 and hr < MARKET_OPEN_HOUR:
+                        reason   = "ما زلنا في ساعات الإغلاق"
+                        reopen   = f"الاثنين {MARKET_OPEN_HOUR:02d}:00 بتوقيت القاهرة"
+                        details  = "أسواق الذهب تبدأ جلستها الأسبوعية يوم الاثنين فجراً."
+                    else:
+                        reason   = "السوق خارج ساعات التداول"
+                        reopen   = "قريباً"
+                        details  = "تُتداول أسواق الذهب من الاثنين حتى الجمعة."
+    
+                    closed_msg = (
+                        f"🛌 سوق الذهب مغلق حالياً\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"📅 السبب: {reason}\n"
+                        f"📖 التفاصيل: {details}\n"
+                        f"⏰ موعد الفتح: {reopen}\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"🕐 {now_c.strftime('%Y-%m-%d %H:%M')} بتوقيت القاهرة\n"
+                        f"✅ البوت يعمل وسيُرسل التقرير فور فتح السوق."
                     )
-                    heartbeat_sent_today[mode] = True
-
-                elif hour_cairo == MORNING_HOUR_CAI and not morning_sent_today[mode]:
-                    log.info(f"🌅 إرسال تقرير الصباح ({mode})...")
-                    report = generate_report(data, is_alert=False, is_morning=True)
-                    if report:
+                    send_to_telegram(closed_msg)
+                    market_closed_notified = True
+                    log.info("📢 تم إرسال إشعار إغلاق السوق للقناة.")
+    
+                log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
+                for m in ['futures', 'spot']: last_gold_price[m] = None
+                time.sleep(30 * 60)
+                continue
+    
+            market_closed_notified = False
+    
+            for mode in ['spot']:
+                data = get_full_market_data(mode=mode)
+                if data and data["gold"]:
+                    consec_failures[mode] = 0
+                    all_models_notified = False
+                    current_gold = data["gold"]
+    
+                    if last_gold_price[mode] is None and last_report_date != today:
+                        log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
+                        report = generate_report(data, is_alert=False)
                         send_reports(data, report)
-                        morning_sent_today[mode] = True
                         last_gold_price[mode] = current_gold
+                        last_report_date = today
                         minutes_counter[mode] = 0
-
-                elif hour_cairo == CLOSING_HOUR_CAI and not closing_sent_today[mode]:
-                    log.info(f"🌙 إرسال ملخص الجلسة ({mode})...")
-                    report = generate_report(data, is_alert=False)
-                    if report:
-                        send_reports(data, report, f"🌙 [ملخص جلسة اليوم - {mode.upper()}]\n")
-                        closing_sent_today[mode] = True
-                        last_gold_price[mode] = current_gold
-                        minutes_counter[mode] = 0
-
-                else:
-                    price_diff = current_gold - (last_gold_price[mode] or current_gold)
-                    if abs(price_diff) >= ALERT_THRESHOLD:
-                        log.info(f"🚨 تحرك حاد {price_diff:+.2f}$ ({mode})")
-                        report = generate_report(data, is_alert=True, price_diff=price_diff)
+                        has_sent_initial = True
+                        log.info("✅ تم إرسال التقرير الافتتاحي. البوت جاهز لمنطق 'سوق مغلق'.")  # noqa
+    
+                    elif hour_cairo == HEARTBEAT_HOUR and not heartbeat_sent_today[mode]:
+                        conf = data['confluence']
+                        send_to_telegram(
+                            f"💚 [Goldbot Heartbeat - {mode.upper()}] البوت يعمل بشكل طبيعي ✔️\n"
+                            f"💰 السعر: {current_gold:.2f}$\n"
+                            f"🎯 {conf['verdict']}\n"
+                            f"🕐 {now_cairo.strftime('%H:%M قاهرة')}"
+                        )
+                        heartbeat_sent_today[mode] = True
+    
+                    elif hour_cairo == MORNING_HOUR_CAI and not morning_sent_today[mode]:
+                        log.info(f"🌅 إرسال تقرير الصباح ({mode})...")
+                        report = generate_report(data, is_alert=False, is_morning=True)
                         if report:
                             send_reports(data, report)
+                            morning_sent_today[mode] = True
                             last_gold_price[mode] = current_gold
                             minutes_counter[mode] = 0
-                    elif minutes_counter[mode] >= ROUTINE_MINUTES:
-                        log.info(f"⏰ مرت {ROUTINE_MINUTES} دقيقة — تقرير دوري ({mode})...")
+    
+                    elif hour_cairo == CLOSING_HOUR_CAI and not closing_sent_today[mode]:
+                        log.info(f"🌙 إرسال ملخص الجلسة ({mode})...")
                         report = generate_report(data, is_alert=False)
                         if report:
-                            send_reports(data, report)
+                            send_reports(data, report, f"🌙 [ملخص جلسة اليوم - {mode.upper()}]\n")
+                            closing_sent_today[mode] = True
                             last_gold_price[mode] = current_gold
                             minutes_counter[mode] = 0
-            else:
-                consec_failures[mode] += 1
-                log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
-                if consec_failures[mode] >= 3 and not all_models_notified:
-                    send_to_telegram(
-                        f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
-                        "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
-                    )
-                    all_models_notified = True
+    
+                    else:
+                        price_diff = current_gold - (last_gold_price[mode] or current_gold)
+                        if abs(price_diff) >= ALERT_THRESHOLD:
+                            log.info(f"🚨 تحرك حاد {price_diff:+.2f}$ ({mode})")
+                            report = generate_report(data, is_alert=True, price_diff=price_diff)
+                            if report:
+                                send_reports(data, report)
+                                last_gold_price[mode] = current_gold
+                                minutes_counter[mode] = 0
+                        elif minutes_counter[mode] >= ROUTINE_MINUTES:
+                            log.info(f"⏰ مرت {ROUTINE_MINUTES} دقيقة — تقرير دوري ({mode})...")
+                            report = generate_report(data, is_alert=False)
+                            if report:
+                                send_reports(data, report)
+                                last_gold_price[mode] = current_gold
+                                minutes_counter[mode] = 0
+                else:
+                    consec_failures[mode] += 1
+                    log.warning(f"⚠️ فشل جلب البيانات مرة {consec_failures[mode]} ({mode}).")
+                    if consec_failures[mode] >= 3 and not all_models_notified:
+                        send_to_telegram(
+                            f"🚨 تحذير — جولدبوت يواجه مشكلة في {mode.upper()}!\n"
+                            "تعذّر جلب البيانات. سيتم إعادة المحاولة تلقائياً."
+                        )
+                        all_models_notified = True
+    
+                minutes_counter[mode] += 1
+                
+            time.sleep(60)
+        except Exception as e:
+            import traceback
+            log.error(f'❌ [CRITICAL LOOP ERROR] {e}\n{traceback.format_exc()}')
+            time.sleep(60)
+            continue
 
-            minutes_counter[mode] += 1
-            
-        time.sleep(60)
 
 
 def _build_group_summary(data: dict, group_name: str, flat_chunks: list) -> str:

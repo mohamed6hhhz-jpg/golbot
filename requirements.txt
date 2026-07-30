@@ -14,6 +14,7 @@ groq
 openai
 requests
 numpy
+cot_reports
 
 # Telethon Bots Dependencies
 telethon==1.44.0

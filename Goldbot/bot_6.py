@@ -107,40 +107,44 @@ def run_bot6():
             # لجلب أحدث الأرقام الحقيقية (بما فيها COT الذي أضفناه)
             data = get_full_market_data(mode='spot')
             
+            reports_to_send = []
+            
             if data and data.get('cot'):
                 cot_date = data['cot'].get('report_date')
-                
-                # إذا كان لدينا تقرير COT جديد لم ننشره بعد
                 if cot_date and cot_date != last_cot_report_date:
                     log.info(f"📊 [Bot 6] اكتشاف تقرير COT جديد لتاريخ: {cot_date}. جاري التوليد...")
                     cot_report = generate_cot_report(data)
-                    
                     if cot_report:
-                        log.info(f"✅ [Bot 6] تم توليد تقرير COT بنجاح:\n{cot_report[:100]}...")
-                        send_to_bot6_telegram(cot_report)
-                        
+                        reports_to_send.append(("تحليل تقرير COT 📊", cot_report))
                         last_cot_report_date = cot_date
             
             if data:
                 # توليد تقرير العرض والطلب
                 sd_report = generate_supply_demand_report(data)
                 if sd_report:
-                    log.info(f"✅ [Bot 6] تم توليد تقرير العرض والطلب بنجاح")
-                    send_to_bot6_telegram(sd_report)
+                    reports_to_send.append(("مناطق العرض والطلب 📉📈", sd_report))
                     
                 # توليد تقرير الميل الفني (الاتجاه)
                 bias_report = generate_technical_bias_report(data)
                 if bias_report:
-                    log.info(f"✅ [Bot 6] تم توليد تقرير الاتجاه الفني بنجاح")
-                    send_to_bot6_telegram(bias_report)
+                    reports_to_send.append(("الاتجاه الفني (الميل السعري) 🧭", bias_report))
                     
                 # توليد صفقات نظام كسر الأرقام
                 breakout_std = generate_standard_breakout_report(data)
+                if breakout_std:
+                    reports_to_send.append(("نظام كسر الأرقام (القياسي) 🔵", breakout_std))
+                    
                 breakout_box = generate_box_breakout_report(data)
-                if breakout_std and breakout_box:
-                    log.info(f"✅ [Bot 6] تم توليد تقارير نظام كسر الأرقام بنجاح")
-                    send_to_bot6_telegram(breakout_std)
-                    send_to_bot6_telegram(breakout_box)
+                if breakout_box:
+                    reports_to_send.append(("نظام كسر الأرقام (البديل) 📦", breakout_box))
+            
+            total_reports = len(reports_to_send)
+            for index, (title, content) in enumerate(reports_to_send, 1):
+                formatted_message = f"📌 [قالب {index}/{total_reports}] {title}\n\n{content}"
+                log.info(f"✅ [Bot 6] جاري إرسال القالب {index}/{total_reports}: {title}")
+                send_to_bot6_telegram(formatted_message)
+                time.sleep(2)  # فاصل زمني بسيط بين الرسائل لتجنب الحظر
+                
             # ننتظر 15 دقيقة قبل فحص السوق مرة أخرى للبوت 6 (يمكن تعديله)
             time.sleep(15 * 60)
         except Exception as e:

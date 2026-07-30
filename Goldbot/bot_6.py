@@ -22,7 +22,14 @@ TELEGRAM_BOT6_TOKEN = "8607967462:AAGJ649TsE3fdp7Z-7q0Pmk4N0ut27IToVk"
 TELEGRAM_BOT6_CHAT = "-5584357836"
 
 import requests
+import socket
+import requests.packages.urllib3.util.connection as urllib3_cn
 
+def allowed_gai_family():
+    """إجبار بايثون على استخدام IPv4 فقط لتفادي مشاكل تعليق شبكات IPv6 في HuggingFace عند الاتصال بـ api.telegram.org"""
+    return socket.AF_INET
+
+urllib3_cn.allowed_gai_family = allowed_gai_family
 def send_to_bot6_telegram(text: str):
     if not text:
         return

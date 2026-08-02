@@ -9135,12 +9135,12 @@ def run_bot():
     
                     if last_gold_price[mode] is None and last_report_date != today:
                         log.info(f"📊 إرسال التقرير الافتتاحي ({mode})...")
+                        has_sent_initial = True
+                        last_report_date = today
                         report = generate_report(data, is_alert=False)
                         send_reports(data, report)
                         last_gold_price[mode] = current_gold
-                        last_report_date = today
                         minutes_counter[mode] = 0
-                        has_sent_initial = True
                         log.info("✅ تم إرسال التقرير الافتتاحي. البوت جاهز لمنطق 'سوق مغلق'.")  # noqa
     
                     elif hour_cairo == HEARTBEAT_HOUR and not heartbeat_sent_today[mode]:

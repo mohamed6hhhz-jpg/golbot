@@ -15,5 +15,9 @@ TELEGRAM_TOKENS = {
     "bot2": "8718236248:AAGIlK8xTWUvRB_WcYOGN2Qx1kEKZwRqihQ",
     "bot3": "8696806326:AAEDKqSNoHAaMEHD8oqjaLm4oSci_3KOUWA",  # @Dsssoppp78_bot — القوالب الفورية S1-S12
     "bot4": "8930341910:AAHzqUUrPgMYf0vkkORWX25HGVgo_BDLRDI",
-    "bot5": "8834685171:AAGLBVBU0jOMXRjjnQ1EaHfiwKfSVGmS3FM",  # @Summariesboot54_bot  # @Boonnii_bot — للقوالب الجديدة
+    "bot5": "8834685171:AAGLBVBU0jOMXRjjnQ1EaHfiwKfSVGmS3FM",  # @Summariesboot54_bot
+    "bot_daily": "8874443139:AAGusTNj2-SRkODsFTPBUXC2xLyz_JrZch0",  # @Bottest42_bot — المستويات اليومية الكلاسيكية والكاماريلا
 }
+
+BOT_DAILY_CHAT_ID = "-1003920252656"  # جروب "bot testt" — المستويات اليومية
+

@@ -7,13 +7,23 @@ try:
     from Goldbot.bot_spot import get_full_market_data, cairo_now
     from Goldbot.ai_generator_bot6 import (
         generate_cot_report, generate_supply_demand_report,
-        generate_technical_bias_report, generate_standard_breakout_report, generate_box_breakout_report
+        generate_technical_bias_report, generate_standard_breakout_report, generate_box_breakout_report,
+        generate_market_session_report, generate_liquidity_flow_report, generate_sudden_liquidity_report,
+        generate_asian_session_liquidity_report, generate_european_session_liquidity_report,
+        generate_american_session_liquidity_report, generate_scalping_setup_report,
+        generate_fed_scenarios_report, generate_touch_and_go_report, generate_best_zero_drawdown_trade_report,
+        generate_best_high_lot_trade_report, generate_fomc_gold_map_report
     )
 except ImportError:
     from bot_spot import get_full_market_data, cairo_now
     from ai_generator_bot6 import (
         generate_cot_report, generate_supply_demand_report,
-        generate_technical_bias_report, generate_standard_breakout_report, generate_box_breakout_report
+        generate_technical_bias_report, generate_standard_breakout_report, generate_box_breakout_report,
+        generate_market_session_report, generate_liquidity_flow_report, generate_sudden_liquidity_report,
+        generate_asian_session_liquidity_report, generate_european_session_liquidity_report,
+        generate_american_session_liquidity_report, generate_scalping_setup_report,
+        generate_fed_scenarios_report, generate_touch_and_go_report, generate_best_zero_drawdown_trade_report,
+        generate_best_high_lot_trade_report, generate_fomc_gold_map_report
     )
 
 log = logging.getLogger(__name__)
@@ -131,14 +141,82 @@ def process_and_send_bot6(data: dict, last_cot_report_date: str) -> tuple[str, l
             breakout_box = generate_box_breakout_report(data)
             if breakout_box:
                 reports_to_send.append(("نظام كسر الأرقام (البديل) 📦", breakout_box))
+                
+            # توليد تقرير تحركات السوق وجلسات التداول
+            session_report = generate_market_session_report(data)
+            if session_report:
+                reports_to_send.append(("تحركات السوق والسيولة 🌊", session_report))
+                
+            # توليد تقرير تدفق السيولة اللحظي (القالب السابع)
+            liquidity_report = generate_liquidity_flow_report(data)
+            if liquidity_report:
+                reports_to_send.append(("رادار السيولة اللحظي 💧🎯", liquidity_report))
+                
+            # توليد تقرير السيولة الفجائية (القالب الثامن)
+            sudden_liquidity = generate_sudden_liquidity_report(data)
+            if sudden_liquidity:
+                reports_to_send.append(("إنذار السيولة الفجائية ⚡", sudden_liquidity))
+                
+            # توليد تقرير سيولة الجلسة الآسيوية (القالب التاسع)
+            asian_liquidity = generate_asian_session_liquidity_report(data)
+            if asian_liquidity:
+                reports_to_send.append(("سيولة الجلسة الآسيوية 🏮", asian_liquidity))
+                
+            # توليد تقرير سيولة الجلسة الأوروبية (القالب العاشر)
+            euro_liquidity = generate_european_session_liquidity_report(data)
+            if euro_liquidity:
+                reports_to_send.append(("سيولة الجلسة الأوروبية 🏛️", euro_liquidity))
+                
+            # توليد تقرير سيولة الجلسة الأمريكية (القالب الحادي عشر)
+            us_liquidity = generate_american_session_liquidity_report(data)
+            if us_liquidity:
+                reports_to_send.append(("سيولة الجلسة الأمريكية 🗽", us_liquidity))
+                
+            # توليد تقرير صفقة السكالبينج (القالب الثاني عشر)
+            scalp_setup = generate_scalping_setup_report(data)
+            if scalp_setup:
+                reports_to_send.append(("إشارة السكالبينج (Scalping Setup) 🎯", scalp_setup))
+                
+            # توليد تقرير سيناريوهات الفيدرالي (القالب الثالث عشر)
+            fed_scenarios = generate_fed_scenarios_report(data)
+            if fed_scenarios:
+                reports_to_send.append(("سيناريوهات الفيدرالي وتأثيرها المتوقع 🇺🇸", fed_scenarios))
+                
+            # توليد تقرير اللمس السريع (القالب الرابع عشر)
+            touch_go = generate_touch_and_go_report(data)
+            if touch_go:
+                reports_to_send.append(("صفقات اللمس السريع (Sniper Limits) ⚡", touch_go))
+                
+            # توليد تقرير أفضل صفقة زيرو انعكاس (القالب الخامس عشر)
+            best_trade = generate_best_zero_drawdown_trade_report(data)
+            if best_trade:
+                reports_to_send.append(("أفضل صفقة زيرو انعكاس 💎", best_trade))
+                
+            # توليد تقرير أفضل صفقة لوت عالي (القالب السادس عشر)
+            high_lot = generate_best_high_lot_trade_report(data)
+            if high_lot:
+                reports_to_send.append(("أفضل صفقة לوت عالي 🔥", high_lot))
+                
+            # توليد خريطة الفيدرالي (القالب السابع عشر)
+            fomc_map = generate_fomc_gold_map_report(data)
+            if fomc_map:
+                reports_to_send.append(("خريطة الذهب ليلة الفيدرالي 🗺️", fomc_map))
         
         total_reports = len(reports_to_send)
         for index, (title, content) in enumerate(reports_to_send, 1):
-            formatted_message = f"📌 [قالب {index}/{total_reports}] {title}\n\n{content}"
+            formatted_message = f"{index}/{total_reports} 📌 {title}\n\n{content}"
             log.info(f"✅ [Bot 6] جاري إرسال القالب {index}/{total_reports}: {title}")
             send_to_bot6_telegram(formatted_message)
             time.sleep(2)  # فاصل زمني بسيط بين الرسائل لتجنب الحظر
             
+        if total_reports > 0:
+            summary_msg = (
+                "✅ تم الانتهاء من إرسال تقارير التحليل المتقدم للذهب.\n"
+                "🛡️ الرجاء إدارة المخاطر بحذر وتفعيل وقف الخسارة دائماً."
+            )
+            send_to_bot6_telegram(summary_msg)
+            
+
     except Exception as e:
         log.error(f"❌ [Bot 6 CRITICAL ERROR] {e}\n{traceback.format_exc()}")
         

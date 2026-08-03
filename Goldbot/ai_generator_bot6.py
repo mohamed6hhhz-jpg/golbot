@@ -423,14 +423,66 @@ def generate_liquidity_flow_report(data: dict) -> str | None:
         # 2. منطقة السحب الفعلي للسيولة تمتد بعد القمة/القاع لضرب الوقف
         upper_target = round(sw_h + 2.0, 2)
         lower_target = round(sw_l - 2.0, 2)
+        
+        # 3. حساب الاحتماليات والأسباب
+        bullish_score = 50
+        reasoning_up = []
+        reasoning_down = []
+
+        if gold_chg > 0:
+            bullish_score += 10
+            reasoning_up.append("تغير السعر الإيجابي")
+        else:
+            bullish_score -= 10
+            reasoning_down.append("تغير السعر السلبي")
+
+        if gold > vwap:
+            bullish_score += 15
+            reasoning_up.append("تمركز السعر فوق VWAP")
+        else:
+            bullish_score -= 15
+            reasoning_down.append("تمركز السعر أسفل VWAP")
+
+        rsi = data.get('rsi', 50)
+        if rsi > 55:
+            bullish_score += 10
+            reasoning_up.append("زخم المشتريين قوي (RSI)")
+        elif rsi < 45:
+            bullish_score -= 10
+            reasoning_down.append("زخم البائعين قوي (RSI)")
+
+        macd = data.get('macd_hist', 0)
+        if macd > 0:
+            bullish_score += 5
+            reasoning_up.append("MACD إيجابي")
+        elif macd < 0:
+            bullish_score -= 5
+            reasoning_down.append("MACD سلبي")
+
+        bullish_score = max(10, min(90, int(bullish_score)))
+        bearish_score = 100 - bullish_score
+
+        if not reasoning_up: reasoning_up.append("لا محفزات شرائية واضحة")
+        if not reasoning_down: reasoning_down.append("لا محفزات بيعية واضحة")
+        
+        reason_up_str = " + ".join(reasoning_up[:3])
+        reason_down_str = " + ".join(reasoning_down[:3])
+        
+        if bullish_score > bearish_score:
+            stronger_path = "المسار الصاعد (BSL) هو الأقوى"
+        elif bearish_score > bullish_score:
+            stronger_path = "المسار الهابط (SSL) هو الأقوى"
+        else:
+            stronger_path = "توازن تام في السيولة"
 
         context = f"""
 معلومات حية ودقيقة 100%:
 - اتجاه السيولة آلياً: {liq_dir}
 - الإطار الزمني والصلاحية: {session_name} ({session_time})
 - السعر الحالي: {gold}$
-- قمة السيولة (BSL): {sw_h}$ والهدف الممتد: {upper_target}$
-- قاع السيولة (SSL): {sw_l}$ والهدف الممتد: {lower_target}$
+- قمة السيولة (BSL): {sw_h}$ والهدف الممتد: {upper_target}$ (احتمالية: {bullish_score}%)
+- قاع السيولة (SSL): {sw_l}$ والهدف الممتد: {lower_target}$ (احتمالية: {bearish_score}%)
+- المسار الأقوى: {stronger_path}
 """
 
         system_prompt = """أنت محلل أسواق مالية محترف. 
@@ -451,8 +503,11 @@ def generate_liquidity_flow_report(data: dict) -> str | None:
 ⏱️ فترة الصلاحية: فعالة خلال [اسم الجلسة] ([توقيت الجلسة])
 
 🎯 أهداف السيولة ومناطق الجذب السعري (Liquidity Pools):
-▪️ مسار السيولة الصاعد (BSL): السعر يستهدف اختراق القمة {sw_h}$ وصولاً إلى {upper_target}$ لامتصاص السيولة الشرائية وضرب وقفات الخسارة.
-▪️ مسار السيولة الهابط (SSL): السعر يستهدف كسر القاع {sw_l}$ وصولاً إلى {lower_target}$ لامتصاص السيولة البيعية وضرب وقفات الخسارة.
+▪️ مسار السيولة الصاعد (BSL): السعر يستهدف اختراق القمة {sw_h}$ وصولاً إلى {upper_target}$ لامتصاص السيولة الشرائية.
+   (الاحتمالية: {bullish_score}% — السبب: {reason_up_str})
+▪️ مسار السيولة الهابط (SSL): السعر يستهدف كسر القاع {sw_l}$ وصولاً إلى {lower_target}$ لامتصاص السيولة البيعية.
+   (الاحتمالية: {bearish_score}% — السبب: {reason_down_str})
+   📌 المسار الأقوى حالياً: {stronger_path}
 
 💡 تحليل تدفق الأموال:
 [فقرة احترافية تشرح وضع السوق الحالي بوضوح بناءً على اتجاه السيولة والأهداف].

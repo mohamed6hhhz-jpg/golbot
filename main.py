@@ -123,6 +123,26 @@ async def trigger_v5(secret: str = ""):
         "message": "🚀 تم إعطاء الأمر لمحرك الجيل الخامس V5 بالبدء فوراً! ستصلك التقارير على قنوات التيليجرام خلال دقائق."
     }
 
+@app.get("/trigger_daily")
+async def trigger_daily(secret: str = ""):
+    if secret != "gold2026vip":
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid secret key")
+    
+    def run_daily_now():
+        try:
+            from Goldbot.bot_daily_levels import _run_once
+            _run_once()
+        except Exception as e:
+            import traceback
+            print(f"[trigger_daily] ERROR: {e}\n{traceback.format_exc()}")
+
+    asyncio.get_event_loop().run_in_executor(None, run_daily_now)
+    
+    return {
+        "status": "started",
+        "message": "✅ تم إعطاء الأمر لبوت المستويات اليومية بالإرسال فوراً! ستصل القوالب الثلاثة لجروب التيست خلال دقيقتين تقريباً."
+    }
+
 @app.get("/test_tg")
 async def test_tg(secret: str = ""):
     if secret != "gold2026vip":

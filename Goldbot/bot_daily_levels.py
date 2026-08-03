@@ -723,11 +723,8 @@ def run_daily_levels_bot():
             now = datetime.now(CAIRO_TZ)
             today = now.date()
 
-            # تحقق من الوقت (01:00 صباحاً ± دقيقتين)
-            is_send_time = (
-                now.hour == SEND_HOUR and
-                now.minute <= SEND_MINUTE + 2
-            )
+            # تحقق من الوقت (الساعة 1 صباحاً بالكامل لضمان عدم تفويت الإرسال في حال إعادة تشغيل السيرفر)
+            is_send_time = (now.hour == SEND_HOUR)
 
             # تحقق من أننا لم نرسل اليوم مسبقاً
             already_sent = (last_sent_date == today)

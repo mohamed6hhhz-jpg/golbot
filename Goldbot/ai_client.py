@@ -165,9 +165,7 @@ def generate_robust_ai_response(system_prompt: str, user_prompt: str, max_tokens
         return "⚠️ لم يتم العثور على أي مفاتيح ذكاء اصطناعي للعمل."
     
     groq_models = [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "llama3-8b-8192"
+        "llama-3.3-70b-versatile"
     ]
     
     for key in all_keys:

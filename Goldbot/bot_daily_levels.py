@@ -560,19 +560,36 @@ def _split_msg(text: str, max_len: int = 4000) -> list:
 
 
 def send_message(token: str, chat_id: str, text: str) -> bool:
-    """يرسل رسالة نصية واحدة عبر تيليجرام Bot API (HTTP)."""
+    """يرسل رسالة نصية واحدة عبر تيليجرام Bot API (HTTP) مع دعم الالتفاف (Direct IPv4)."""
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+    ip_url = f"https://149.154.167.220/bot{token}/sendMessage"
+    
     headers = {"User-Agent": "Mozilla/5.0"}
+    ip_headers = dict(headers)
+    ip_headers["Host"] = "api.telegram.org"
+    
     payload = {"chat_id": str(chat_id), "text": text}
+    
     for attempt in range(3):
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=30)
+            r = requests.post(url, json=payload, headers=headers, timeout=15.0)
             r.raise_for_status()
             return True
         except Exception as e:
-            wait = 2 ** attempt
-            log.warning(f"⚠️ [Telegram] محاولة {attempt+1}/3 — {e} — انتظار {wait}s")
-            time.sleep(wait)
+            log.warning(f"⚠️ [Telegram] محاولة {attempt+1}/3 الأساسية فشلت: {e}")
+            try:
+                # الالتفاف على الحظر باستخدام IP مباشر
+                r = requests.post(ip_url, json=payload, headers=ip_headers, timeout=15.0, verify=False)
+                r.raise_for_status()
+                log.info("✅ [Telegram] تم الإرسال للتيليجرام بنجاح (Direct IPv4)!")
+                return True
+            except Exception as e2:
+                wait = 2 ** attempt
+                log.warning(f"⚠️ [Telegram] محاولة {attempt+1}/3 بالـ IPv4 فشلت — {e2} — انتظار {wait}s")
+                time.sleep(wait)
     return False
 
 

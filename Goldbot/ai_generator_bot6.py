@@ -369,6 +369,66 @@ def generate_market_session_report(data: dict) -> str | None:
         log.error(f"❌ فشل توليد تقرير السيولة: {e}\n{traceback.format_exc()}")
         return None
 
+
+def _calc_prob_and_reasons(data: dict):
+    hist = data.get('hist_ctx', {})
+    gold_chg = round(hist.get('chg_1d', 0), 2) if hist else 0
+    gold = data.get("gold", 0)
+    vwap = data.get("vwap", gold)
+    
+    bullish_score = 50
+    reasoning_up = []
+    reasoning_down = []
+
+    if gold_chg > 0:
+        bullish_score += 10
+        reasoning_up.append("تغير السعر الإيجابي")
+    else:
+        bullish_score -= 10
+        reasoning_down.append("تغير السعر السلبي")
+
+    if gold > vwap:
+        bullish_score += 15
+        reasoning_up.append("تمركز السعر فوق VWAP")
+    else:
+        bullish_score -= 15
+        reasoning_down.append("تمركز السعر أسفل VWAP")
+
+    rsi = data.get('rsi', 50)
+    if rsi > 55:
+        bullish_score += 10
+        reasoning_up.append("زخم المشتريين قوي (RSI)")
+    elif rsi < 45:
+        bullish_score -= 10
+        reasoning_down.append("زخم البائعين قوي (RSI)")
+
+    macd = data.get('macd_hist', 0)
+    if macd > 0:
+        bullish_score += 5
+        reasoning_up.append("MACD إيجابي")
+    elif macd < 0:
+        bullish_score -= 5
+        reasoning_down.append("MACD سلبي")
+
+    bullish_score = max(10, min(90, int(bullish_score)))
+    bearish_score = 100 - bullish_score
+
+    if not reasoning_up: reasoning_up.append("لا محفزات شرائية واضحة")
+    if not reasoning_down: reasoning_down.append("لا محفزات بيعية واضحة")
+    
+    reason_up_str = " + ".join(reasoning_up[:3])
+    reason_down_str = " + ".join(reasoning_down[:3])
+    
+    if bullish_score > bearish_score:
+        stronger_path = "المسار الصاعد (BSL) هو الأقوى"
+    elif bearish_score > bullish_score:
+        stronger_path = "المسار الهابط (SSL) هو الأقوى"
+    else:
+        stronger_path = "توازن تام في السيولة"
+        
+    return bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path
+
+
 def generate_liquidity_flow_report(data: dict) -> str | None:
     from datetime import datetime, timezone, timedelta
     import traceback
@@ -424,56 +484,7 @@ def generate_liquidity_flow_report(data: dict) -> str | None:
         upper_target = round(sw_h + 2.0, 2)
         lower_target = round(sw_l - 2.0, 2)
         
-        # 3. حساب الاحتماليات والأسباب
-        bullish_score = 50
-        reasoning_up = []
-        reasoning_down = []
-
-        if gold_chg > 0:
-            bullish_score += 10
-            reasoning_up.append("تغير السعر الإيجابي")
-        else:
-            bullish_score -= 10
-            reasoning_down.append("تغير السعر السلبي")
-
-        if gold > vwap:
-            bullish_score += 15
-            reasoning_up.append("تمركز السعر فوق VWAP")
-        else:
-            bullish_score -= 15
-            reasoning_down.append("تمركز السعر أسفل VWAP")
-
-        rsi = data.get('rsi', 50)
-        if rsi > 55:
-            bullish_score += 10
-            reasoning_up.append("زخم المشتريين قوي (RSI)")
-        elif rsi < 45:
-            bullish_score -= 10
-            reasoning_down.append("زخم البائعين قوي (RSI)")
-
-        macd = data.get('macd_hist', 0)
-        if macd > 0:
-            bullish_score += 5
-            reasoning_up.append("MACD إيجابي")
-        elif macd < 0:
-            bullish_score -= 5
-            reasoning_down.append("MACD سلبي")
-
-        bullish_score = max(10, min(90, int(bullish_score)))
-        bearish_score = 100 - bullish_score
-
-        if not reasoning_up: reasoning_up.append("لا محفزات شرائية واضحة")
-        if not reasoning_down: reasoning_down.append("لا محفزات بيعية واضحة")
-        
-        reason_up_str = " + ".join(reasoning_up[:3])
-        reason_down_str = " + ".join(reasoning_down[:3])
-        
-        if bullish_score > bearish_score:
-            stronger_path = "المسار الصاعد (BSL) هو الأقوى"
-        elif bearish_score > bullish_score:
-            stronger_path = "المسار الهابط (SSL) هو الأقوى"
-        else:
-            stronger_path = "توازن تام في السيولة"
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
 
         context = f"""
 معلومات حية ودقيقة 100%:
@@ -533,10 +544,13 @@ def generate_sudden_liquidity_report(data: dict) -> str | None:
         
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         rel_vol = data.get("rel_vol", 1.0)
         
         hist = data.get('hist_ctx', {})
         gold_chg = round(hist.get('chg_1d', 0), 2) if hist else 0
+        
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
 
         # تحديد اتجاه السيولة الفجائية
         if gold_chg > 0:
@@ -565,7 +579,9 @@ def generate_sudden_liquidity_report(data: dict) -> str | None:
 - وضع السيولة الفجائية: {vol_status}
 - اتجاه السيولة الفجائية: {sudden_dir}
 - السعر الحالي: {gold}$
-- السعر المستهدف للسيولة الفجائية: {target_price}$
+- قمة السيولة (BSL): السعر يستهدف {round(gold + (atr * 0.8), 2)}$ (احتمالية: {bullish_score}%)
+- قاع السيولة (SSL): السعر يستهدف {round(gold - (atr * 0.8), 2)}$ (احتمالية: {bearish_score}%)
+- المسار الأقوى: {stronger_path}
 - الإطار الزمني والصلاحية: {time_validity}
 """
 
@@ -611,6 +627,7 @@ def generate_asian_session_liquidity_report(data: dict) -> str | None:
     try:
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         
         # أهداف الجلسة الآسيوية غالباً ما تكون هادئة وتميل لتشكيل قمم وقيعان (نطاق عرضي)
         # لذا يتم الاعتماد على نسبة أقل من الـ ATR لتمثيل النطاق المستهدف
@@ -622,8 +639,9 @@ def generate_asian_session_liquidity_report(data: dict) -> str | None:
         context = f"""
 معلومات حية ودقيقة 100%:
 - السعر الحالي: {gold}$
-- هدف السيولة الصاعد للجلسة الآسيوية: {asian_upper_target}$
-- هدف السيولة الهابط للجلسة الآسيوية: {asian_lower_target}$
+- هدف السيولة الصاعد للجلسة الآسيوية: {asian_upper_target}$ (احتمالية: {bullish_score}%)
+- هدف السيولة الهابط للجلسة الآسيوية: {asian_lower_target}$ (احتمالية: {bearish_score}%)
+- المسار الأقوى: {stronger_path}
 - توقيت الجلسة: {time_validity}
 """
 
@@ -644,8 +662,11 @@ def generate_asian_session_liquidity_report(data: dict) -> str | None:
 
 🎯 مستهدفات السيولة والنطاق السعري (Asian Box):
 ▪️ السعر الحالي: [سعر]$
-▪️ هدف السيولة الشرائية (الحد العلوي): السعر يستهدف مستوى [الرقم العلوي]$ كقمة متوقعة للجلسة.
-▪️ هدف السيولة البيعية (الحد السفلي): السعر يستهدف مستوى [الرقم السفلي]$ كقاع متوقع للجلسة.
+▪️ هدف السيولة الشرائية (الحد العلوي): السعر يستهدف مستوى {asian_upper_target}$ كقمة متوقعة.
+   (الاحتمالية: {bullish_score}% — السبب: {reason_up_str})
+▪️ هدف السيولة البيعية (الحد السفلي): السعر يستهدف مستوى {asian_lower_target}$ كقاع متوقع.
+   (الاحتمالية: {bearish_score}% — السبب: {reason_down_str})
+   📌 الاتجاه المرجح لكسر النطاق: {stronger_path}
 
 💡 تحليل الجلسة الآسيوية:
 [فقرة احترافية تشرح وضع سيولة الجلسة الآسيوية وكيفية تشكيلها لنطاق سعري (Range) وتأثير ذلك بناءً على الأرقام المرفقة].
@@ -667,6 +688,7 @@ def generate_european_session_liquidity_report(data: dict) -> str | None:
     try:
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         
         # الجلسة الأوروبية (لندن) تتميز بالسيولة العالية وتحديد الاتجاه
         # لذا نستخدم نسبة أكبر من الـ ATR لتمثيل النطاق المستهدف الفعلي (اختراق النطاق الآسيوي)
@@ -678,8 +700,9 @@ def generate_european_session_liquidity_report(data: dict) -> str | None:
         context = f"""
 معلومات حية ودقيقة 100%:
 - السعر الحالي: {gold}$
-- هدف السيولة الصاعد للجلسة الأوروبية: {euro_upper_target}$
-- هدف السيولة الهابط للجلسة الأوروبية: {euro_lower_target}$
+- هدف السيولة الصاعد للجلسة الأوروبية: {euro_upper_target}$ (احتمالية: {bullish_score}%)
+- هدف السيولة الهابط للجلسة الأوروبية: {euro_lower_target}$ (احتمالية: {bearish_score}%)
+- المسار الأقوى: {stronger_path}
 - توقيت الجلسة: {time_validity}
 """
 
@@ -724,6 +747,7 @@ def generate_american_session_liquidity_report(data: dict) -> str | None:
     try:
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         
         # الجلسة الأمريكية (نيويورك) هي الأعنف وتتسم بالسيولة الضخمة جداً
         # لذا نستخدم نسبة أكبر من الـ ATR لتمثيل النطاق المستهدف الفعلي (اختراق نطاق لندن/آسيا)
@@ -735,8 +759,9 @@ def generate_american_session_liquidity_report(data: dict) -> str | None:
         context = f"""
 معلومات حية ودقيقة 100%:
 - السعر الحالي: {gold}$
-- هدف السيولة الصاعد للجلسة الأمريكية: {us_upper_target}$
-- هدف السيولة الهابط للجلسة الأمريكية: {us_lower_target}$
+- هدف السيولة الصاعد للجلسة الأمريكية: {us_upper_target}$ (احتمالية: {bullish_score}%)
+- هدف السيولة الهابط للجلسة الأمريكية: {us_lower_target}$ (احتمالية: {bearish_score}%)
+- المسار الأقوى: {stronger_path}
 - توقيت الجلسة: {time_validity}
 """
 
@@ -781,6 +806,7 @@ def generate_scalping_setup_report(data: dict) -> str | None:
     try:
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         vwap = data.get("vwap", gold)
         
         # تحديد الاتجاه اللحظي (شراء أو بيع) بناءً على السعر و VWAP
@@ -838,6 +864,7 @@ def generate_fed_scenarios_report(data: dict) -> str | None:
     try:
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         
         # مستويات الفيدرالي تتطلب نطاقات تذبذب عنيفة جداً (أضعاف الـ ATR الطبيعي)
         hawk_target_1 = round(gold - (atr * 0.8), 2)
@@ -889,6 +916,7 @@ def generate_touch_and_go_report(data: dict) -> str | None:
     try:
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         
         # مستويات اللمس السريع (Sniper Entries / Touch & Go)
         # أرقام قريبة نسبياً لالتقاط التذبذب اللحظي
@@ -932,6 +960,7 @@ def generate_best_zero_drawdown_trade_report(data: dict) -> str | None:
     try:
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         vwap = data.get("vwap", gold)
         
         # الاعتماد على صفقات "أفضل نقطة" يعني انتظار السعر عند مستويات عميقة وآمنة
@@ -999,6 +1028,7 @@ def generate_best_high_lot_trade_report(data: dict) -> str | None:
     try:
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         vwap = data.get("vwap", gold)
         
         # صفقة اللوت العالي تتطلب "أفضل وأقوى ارتداد مؤكد" وليس مجرد ترند قوي
@@ -1066,6 +1096,7 @@ def generate_fomc_gold_map_report(data: dict) -> str | None:
     try:
         gold = data.get("gold", 0)
         atr = data.get("atr", 30)
+        bullish_score, bearish_score, reason_up_str, reason_down_str, stronger_path = _calc_prob_and_reasons(data)
         
         # مستويات الفيدرالي تتطلب مسافات اختراق وكسر واضحة، وأهدافاً ممتدة جداً
         up_break = round(gold + (atr * 0.4), 2)

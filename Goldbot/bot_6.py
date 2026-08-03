@@ -114,13 +114,12 @@ def process_and_send_bot6(data: dict, last_cot_report_date: str) -> tuple[str, l
     
     try:
         if data and data.get('cot'):
-            cot_date = data['cot'].get('report_date')
-            if cot_date and cot_date != last_cot_report_date:
-                log.info(f"📊 [Bot 6] اكتشاف تقرير COT جديد لتاريخ: {cot_date}. جاري التوليد...")
-                cot_report = generate_cot_report(data)
-                if cot_report:
-                    reports_to_send.append(("تحليل تقرير COT 📊", cot_report))
-                    new_cot_date = cot_date
+            cot_date = data['cot'].get('report_date', 'N/A')
+            log.info(f"📊 [Bot 6] جاري توليد تقرير COT (تاريخ التقرير الحالي: {cot_date})...")
+            cot_report = generate_cot_report(data)
+            if cot_report:
+                reports_to_send.append(("تحليل تقرير COT 📊", cot_report))
+                new_cot_date = cot_date
         
         if data:
             # توليد تقرير العرض والطلب

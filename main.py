@@ -14,6 +14,7 @@ from python.main import app
 from Goldbot.bot_spot import run_bot as run_spot
 from Goldbot.bot_futures import run_bot as run_futures
 from Goldbot.bot_6 import run_bot6
+from Goldbot.bot_daily_levels import run_daily_levels_bot
 
 # Import the Auto_Sheets_Bot async function
 from Auto_Sheets_Bot.bot import start_sheets_bot
@@ -166,8 +167,12 @@ async def startup_event():
     # threading.Thread(target=run_bot6, daemon=True, name="Goldbot-Bot6").start()
     print("[Orchestrator] Bot 6 (COT/SD/Bias/Breakout) task created.")
 
+    # Start Daily Levels Bot (Classical + Camarilla — sends at 01:00 AM Cairo)
+    threading.Thread(target=run_daily_levels_bot, daemon=True, name="Goldbot-DailyLevels").start()
+    print("[Orchestrator] Daily Levels Bot task created (sends at 01:00 AM Cairo).")
+
     # 2. Start auto-copy Telegram bot on the main asyncio event loop
-    # asyncio.create_task(start_telethon_bot())
+    asyncio.create_task(start_telethon_bot())
     print("[Orchestrator] Auto-copy Telethon bot task created.")
 
     # 3. Start Auto_Sheets_Bot Telegram bot on the main asyncio event loop

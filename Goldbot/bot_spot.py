@@ -1,8 +1,47 @@
 import yfinance as yf
+
+# =========================================================================
+# AI Client Patch: Redirect all local Groq calls to the robust AI manager
+# =========================================================================
 try:
-    from Goldbot.ai_client import UniversalAIClient as Groq, get_api_keys
+    from Goldbot.ai_client import generate_robust_ai_response, get_api_keys
 except ImportError:
-    from ai_client import UniversalAIClient as Groq, get_api_keys
+    from ai_client import generate_robust_ai_response, get_api_keys
+
+class _RobustCompletions:
+    def create(self, messages, model=None, temperature=0.1, max_tokens=700, **kwargs):
+        system_prompt = messages[0]["content"] if len(messages) > 0 else ""
+        user_prompt = messages[1]["content"] if len(messages) > 1 else ""
+        
+        # We rely on generate_robust_ai_response which handles 429, failovers, and OpenAI automatically.
+        content = generate_robust_ai_response(system_prompt, user_prompt, max_tokens, temperature)
+        
+        # Create a dummy response object to match the expected format: resp.choices[0].message.content
+        class _Message:
+            def __init__(self, content):
+                self.content = content
+        class _Choice:
+            def __init__(self, content):
+                self.message = _Message(content)
+        class _Response:
+            def __init__(self, content):
+                self.choices = [_Choice(content)]
+                
+        return _Response(content)
+
+class _RobustChat:
+    def __init__(self):
+        self.completions = _RobustCompletions()
+
+class RobustAIClient:
+    def __init__(self, api_key=None, **kwargs):
+        self.chat = _RobustChat()
+
+# Override Groq with our completely managed robust client
+Groq = RobustAIClient
+  # Force loop to only run once per report
+# =========================================================================
+
 import requests
 from datetime import datetime, timezone, timedelta
 import time
@@ -29,11 +68,7 @@ _SHARED_CLIENT: TelegramClient | None = None
 _CLIENT_LOOP:   asyncio.AbstractEventLoop | None = None
 _CLIENT_LOCK  = threading.Lock()
 
-GROQ_MODELS = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "llama3-8b-8192",
-]
+GROQ_MODELS = ["auto-managed"]
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
 logging.getLogger('yfinance').setLevel(logging.CRITICAL)  # منع رسائل ياهو المزعجة
@@ -4061,7 +4096,7 @@ def _build_live_liquidity_spike(d: dict) -> str:
         alert_level = "⚠️ تنبيه متوسط — نشاط غير عادي"
         alert_emoji = "⚠️"
     else:
-        alert_level = "✅ طبيعي — لا سبايك"
+        alert_level = "✅ طبيعي — سيولة مستقرة واعتيادية"
         alert_emoji = "✅"
 
     # ── مؤشر البولينجر باند للضغط ──
@@ -4093,10 +4128,11 @@ def _build_live_liquidity_spike(d: dict) -> str:
    الحجم الحالي (5د)   : {vol_current:>10,} عقد
    متوسط 5 شمعات       : {int(vol_avg_5):>10,} عقد
    متوسط 20 شمعة       : {int(vol_avg_20):>10,} عقد
-   نسبة السبايك        : {spike_ratio:.2f}x  [{_vol_bar(spike_ratio)}]
+   قوة تدفق السيولة    : {spike_ratio:.2f}x (يعادل {spike_ratio:.2f} ضعف المتوسط الطبيعي)
+   مؤشر قوة التدفق     : [{_vol_bar(spike_ratio)}]
    الفوليوم اليومي (rel): {rel_vol:.2f}x المتوسط اليومي
 
-{'🚨 *** سبايك مفاجئ محدد! ***' if spike_detected else '   لا يوجد سبايك حالياً'}
+{'🚨 *** تم رصد تدفق سيولة مفاجئ (Spike)! ***' if spike_detected else '   ✅ تدفق السيولة في معدلاته الطبيعية المستقرة'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 💧 نوع السيولة الداخلة
    {liq_type}

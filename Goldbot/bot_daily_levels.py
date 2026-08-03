@@ -131,22 +131,58 @@ def fetch_daily_data() -> dict | None:
         log.error("❌ فشل جلب البيانات اليومية الدقيقة!")
         return None
 
-    # حساب داتا الأمس من GC=F وتعديلها لتكون Spot دقيق جداً
-    df = _fetch("GC=F", period="5d", interval="1d")
-    if df is not None and len(df) >= 2:
-        yest = df.iloc[-2]
-        ph = round(float(yest["High"]), 2)
-        pl = round(float(yest["Low"]), 2)
-        pc = round(float(yest["Close"]), 2)
-        
-        # تعديل الفارق بين الآجل والفوري
-        gs = d.get("gold_spot", 0)
-        gf = d.get("gold_futures", 0)
-        if gs and gf and abs(gf - gs) < 50:
-            basis = gf - gs
-            ph = round(ph - basis, 2)
-            pl = round(pl - basis, 2)
-            pc = round(pc - basis, 2)
+    # جلب بيانات الأمس بدقة متناهية للفوري (Spot) باستخدام TwelveData
+    import os, requests
+    from datetime import datetime
+    try:
+        from Goldbot.secrets_config import TWELVEDATA_API_KEY_FALLBACK
+    except ImportError:
+        try:
+            from secrets_config import TWELVEDATA_API_KEY_FALLBACK
+        except ImportError:
+            TWELVEDATA_API_KEY_FALLBACK = ""
+            
+    td_key = os.environ.get("TWELVEDATA_API_KEY", TWELVEDATA_API_KEY_FALLBACK)
+    td_fetched = False
+    
+    if td_key:
+        try:
+            url = f"https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1day&outputsize=4&apikey={td_key}"
+            resp = requests.get(url, timeout=5).json()
+            if "values" in resp and len(resp["values"]) >= 2:
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                valid_candles = []
+                for val in resp["values"]:
+                    if val["datetime"][:10] != today_str:
+                        if abs(float(val["high"]) - float(val["low"])) > 3.0:
+                            valid_candles.append(val)
+                
+                if valid_candles:
+                    yest = valid_candles[0]
+                    ph = round(float(yest["high"]), 2)
+                    pl = round(float(yest["low"]), 2)
+                    pc = round(float(yest["close"]), 2)
+                    td_fetched = True
+                    log.info(f"✅ تم جلب الهاي واللو بدقة من TwelveData: H={ph}, L={pl}, C={pc}")
+        except Exception as e:
+            log.warning(f"⚠️ فشل جلب بيانات الأمس من TwelveData: {e}")
+
+    if not td_fetched:
+        log.warning("🔄 جاري الرجوع لـ yfinance (GC=F) كحل بديل...")
+        df = _fetch("GC=F", period="5d", interval="1d")
+        if df is not None and len(df) >= 2:
+            yest = df.iloc[-2]
+            ph = round(float(yest["High"]), 2)
+            pl = round(float(yest["Low"]), 2)
+            pc = round(float(yest["Close"]), 2)
+            
+            gs = d.get("gold_spot", 0)
+            gf = d.get("gold_futures", 0)
+            if gs and gf and abs(gf - gs) < 50:
+                basis = gf - gs
+                ph = round(ph - basis, 2)
+                pl = round(pl - basis, 2)
+                pc = round(pc - basis, 2)
     else:
         log.error("❌ فشل جلب بيانات الأمس من ياهو!")
         return None

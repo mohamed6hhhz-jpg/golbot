@@ -4119,11 +4119,11 @@ def _build_live_liquidity_spike(d: dict) -> str:
    الحجم الحالي (5د)   : {vol_current:>10,} عقد
    متوسط 5 شمعات       : {int(vol_avg_5):>10,} عقد
    متوسط 20 شمعة       : {int(vol_avg_20):>10,} عقد
-   قوة تدفق السيولة    : {spike_ratio:.2f}x (يعادل {spike_ratio:.2f} ضعف المتوسط الطبيعي)
-   مؤشر قوة التدفق     : [{_vol_bar(spike_ratio)}]
+   مؤشر تدفق السيولة (VSI) : {spike_ratio:.2f}x (قوة الفوليوم الحالي مقارنة بالمتوسط)
+   شريط القوة          : [{_vol_bar(spike_ratio)}]
    الفوليوم اليومي (rel): {rel_vol:.2f}x المتوسط اليومي
 
-{'🚨 *** تم رصد تدفق سيولة مفاجئ (Spike)! ***' if spike_detected else '   ✅ تدفق السيولة في معدلاته الطبيعية المستقرة'}
+{'🚨 *** تم رصد تدفق سيولة مفاجئ عالي الكثافة! ***' if spike_detected else '   ✅ تدفق السيولة في معدلاته الطبيعية المستقرة'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 💧 نوع السيولة الداخلة
    {liq_type}
@@ -4152,8 +4152,8 @@ def _build_live_liquidity_spike(d: dict) -> str:
    ADX : {adx:.1f} ({'قوي' if adx>=30 else 'متوسط' if adx>=20 else 'ضعيف'}) | D+{di_plus:.1f} vs D-{di_minus:.1f}
    CCI : {cci:.1f} ({'تشبع شراء ⚠️' if cci>100 else 'تشبع بيع ⚠️' if cci<-100 else 'طبيعي'})
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 تفسير السبايك:
-   VSI ≥ 3.0x → دخول مؤسسي ضخم/إخبار مفاجئ 🚨
+💡 تفسير مؤشر تدفق السيولة (VSI):
+   VSI ≥ 3.0x → دخول مؤسسي ضخم / إخبار مفاجئ 🚨
    VSI ≥ 2.0x → دخول مؤسسي محتمل أو نيوز ⚡
    VSI ≥ 1.5x → نشاط فوق المعتاد، راقب الاتجاه ⚠️
    VSI < 1.0x → سوق هادئ، لا توتر حالياً ✅"""
@@ -8707,26 +8707,30 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
         # القوالب الفورية S1-S12 — البوت الثالث @Dsssoppp78_bot
         bot3_reports = []
-        try:
-            bot3_reports.append(("[فوري] 1/16 الاسعار والفيبوناتشي",       _build_spot_s1(data),  None))
-            bot3_reports.append(("[فوري] 2/16 الاطارات الزمنية",            _build_spot_s2(data),  None))
-            bot3_reports.append(("[فوري] 3/16 زيرو انعكاس",                 _build_spot_s3(data),  None))
-            bot3_reports.append(("[فوري] 4/16 السكالبينج",                   _build_spot_s4(data),  None))
-            bot3_reports.append(("[فوري] 5/16 السوينج",                      _build_spot_s5(data),  None))
-            bot3_reports.append(("[فوري] 6/16 اللوت العالي",                 _build_spot_s6(data),  None))
-            bot3_reports.append(("[فوري] 7/16 التحليل الفني والزخم",         _build_spot_s7(data),  None))
-            bot3_reports.append(("[فوري] 8/16 الاقتصاد الكلي",              _build_spot_s8(data),  None))
-            bot3_reports.append(("[فوري] 9/16 شهية المخاطرة",               _build_spot_s9(data),  None))
-            bot3_reports.append(("[فوري] 10/16 عوائد السندات",              _build_spot_s10(data), None))
-            bot3_reports.append(("[فوري] 11/16 قوة العملات DXY",             _build_spot_s11(data), None))
-            bot3_reports.append(("[فوري] 12/16 الخلاصة المحورية",            _build_spot_s12(data), None))
-            bot3_reports.append(("[فوري] 13/16 المستهدف الأسبوعي", _build_friday_target(data, False), None))
-            bot3_reports.append(("[فوري] 14/16 مسار القمة والقاع", _build_spot_s14(data), None))
-            bot3_reports.append(("[فوري] 15/16 الرادار المؤسساتي والسيولة", _build_spot_s15(data), None))
-            bot3_reports.append(("[فوري] 16/16 استراتيجية اللوت الكامل", _build_spot_s16(data), None))
-            log.info(f"[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي")
-        except Exception as _se:
-            log.warning(f"[S1-S12] خطا في توليد القوالب الفورية: {_se}")
+        def safe_b3(title, func, *args):
+            try:
+                return (title, func(*args), None)
+            except Exception as e:
+                log.warning(f"[Bot3] خطأ في قالب {title}: {e}")
+                return (title, f"⚠️ خطأ أثناء إعداد القالب: {e}", None)
+
+        bot3_reports.append(safe_b3("[فوري] 1/16 الاسعار والفيبوناتشي",       _build_spot_s1, data))
+        bot3_reports.append(safe_b3("[فوري] 2/16 الاطارات الزمنية",            _build_spot_s2, data))
+        bot3_reports.append(safe_b3("[فوري] 3/16 زيرو انعكاس",                 _build_spot_s3, data))
+        bot3_reports.append(safe_b3("[فوري] 4/16 السكالبينج",                   _build_spot_s4, data))
+        bot3_reports.append(safe_b3("[فوري] 5/16 السوينج",                      _build_spot_s5, data))
+        bot3_reports.append(safe_b3("[فوري] 6/16 اللوت العالي",                 _build_spot_s6, data))
+        bot3_reports.append(safe_b3("[فوري] 7/16 التحليل الفني والزخم",         _build_spot_s7, data))
+        bot3_reports.append(safe_b3("[فوري] 8/16 الاقتصاد الكلي",              _build_spot_s8, data))
+        bot3_reports.append(safe_b3("[فوري] 9/16 شهية المخاطرة",               _build_spot_s9, data))
+        bot3_reports.append(safe_b3("[فوري] 10/16 عوائد السندات",              _build_spot_s10, data))
+        bot3_reports.append(safe_b3("[فوري] 11/16 قوة العملات DXY",             _build_spot_s11, data))
+        bot3_reports.append(safe_b3("[فوري] 12/16 الخلاصة المحورية",            _build_spot_s12, data))
+        bot3_reports.append(safe_b3("[فوري] 13/16 المستهدف الأسبوعي", _build_friday_target, data, False))
+        bot3_reports.append(safe_b3("[فوري] 14/16 مسار القمة والقاع", _build_spot_s14, data))
+        bot3_reports.append(safe_b3("[فوري] 15/16 الرادار المؤسساتي والسيولة", _build_spot_s15, data))
+        bot3_reports.append(safe_b3("[فوري] 16/16 استراتيجية اللوت الكامل", _build_spot_s16, data))
+        log.info(f"[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي")
 
         bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7 or _build_template_7(data), None))
         bot2_reports.append(("🐋 تاثير الاسواق والمؤسسات (الفوري)", t8 or _build_template_8(data), None))
@@ -8785,18 +8789,25 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         # ── القوالب الجديدة — البوت الرابع @Boonnii_bot ──
         BOT4_TOTAL = 12  # عدد ثابت دائماً
         bot4_reports = []
-        bot4_reports.append(("🔬 [1] كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector(data), None))
-        bot4_reports.append(("🐋 [2] رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker(data), None))
-        bot4_reports.append(("🎯 [3] الأهداف السعرية الديناميكية", _build_dynamic_price_targets(data), None))
-        bot4_reports.append(("⚡ [4] رصد السيولة اللحظية المفاجئة", _build_live_liquidity_spike(data), None))
-        bot4_reports.append(("🧲 [5] خريطة ارتكاز السيولة المؤسساتية (Volume Profile)", _build_liquidity_concentration_zones(data), None))
-        bot4_reports.append(("🌍 [6] رادار عقود الخيارات العالمي", _build_global_options_radar(data), None))
-        bot4_reports.append(("🕵️ [7] مراقب محافظ الحيتان (Block Trades & Dark Pools)", _build_whale_wallet_monitor(data), None))
-        bot4_reports.append(("💥 [8] مراقب محافظ الحيتان والسيولة الهجومية (Momentum Block Trades)", _build_aggressive_whale_monitor(data), None))
-        bot4_reports.append(("🧮 [9] خزانة السيولة الكلية وتدفق العقود", _build_total_liquidity_flow_matrix(data), None))
-        bot4_reports.append(("⚖️ [10] ميزان قوى الحيتان مقابل القطيع", _build_smart_money_vs_retail(data), None))
-        bot4_reports.append(("🧠 [11] محرك القرار الخوارزمي النهائي", _build_ultimate_quant_score(data), None))
-        bot4_reports.append(("⏳ [12] مصفوفة التأثير الزمني الشامل", _build_timeframe_impact_matrix(data), None))
+        def safe_b4(title, func):
+            try:
+                return (title, func(data), None)
+            except Exception as e:
+                log.warning(f"[Bot4] خطأ في قالب {title}: {e}")
+                return (title, f"⚠️ خطأ أثناء إعداد القالب: {e}", None)
+
+        bot4_reports.append(safe_b4("🔬 [1] كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector))
+        bot4_reports.append(safe_b4("🐋 [2] رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker))
+        bot4_reports.append(safe_b4("🎯 [3] الأهداف السعرية الديناميكية", _build_dynamic_price_targets))
+        bot4_reports.append(safe_b4("⚡ [4] رصد السيولة اللحظية المفاجئة", _build_live_liquidity_spike))
+        bot4_reports.append(safe_b4("🧲 [5] خريطة ارتكاز السيولة المؤسساتية (Volume Profile)", _build_liquidity_concentration_zones))
+        bot4_reports.append(safe_b4("🌍 [6] رادار عقود الخيارات العالمي", _build_global_options_radar))
+        bot4_reports.append(safe_b4("🕵️ [7] مراقب محافظ الحيتان (Block Trades & Dark Pools)", _build_whale_wallet_monitor))
+        bot4_reports.append(safe_b4("💥 [8] مراقب محافظ الحيتان والسيولة الهجومية (Momentum Block Trades)", _build_aggressive_whale_monitor))
+        bot4_reports.append(safe_b4("🧮 [9] خزانة السيولة الكلية وتدفق العقود", _build_total_liquidity_flow_matrix))
+        bot4_reports.append(safe_b4("⚖️ [10] ميزان قوى الحيتان مقابل القطيع", _build_smart_money_vs_retail))
+        bot4_reports.append(safe_b4("🧠 [11] محرك القرار الخوارزمي النهائي", _build_ultimate_quant_score))
+        bot4_reports.append(safe_b4("⏳ [12] مصفوفة التأثير الزمني الشامل", _build_timeframe_impact_matrix))
 
         flat_chunks_4 = []
         for tmpl_idx4, (title4, txt4, cid4) in enumerate(bot4_reports, 1):

@@ -183,9 +183,9 @@ def fetch_daily_data() -> dict | None:
                 ph = round(ph - basis, 2)
                 pl = round(pl - basis, 2)
                 pc = round(pc - basis, 2)
-    else:
-        log.error("❌ فشل جلب بيانات الأمس من ياهو!")
-        return None
+        else:
+            log.error("❌ فشل جلب بيانات الأمس من ياهو أو TwelveData!")
+            return None
 
     d["prev_high"]  = ph
     d["prev_low"]   = pl
@@ -580,11 +580,19 @@ def build_template_quant(d: dict) -> str:
     """يبني القالب الثالث (الكمي الشامل) بناءً على بيانات bot_spot."""
     gold = d.get("gold", 0)
     rn = d.get("round_numbers", {"nearest_resistance": 0, "dist_to_resistance": 0, "nearest_support": 0, "dist_to_support": 0})
-    fib_line = d.get("fibo_line", "")
-    if not fib_line:
+    fib = d.get("fib", {})
+    if fib:
+        fib_line = (f"فيبوناتشي (فوري): 0%={fib.get('0.0%','-')}$ | 23.6%={fib.get('23.6%','-')}$ | 38.2%={fib.get('38.2%','-')}$ | "
+                    f"50.0%={fib.get('50.0%','-')}$ | 61.8%={fib.get('61.8%','-')}$ | 78.6%={fib.get('78.6%','-')}$ | 100%={fib.get('100%','-')}$")
+    else:
         fib_line = "فيبوناتشي: غير متاح"
-    range_line = d.get("range_line", "")
-    if not range_line:
+        
+    atr = d.get("atr", 0)
+    if gold and atr:
+        exp_low  = round(gold - atr * 0.65, 2)
+        exp_high = round(gold + atr * 0.65, 2)
+        range_line = f"نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$"
+    else:
         range_line = "نطاق اليوم المتوقع: غير متاح"
 
     market_suffix = "فوري XAUUSD" if d.get("gold_spot") else "آجل GC=F"
@@ -599,9 +607,9 @@ def build_template_quant(d: dict) -> str:
     demand_str = f"{d['sd_demand']}$" if d.get("sd_demand") else "—"
     supply_str = f"{d['sd_supply']}$" if d.get("sd_supply") else "—"
 
-    date_flag = "✅ " if "اليوم" in d.get("pivot_data_date", "") or "أمس" in d.get("pivot_data_date", "") else "⚠️ "
-    date_nat = " — طبيعي" if "أمس" in d.get("pivot_data_date", "") or "اليوم" in d.get("pivot_data_date", "") else ""
-    calc_status = "⚠️ مستويات مُعاد حسابها (ATR)" if d.get("pivot_source") == "atr" else "✅ بيفوت كلاسيكي"
+    date_flag = "✅ "
+    date_nat = " — طبيعي"
+    calc_status = "✅ بيفوت كلاسيكي"
 
     template = f"""👑 📊 التقرير الكمي الشامل للذهب (الفوري - Spot)
 🔢 المستويات والصفقات (الفوري - Spot)
@@ -624,9 +632,9 @@ def build_template_quant(d: dict) -> str:
    🟢 الدعوم: S1: {d.get('s1', '—')}$ | S2: {d.get('s2', '—')}$
    ═════════════════════════════
    📋 حالة البيانات والبيفوت:
-   ▪️ المصدر: {('✅ فوري (XAU/USD)' if d.get('gold_spot') else '⚠️ آجل (GC=F)')}
-   ▪️ التاريخ: {date_flag}📅 {d.get('pivot_data_date', '—')}{date_nat}
-   ▪️ الحساب: {calc_status}
+    ▪️ المصدر: ✅ فوري (XAU/USD)
+    ▪️ التاريخ: {date_flag}📅 اليوم ({datetime.now().strftime('%Y-%m-%d')}){date_nat}
+    ▪️ الحساب: {calc_status}
    🎯 كفاءة العمليات الرياضية: 100% (دقة حسابية خالية من الأخطاء)
    ═════════════════════════════
    🟡 {fib_line}

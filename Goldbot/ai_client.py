@@ -136,6 +136,24 @@ class UniversalAIClient:
                         )
                 raise
 
+
+# Global cache for rate-limited models
+_RATE_LIMITED_MODELS = {}
+
+def is_model_rate_limited(model: str) -> bool:
+    import time
+    if model in _RATE_LIMITED_MODELS:
+        # If the penalty time (e.g. 5 minutes) hasn't passed, skip it
+        if time.time() < _RATE_LIMITED_MODELS[model]:
+            return True
+        else:
+            del _RATE_LIMITED_MODELS[model]
+    return False
+
+def mark_model_rate_limited(model: str, penalty_seconds: int = 300):
+    import time
+    _RATE_LIMITED_MODELS[model] = time.time() + penalty_seconds
+
 def generate_robust_ai_response(system_prompt: str, user_prompt: str, max_tokens: int = 1500, temperature: float = 0.1) -> str:
     """
     Robust generator that attempts all available API keys (Groq and OpenAI) until success.
@@ -171,6 +189,10 @@ def generate_robust_ai_response(system_prompt: str, user_prompt: str, max_tokens
             else:
                 # Iterate models for Groq keys to handle 429 inside the same key
                 for model in groq_models:
+                    if is_model_rate_limited(model):
+                        log.warning(f"⏭️ [AI] تخطي النموذج {model} بسبب حظر مؤقت (Rate Limit).")
+                        continue
+                        
                     try:
                         resp = client.chat.completions.create(
                             messages=[
@@ -187,7 +209,9 @@ def generate_robust_ai_response(system_prompt: str, user_prompt: str, max_tokens
                     except Exception as e:
                         err_str = str(e).lower()
                         if "429" in err_str or "too many" in err_str:
-                            time.sleep(2)
+                            log.warning(f"⚠️ [AI] النموذج {model} تعرض لـ 429. سيتم حظره مؤقتاً لـ 5 دقائق.")
+                            mark_model_rate_limited(model, 300)
+                            time.sleep(1)
                             continue # Try next model
                         # Auth or other error, break model loop to try next key
                         log.warning(f"⚠️ [AI Robust] Key {key[:10]}... model {model} failed: {e}. Trying next key...")

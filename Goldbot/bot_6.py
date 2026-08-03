@@ -12,7 +12,7 @@ try:
         generate_asian_session_liquidity_report, generate_european_session_liquidity_report,
         generate_american_session_liquidity_report, generate_scalping_setup_report,
         generate_fed_scenarios_report, generate_touch_and_go_report, generate_best_zero_drawdown_trade_report,
-        generate_best_high_lot_trade_report, generate_fomc_gold_map_report, generate_best_overall_trade_report
+        generate_best_high_lot_trade_report, generate_fomc_gold_map_report, generate_best_overall_trade_report, generate_daily_best_direction_report
     )
 except ImportError:
     from bot_spot import get_full_market_data, cairo_now
@@ -23,7 +23,7 @@ except ImportError:
         generate_asian_session_liquidity_report, generate_european_session_liquidity_report,
         generate_american_session_liquidity_report, generate_scalping_setup_report,
         generate_fed_scenarios_report, generate_touch_and_go_report, generate_best_zero_drawdown_trade_report,
-        generate_best_high_lot_trade_report, generate_fomc_gold_map_report, generate_best_overall_trade_report
+        generate_best_high_lot_trade_report, generate_fomc_gold_map_report, generate_best_overall_trade_report, generate_daily_best_direction_report
     )
 
 log = logging.getLogger(__name__)
@@ -201,6 +201,12 @@ def process_and_send_bot6(data: dict, last_cot_report_date: str) -> tuple[str, l
             best_overall = generate_best_overall_trade_report(data)
             if best_overall:
                 reports_to_send.append(("أفضل صفقة اليوم بشكل عام 👑", best_overall))
+                
+
+            # توليد تقرير أفضل اتجاه لليوم (القالب التاسع عشر)
+            best_direction = generate_daily_best_direction_report(data)
+            if best_direction:
+                reports_to_send.append(("أفضل اتجاه للذهب خلال اليوم 🧭", best_direction))
                 
             # توليد خريطة الفيدرالي (القالب السابع عشر)
             fomc_map = generate_fomc_gold_map_report(data)

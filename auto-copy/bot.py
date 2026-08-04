@@ -76,8 +76,19 @@ async def handle_new_message(event: events.NewMessage.Event):
         source = getattr(event.chat, 'username', str(event.chat_id))
         log.info(f'رسالة جديدة من @{source} | msg_id={msg_id}')
 
-        # إرسال الرسالة كأنها جديدة تماماً بدون أي أثر للمصدر
-        await client.send_message(DEST_CHANNEL, msg)
+        # استخراج النص والميديا لمنع الحظر في حالة القنوات المحمية (بدلاً من إعادة التوجيه)
+        text = msg.text or ''
+        if msg.media:
+            if len(text) <= 1024:
+                await client.send_file(DEST_CHANNEL, msg.media, caption=text)
+            else:
+                await client.send_file(DEST_CHANNEL, msg.media)
+                await client.send_message(DEST_CHANNEL, text)
+        else:
+            if text:
+                await client.send_message(DEST_CHANNEL, text)
+            else:
+                log.warning("⚠️ رسالة فارغة (بدون نص أو ميديا).")
 
         log.info(f'تم النسخ إلى {DEST_CHANNEL} بنجاح.')
 

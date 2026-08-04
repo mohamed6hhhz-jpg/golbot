@@ -107,12 +107,12 @@ class UniversalAIClient:
         def __init__(self, parent):
             self.parent = parent
         def create(self, messages, model=None, temperature=0.1, max_tokens=700, **kwargs):
-            if self.parent.is_openai:
-                model = "gpt-4o-mini"
+            orig_model = model
+            current_model = "gpt-4o-mini" if self.parent.is_openai else model
             try:
                 return self.parent._client.chat.completions.create(
                     messages=messages,
-                    model=model,
+                    model=current_model,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     **kwargs
@@ -125,11 +125,10 @@ class UniversalAIClient:
                     if all_keys:
                         new_key = random.choice(all_keys)
                         self.parent.__init__(api_key=new_key)
-                        if self.parent.is_openai:
-                            model = "gpt-4o-mini"
+                        fallback_model = "gpt-4o-mini" if self.parent.is_openai else orig_model
                         return self.parent._client.chat.completions.create(
                             messages=messages,
-                            model=model,
+                            model=fallback_model,
                             temperature=temperature,
                             max_tokens=max_tokens,
                             **kwargs

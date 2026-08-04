@@ -160,6 +160,10 @@ def generate_robust_ai_response(system_prompt: str, user_prompt: str, max_tokens
     Prevents crashing and gracefully falls back to OpenAI if Groq hits 429/401 limit.
     """
     import time
+    
+    strict_math_rule = "\n\n🚨 قاعدة حسابية صارمة جداً 🚨: في أي قالب يطلب منك وضع نسبة مئوية لاحتمالات متعاكسة (مثل نسبة الصعود مقابل نسبة الهبوط)، يجب أن يكون مجموع النسبتين 100% بالضبط! لا يجوز أبداً أن يكون المجموع غير 100%. مثلاً: إذا قررت أن نسبة الصعود 70%، يجب أن تكون نسبة الهبوط 30%. ممنوع استخدام 50% أو 50/50 إلا نادراً جداً ومبررة. طبق هذا على جميع التحليلات دون استثناء."
+    system_prompt = system_prompt.rstrip() + strict_math_rule
+    
     all_keys = get_api_keys()
     if not all_keys:
         return "⚠️ لم يتم العثور على أي مفاتيح ذكاء اصطناعي للعمل."

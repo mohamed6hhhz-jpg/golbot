@@ -1750,48 +1750,34 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     r1    = round(2*pivot - pl, 2);  r2 = round(pivot + (ph-pl), 2); r3 = round(ph + 2*(pivot-pl), 2)
     s1    = round(2*pivot - ph, 2);  s2 = round(pivot - (ph-pl), 2); s3 = round(pl - 2*(ph-pivot), 2)
 
-    # Fix 2: فلتر منطق الدعم/المقاومة — يضمن دائماً: الدعم تحت السعر | المقاومة فوق السعر
-    # إذا كانت المستويات مقلوبة (بسبب تغيرات السوق الكبيرة) نعيد حسابها من ATR مباشرة
+    # Fix 2: فلتر منطق الدعم/المقاومة
+    # ── [ATR Pivot Calculation] (تُحسب منفصلة لاستخدامها في قالب التيست) ──
     _ref_price = float(gold_spot if gold_spot else (gold_futures if gold_futures else 0))
     _atr_safe  = float(atr if atr and atr > 0 else 50.0)
     
-    # فلتر الجودة (Quality Filter): تم التعديل بناءً على طلب العميل ليكون دائماً ATR لضمان الدقة والاستقرار
-    _is_out_of_bounds = True
-    _is_too_squished  = True
+    atr_pivot = round(_ref_price, 2)
+    atr_r1    = round(_ref_price + _atr_safe * 0.50, 2)
+    atr_r2    = round(_ref_price + _atr_safe * 1.00, 2)
+    atr_r3    = round(_ref_price + _atr_safe * 1.50, 2)
+    atr_s1    = round(_ref_price - _atr_safe * 0.50, 2)
+    atr_s2    = round(_ref_price - _atr_safe * 1.00, 2)
+    atr_s3    = round(_ref_price - _atr_safe * 1.50, 2)
 
-    if _ref_price > 0:
-        log.info(
-            f"⚠️ [Pivot Fix2] الاعتماد الدائم على ATR لضمان جودة المستويات "
-            f"(ATR={_atr_safe:.1f}$) — "
-            f"إعادة حساب تلقائية للحفاظ على الجودة العالية."
-        )
-        pivot = round(_ref_price, 2)
-        r1    = round(_ref_price + _atr_safe * 0.50, 2)
-        r2    = round(_ref_price + _atr_safe * 1.00, 2)
-        r3    = round(_ref_price + _atr_safe * 1.50, 2)
-        s1    = round(_ref_price - _atr_safe * 0.50, 2)
-        s2    = round(_ref_price - _atr_safe * 1.00, 2)
-        s3    = round(_ref_price - _atr_safe * 1.50, 2)
-        # metadata: ATR Fallback
-        _pivot_source    = "atr"
-        _pivot_conf      = 100
-        _pivot_data_date = f"اليوم ({cairo_now().strftime('%Y-%m-%d')}) — سعر حي"
-    else:
-        # metadata: Classic Pivot
-        try:
-            _data_d = gold_daily.index[-2].date()
-            _today_d = cairo_now().date()
-            _days_diff = (_today_d - _data_d).days
-            if _days_diff == 0:
-                _pivot_data_date = f"اليوم ({_data_d})"
-            elif _days_diff == 1:
-                _pivot_data_date = f"أمس ({_data_d})"
-            else:
-                _pivot_data_date = f"{_data_d} (قبل {_days_diff} أيام)"
-        except Exception:
-            _pivot_data_date = "أمس"
-        _pivot_source = "spot"
-        _pivot_conf   = 100
+    # metadata: Classic Pivot (البوت الرئيسي سيعتمد على هذا الأساس طوال اليوم كما طلب العميل)
+    try:
+        _data_d = gold_daily.index[-2].date()
+        _today_d = cairo_now().date()
+        _days_diff = (_today_d - _data_d).days
+        if _days_diff == 0:
+            _pivot_data_date = f"اليوم ({_data_d})"
+        elif _days_diff == 1:
+            _pivot_data_date = f"أمس ({_data_d})"
+        else:
+            _pivot_data_date = f"{_data_d} (قبل {_days_diff} أيام)"
+    except Exception:
+        _pivot_data_date = "أمس"
+    _pivot_source = "spot"
+    _pivot_conf   = 100
 
     # ── التسميات ──
     rsi_label   = "تشبع شراء 🔴" if rsi > 70 else ("تشبع بيع 🟢" if rsi < 30 else "محايد ⚪")
@@ -1847,6 +1833,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         atr=atr, atr_regime=atr_reg, variance=variance, fib=fib, divergence=divergence,
         swing_high=swing_high, swing_low=swing_low,
         pivot=pivot, r1=r1, r2=r2, r3=r3, s1=s1, s2=s2, s3=s3,
+        atr_pivot=atr_pivot, atr_r1=atr_r1, atr_r2=atr_r2, atr_r3=atr_r3, atr_s1=atr_s1, atr_s2=atr_s2, atr_s3=atr_s3,
         pivot_source=_pivot_source, pivot_conf=_pivot_conf, pivot_data_date=_pivot_data_date,
         round_numbers=round_numbers, hist_ctx=hist_ctx,
         real_yield_signal=real_yield_signal,
@@ -8686,6 +8673,35 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
     log.info("🤖 [Spot] بدء توليد التقارير (خارج القفل)...")
     raw_reports = []
+
+    # ── [إضافة جديدة: توليد قالب ATR الخاص بوت التيست وإرساله فوراً] ──
+    try:
+        d_atr = data.copy()
+        d_atr['pivot'] = d_atr.get('atr_pivot', data.get('pivot', 0))
+        d_atr['r1'] = d_atr.get('atr_r1', data.get('r1', 0))
+        d_atr['r2'] = d_atr.get('atr_r2', data.get('r2', 0))
+        d_atr['r3'] = d_atr.get('atr_r3', data.get('r3', 0))
+        d_atr['s1'] = d_atr.get('atr_s1', data.get('s1', 0))
+        d_atr['s2'] = d_atr.get('atr_s2', data.get('s2', 0))
+        d_atr['s3'] = d_atr.get('atr_s3', data.get('s3', 0))
+        d_atr['pivot_source'] = 'atr'
+        from Goldbot.bot_spot import cairo_now, calc_all_entries, _build_fixed_template
+        d_atr['pivot_data_date'] = f"اليوم ({cairo_now().strftime('%Y-%m-%d')}) — سعر حي"
+        d_atr['entries'] = calc_all_entries(d_atr, d_atr.get('confluence', {}).get('bias', 'neutral'))
+        atr_fixed_block, _ = _build_fixed_template(d_atr, "⚠️ مستويات مُعاد حسابها (ATR)")
+        
+        # إرسال قالب الـ ATR لبوت التيست مباشرة
+        import requests
+        from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT_DAILY_CHAT_ID
+        test_bot_token = TELEGRAM_TOKENS.get("bot_daily")
+        if test_bot_token and BOT_DAILY_CHAT_ID:
+            requests.post(
+                f"https://api.telegram.org/bot{test_bot_token}/sendMessage",
+                data={"chat_id": BOT_DAILY_CHAT_ID, "text": f"👑 📊 التقرير الكمي الشامل للذهب (الفوري - Spot) [نسخة التيست ATR]\n{atr_fixed_block}"}
+            )
+            log.info("✅ تم إرسال قالب ATR بنجاح إلى جروب التيست.")
+    except Exception as e:
+        log.error(f"❌ فشل توليد/إرسال قالب ATR للتيست: {e}")
 
     # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
     if report_text:

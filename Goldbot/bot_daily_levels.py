@@ -202,18 +202,27 @@ def fetch_daily_data() -> dict | None:
 #  2. حساب المستويات
 # ════════════════════════════════════════════════════════════════
 
-def calc_classical_pivots(h: float, l: float, c: float) -> dict:
+def calc_classical_pivots(h: float, l: float, c: float, ref_price: float = None, atr: float = None) -> dict:
     """
-    البيفوت الكلاسيكي — الأساسي في جميع منصات التداول الاحترافية.
-    المصدر: شمعة الأمس الكاملة (High / Low / Close).
+    البيفوت المبني على ATR (تم التبديل بناءً على طلب المستخدم ليحل محل الكلاسيكي).
     """
-    pivot = round((h + l + c) / 3, 2)
-    r1    = round(2 * pivot - l,       2)
-    r2    = round(pivot + (h - l),     2)
-    r3    = round(h + 2 * (pivot - l), 2)
-    s1    = round(2 * pivot - h,       2)
-    s2    = round(pivot - (h - l),     2)
-    s3    = round(l - 2 * (h - pivot), 2)
+    if ref_price is not None and atr is not None and atr > 0:
+        pivot = round(ref_price, 2)
+        r1    = round(ref_price + atr * 0.50, 2)
+        r2    = round(ref_price + atr * 1.00, 2)
+        r3    = round(ref_price + atr * 1.50, 2)
+        s1    = round(ref_price - atr * 0.50, 2)
+        s2    = round(ref_price - atr * 1.00, 2)
+        s3    = round(ref_price - atr * 1.50, 2)
+    else:
+        pivot = round((h + l + c) / 3, 2)
+        r1    = round(2 * pivot - l,       2)
+        r2    = round(pivot + (h - l),     2)
+        r3    = round(h + 2 * (pivot - l), 2)
+        s1    = round(2 * pivot - h,       2)
+        s2    = round(pivot - (h - l),     2)
+        s3    = round(l - 2 * (h - pivot), 2)
+
     return {
         "pivot": pivot,
         "r1": r1, "r2": r2, "r3": r3,
@@ -422,7 +431,7 @@ def build_template_classical(data: dict, cp: dict, trades: dict) -> str:
     sell_block = _fmt_trade_block(trades["sells"], "sell")
 
     return (
-        f"1/2 📐 المستويات الكلاسيكية الثابتة — ذهب XAU/USD\n"
+        f"1/2 📐 المستويات المبنية على متوسط التحرك (ATR) — ذهب XAU/USD\n"
         f"🕐 {data['send_time']} القاهرة\n"
         f"🔄 تتجدد يومياً عند افتتاح السوق (الساعة 1 صباحاً)\n"
         f"\n"
@@ -435,13 +444,12 @@ def build_template_classical(data: dict, cp: dict, trades: dict) -> str:
         f"  ← أدنى سعر وصله الذهب أمس\n"
         f"   🔒 الإغلاق (Close): {data['prev_close']}$"
         f"  ← آخر سعر عند نهاية جلسة أمس\n"
-        f"   📏 نطاق أمس       : {prev_rng}$"
-        f"  ← الفرق بين القمة والقاع (يقيس تقلب السوق)\n"
+        f"   📏 متوسط التحرك (ATR): {data.get('atr', prev_rng)}$"
+        f"  ← متوسط الحركة السعرية (يقيس تقلب السوق)\n"
         f"\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔢 خريطة المستويات الكلاسيكية\n"
-        f"   (هذه الأرقام ثابتة طوال اليوم ولا تتغير)\n"
-        f"\n"
+        f"🔢 خريطة المستويات المستندة لـ ATR\n"
+        f"   (المحسوبة من السعر الفوري والـ ATR)\n"
         f"   🔴 R3 = {cp['r3']}$  ← مقاومة قوية جداً (يصلها السعر نادراً)\n"
         f"   🟠 R2 = {cp['r2']}$  ← مقاومة ثانية (هدف صعود متقدم)\n"
         f"   🔺 R1 = {cp['r1']}$  ← مقاومة أولى (أول عائق أمام الصعود)\n"
@@ -704,10 +712,10 @@ def _run_once():
     c = data["prev_close"]
 
     # 2. حساب المستويات للكلاسيكي والكاماريلا
-    cp  = calc_classical_pivots(h, l, c)
-    cam = calc_camarilla_pivots(h, l, c)
-    ref = data["spot_price"] or cp["pivot"]
+    ref = data["spot_price"] or round((h + l + c) / 3, 2)
     atr = data["atr"]
+    cp  = calc_classical_pivots(h, l, c, ref_price=ref, atr=atr)
+    cam = calc_camarilla_pivots(h, l, c)
 
     log.info(f"📐 [Classical] Pivot={cp['pivot']} | R1={cp['r1']} | S1={cp['s1']}")
     log.info(f"🎯 [Camarilla] H3={cam['h3']} | L3={cam['l3']} | H4={cam['h4']} | L4={cam['l4']}")

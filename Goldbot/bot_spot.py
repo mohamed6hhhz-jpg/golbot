@@ -8674,34 +8674,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
     log.info("🤖 [Spot] بدء توليد التقارير (خارج القفل)...")
     raw_reports = []
 
-    # ── [إضافة جديدة: توليد قالب ATR الخاص بوت التيست وإرساله فوراً] ──
-    try:
-        d_atr = data.copy()
-        d_atr['pivot'] = d_atr.get('atr_pivot', data.get('pivot', 0))
-        d_atr['r1'] = d_atr.get('atr_r1', data.get('r1', 0))
-        d_atr['r2'] = d_atr.get('atr_r2', data.get('r2', 0))
-        d_atr['r3'] = d_atr.get('atr_r3', data.get('r3', 0))
-        d_atr['s1'] = d_atr.get('atr_s1', data.get('s1', 0))
-        d_atr['s2'] = d_atr.get('atr_s2', data.get('s2', 0))
-        d_atr['s3'] = d_atr.get('atr_s3', data.get('s3', 0))
-        d_atr['pivot_source'] = 'atr'
-        from Goldbot.bot_spot import cairo_now, calc_all_entries, _build_fixed_template
-        d_atr['pivot_data_date'] = f"اليوم ({cairo_now().strftime('%Y-%m-%d')}) — سعر حي"
-        d_atr['entries'] = calc_all_entries(d_atr, d_atr.get('confluence', {}).get('bias', 'neutral'))
-        atr_fixed_block, _ = _build_fixed_template(d_atr, "⚠️ مستويات مُعاد حسابها (ATR)")
-        
-        # إرسال قالب الـ ATR لبوت التيست مباشرة
-        import requests
-        from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT_DAILY_CHAT_ID
-        test_bot_token = TELEGRAM_TOKENS.get("bot_daily")
-        if test_bot_token and BOT_DAILY_CHAT_ID:
-            requests.post(
-                f"https://api.telegram.org/bot{test_bot_token}/sendMessage",
-                data={"chat_id": BOT_DAILY_CHAT_ID, "text": f"👑 📊 التقرير الكمي الشامل للذهب (الفوري - Spot) [نسخة التيست ATR]\n{atr_fixed_block}"}
-            )
-            log.info("✅ تم إرسال قالب ATR بنجاح إلى جروب التيست.")
-    except Exception as e:
-        log.error(f"❌ فشل توليد/إرسال قالب ATR للتيست: {e}")
+    # تم إزالة الكود الخاص بـ ATR هنا لنقله إلى bot_daily_levels.py
 
     # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
     if report_text:

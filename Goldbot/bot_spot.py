@@ -1855,7 +1855,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         # Prices
         gold=gold,
         gold_futures=gold_futures,
-        gold_spot=gold_spot,
+        gold_spot=gold_spot, spot_price=gold_spot or gold,
         daily_high=daily_high,
         daily_low=daily_low,
         futures_date=futures_date, spot_date=spot_date,

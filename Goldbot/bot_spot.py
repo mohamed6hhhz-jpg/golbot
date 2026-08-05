@@ -1320,10 +1320,10 @@ def _calc_price_forecasts(gold: float, atr: float, bias: str, tf_data: dict) -> 
 # ══════════════════════════════════════════════
 #  6. جلب كل بيانات السوق
 # ══════════════════════════════════════════════
-def get_full_market_data(mode: str = "futures") -> dict | None:
+def get_full_market_data(mode: str = "spot") -> dict | None:
     log.info(f"📡 جلب البيانات ({mode.upper()}) — متعدد الإطارات...")
 
-    ticker = "XAUUSD=X"  # Yahoo Finance dropped XAUUSD=X, so we use XAUUSD=X for historical OHLCV data for both modes
+    ticker = "GC=F"  # Use GC=F for historical OHLCV data (indicators) since XAUUSD=X is delisted from Yahoo
 
     # ── الذهب: الفوري والفوري وإطارات متعددة ──
     gold_daily  = _fetch(ticker,     period="90d", interval="1d");  time.sleep(0.7)

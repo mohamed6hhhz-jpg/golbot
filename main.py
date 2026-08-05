@@ -12,7 +12,6 @@ from python.main import app
 
 # Import V4 Bots
 from Goldbot.bot_spot import run_bot as run_spot
-from Goldbot.bot_futures import run_bot as run_futures
 from Goldbot.bot_6 import run_bot6
 from Goldbot.bot_daily_levels import run_daily_levels_bot
 

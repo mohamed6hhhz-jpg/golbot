@@ -139,19 +139,21 @@ class UniversalAIClient:
 # Global cache for rate-limited models
 _RATE_LIMITED_MODELS = {}
 
-def is_model_rate_limited(model: str) -> bool:
+def is_model_rate_limited(model: str, api_key: str = "") -> bool:
     import time
-    if model in _RATE_LIMITED_MODELS:
+    cache_key = f"{api_key}_{model}"
+    if cache_key in _RATE_LIMITED_MODELS:
         # If the penalty time (e.g. 5 minutes) hasn't passed, skip it
-        if time.time() < _RATE_LIMITED_MODELS[model]:
+        if time.time() < _RATE_LIMITED_MODELS[cache_key]:
             return True
         else:
-            del _RATE_LIMITED_MODELS[model]
+            del _RATE_LIMITED_MODELS[cache_key]
     return False
 
-def mark_model_rate_limited(model: str, penalty_seconds: int = 300):
+def mark_model_rate_limited(model: str, penalty_seconds: int = 300, api_key: str = ""):
     import time
-    _RATE_LIMITED_MODELS[model] = time.time() + penalty_seconds
+    cache_key = f"{api_key}_{model}"
+    _RATE_LIMITED_MODELS[cache_key] = time.time() + penalty_seconds
 
 def generate_robust_ai_response(system_prompt: str, user_prompt: str, max_tokens: int = 1500, temperature: float = 0.1) -> str:
     """
@@ -191,8 +193,8 @@ def generate_robust_ai_response(system_prompt: str, user_prompt: str, max_tokens
             else:
                 # Iterate models for Groq keys to handle 429 inside the same key
                 for model in groq_models:
-                    if is_model_rate_limited(model):
-                        log.warning(f"⏭️ [AI] تخطي النموذج {model} بسبب حظر مؤقت (Rate Limit).")
+                    if is_model_rate_limited(model, key):
+                        log.warning(f"⏭️ [AI] تخطي النموذج {model} للمفتاح {key[:10]} بسبب حظر مؤقت (Rate Limit).")
                         continue
                         
                     try:
@@ -211,8 +213,8 @@ def generate_robust_ai_response(system_prompt: str, user_prompt: str, max_tokens
                     except Exception as e:
                         err_str = str(e).lower()
                         if "429" in err_str or "too many" in err_str:
-                            log.warning(f"⚠️ [AI] النموذج {model} تعرض لـ 429. سيتم حظره مؤقتاً لـ 5 دقائق.")
-                            mark_model_rate_limited(model, 300)
+                            log.warning(f"⚠️ [AI] المفتاح {key[:10]} للنموذج {model} تعرض لـ 429. سيتم حظره لـ 5 دقائق.")
+                            mark_model_rate_limited(model, 300, key)
                             time.sleep(1)
                             continue # Try next model
                         # Auth or other error, break model loop to try next key

@@ -62,6 +62,7 @@ client = TelegramClient(
 # ══════════════════════════════════════════════════════════════
 # المعالج الأساسي — نسخ (Copy) وليس تحويل (Forward)
 # ══════════════════════════════════════════════════════════════
+from telethon.errors.rpcerrorlist import ChatForwardsRestrictedError
 
 @client.on(events.NewMessage(chats=SOURCE_CHANNELS))
 async def handle_new_message(event: events.NewMessage.Event):
@@ -79,11 +80,26 @@ async def handle_new_message(event: events.NewMessage.Event):
         # استخراج النص والميديا لمنع الحظر في حالة القنوات المحمية (بدلاً من إعادة التوجيه)
         text = msg.text or ''
         if msg.media:
-            if len(text) <= 1024:
-                await client.send_file(DEST_CHANNEL, msg.media, caption=text)
-            else:
-                await client.send_file(DEST_CHANNEL, msg.media)
-                await client.send_message(DEST_CHANNEL, text)
+            try:
+                if len(text) <= 1024:
+                    await client.send_file(DEST_CHANNEL, msg.media, caption=text)
+                else:
+                    await client.send_file(DEST_CHANNEL, msg.media)
+                    await client.send_message(DEST_CHANNEL, text)
+            except ChatForwardsRestrictedError:
+                log.warning("⚠️ محتوى محمي (Forwards Restricted). جاري تحميل الميديا ثم إرسالها...")
+                # Download media to a temp file, then upload
+                path = await client.download_media(msg)
+                if path:
+                    if len(text) <= 1024:
+                        await client.send_file(DEST_CHANNEL, path, caption=text)
+                    else:
+                        await client.send_file(DEST_CHANNEL, path)
+                        await client.send_message(DEST_CHANNEL, text)
+                    os.remove(path)
+                else:
+                    log.error("❌ فشل تحميل الميديا من القناة المحمية. سيتم إرسال النص فقط.")
+                    if text: await client.send_message(DEST_CHANNEL, text)
         else:
             if text:
                 await client.send_message(DEST_CHANNEL, text)

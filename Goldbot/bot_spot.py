@@ -923,6 +923,18 @@ def calc_divergence(df) -> str:
 
 
 def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
+    import math
+    def safe_int(val):
+        try:
+            return 0 if math.isnan(val) else int(val)
+        except (ValueError, TypeError):
+            return 0
+    def safe_round(val, decimals=0):
+        try:
+            return 0 if math.isnan(val) else round(val, decimals)
+        except (ValueError, TypeError):
+            return 0
+
     score   = 0
     reasons = []
     is_buy  = t.get('is_buy', t.get('dir', '') == 'buy')
@@ -967,7 +979,12 @@ def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
         if aligned >= 3: reasons.append(f'tawafuq_{aligned}4_itarat')
 
     # 3. RSI smart scoring (15 pts)
-    rsi = float(d['rsi'])
+    try:
+        rsi = float(d['rsi'])
+        if math.isnan(rsi): rsi = 50.0
+    except:
+        rsi = 50.0
+    
     if is_buy:
         if rsi < 30: score += 15; reasons.append('rsi_tashabuo_bay')
         elif rsi < 40: score += 11; reasons.append('rsi_mantiqat_shira')
@@ -980,17 +997,26 @@ def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
         elif rsi > 35: score += 3
 
     # 4. MACD histogram intensity (12 pts)
-    macd = float(d['macd_hist'])
+    try:
+        macd = float(d['macd_hist'])
+        if math.isnan(macd): macd = 0.0
+    except:
+        macd = 0.0
+
     if (is_buy and macd > 0) or (not is_buy and macd < 0):
-        intensity = min(12, int(abs(macd) * 0.8) + 6)
+        intensity = min(12, safe_int(abs(macd) * 0.8) + 6)
         score += intensity; reasons.append('macd_muayad')
     elif abs(macd) < 1.0:
         score += 4
 
     # 5. ADX trend strength (10 pts)
-    adx  = float(d['adx'])
-    di_p = float(d['di_plus'])
-    di_m = float(d['di_minus'])
+    try:
+        adx  = float(d['adx']); di_p = float(d['di_plus']); di_m = float(d['di_minus'])
+        if math.isnan(adx): adx = 0.0
+        if math.isnan(di_p): di_p = 0.0
+        if math.isnan(di_m): di_m = 0.0
+    except:
+        adx = 0.0; di_p = 0.0; di_m = 0.0
     if adx > 30:
         if (is_buy and di_p > di_m) or (not is_buy and di_m > di_p):
             score += 10; reasons.append(f'adx_trend_qawi_{adx:.0f}')
@@ -1001,14 +1027,14 @@ def calc_trade_confidence(d: dict, t: dict) -> tuple[int, str, str]:
 
     # 6. Proximity to S/R level (10 pts)
     s1, r1 = d['s1'], d['r1']
-    dist_range = max(abs(r1 - s1), 1)
+    dist_range = max(abs(r1 - s1) if not math.isnan(r1) and not math.isnan(s1) else 10.0, 1.0)
     if is_buy:
-        prox = 1 - min(1, abs(entry - s1) / (dist_range * 0.5))
-        score += round(prox * 10)
+        prox = 1 - min(1, abs(entry - s1) / (dist_range * 0.5)) if not math.isnan(entry) and not math.isnan(s1) else 0
+        score += safe_round(prox * 10)
         if abs(entry - s1) < dist_range * 0.15: reasons.append('qarib_min_daom')
     else:
-        prox = 1 - min(1, abs(r1 - entry) / (dist_range * 0.5))
-        score += round(prox * 10)
+        prox = 1 - min(1, abs(r1 - entry) / (dist_range * 0.5)) if not math.isnan(entry) and not math.isnan(r1) else 0
+        score += safe_round(prox * 10)
         if abs(r1 - entry) < dist_range * 0.15: reasons.append('qarib_min_muqawama')
 
     # 7. Risk/Reward (8 pts)
@@ -2113,8 +2139,15 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
             return f"\n   ❌ لا توجد صفقات {dir_label} مطابقة حالياً حتى بنسبة ضعيفة.\n"
         return "\n".join(lines)
 
-    buy_block  = fmt_block(ent['buys'], "شراء")
-    sell_block = fmt_block(ent['sells'], "بيع")
+    try:
+        buy_block  = fmt_block(ent.get('buys', []), "شراء")
+    except Exception as e:
+        buy_block  = f"   ❌ خطأ في تنسيق المشتريات: {e}"
+        
+    try:
+        sell_block = fmt_block(ent.get('sells', []), "بيع")
+    except Exception as e:
+        sell_block = f"   ❌ خطأ في تنسيق المبيعات: {e}"
 
     # مستويات فيبوناتشي الرئيسية
     fib = d['fib']
@@ -2125,9 +2158,16 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     exp_high = round(gold + d['atr'] * 0.65, 2)
     range_line = f"نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$"
 
-    current_vol = int(d.get('last_vol', 0))
+    try:
+        current_vol = int(float(d.get('last_vol', 0)))
+    except (ValueError, TypeError):
+        current_vol = 0
+        
     if current_vol == 0:
-        current_vol = int(d.get('atr', 20) * float(d.get('rel_vol', 1.0) or 1.0) * 1000)
+        try:
+            current_vol = int(float(d.get('atr', 20)) * float(d.get('rel_vol', 1.0) or 1.0) * 1000)
+        except (ValueError, TypeError):
+            current_vol = 20000
     rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
     if rel_vol > 4.0: rel_vol = 1.5 + (rel_vol % 2.0)
     if rel_vol < 0.2: rel_vol = 0.5

@@ -8771,9 +8771,9 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
     # ── [توليد قوالب التيست اليومية وإرسالها فوراً لجروب التيست] ──
     try:
         from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT_DAILY_CHAT_ID
-        from Goldbot.bot_daily_levels import calc_classical_pivots, calc_camarilla_pivots, _trades_from_levels, build_template_classical, build_template_camarilla, build_template_quant, get_full_market_data
+        from Goldbot.bot_daily_levels import calc_classical_pivots, calc_camarilla_pivots, _trades_from_levels, build_template_classical, build_template_camarilla, build_template_quant, fetch_daily_data
         
-        test_data = get_full_market_data()
+        test_data = fetch_daily_data()
         if not test_data:
             log.error("❌ فشل جلب بيانات الأمس للتيست داخل السبوت.")
         else:

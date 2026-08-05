@@ -171,7 +171,18 @@ def fetch_daily_data() -> dict | None:
         log.warning("🔄 جاري الرجوع لـ yfinance (GC=F) كحل بديل...")
         df = _fetch("GC=F", period="5d", interval="1d")
         if df is not None and len(df) >= 2:
-            yest = df.iloc[-2]
+            from datetime import datetime
+            import pytz
+            CAIRO_TZ_LOCAL = pytz.timezone('Africa/Cairo')
+            last_date = df.index[-1].date()
+            today_date = datetime.now(CAIRO_TZ_LOCAL).date()
+            
+            # الفلتر الذكي: لو شمعة اليوم لسه مفتوحتش أو احنا في إجازة، هناخد الشمعة الأخيرة كأمس
+            if last_date == today_date:
+                yest = df.iloc[-2]
+            else:
+                yest = df.iloc[-1]
+                
             ph = round(float(yest["High"]), 2)
             pl = round(float(yest["Low"]), 2)
             pc = round(float(yest["Close"]), 2)

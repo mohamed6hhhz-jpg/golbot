@@ -12,7 +12,7 @@ try:
         generate_asian_session_liquidity_report, generate_european_session_liquidity_report,
         generate_american_session_liquidity_report, generate_scalping_setup_report,
         generate_fed_scenarios_report, generate_touch_and_go_report, generate_best_zero_drawdown_trade_report,
-        generate_best_high_lot_trade_report, generate_fomc_gold_map_report, generate_best_overall_trade_report, generate_daily_best_direction_report, generate_strongest_top_and_bottom_report, generate_best_top_and_bottom_report, generate_first_target_expected_report, generate_best_closing_point_report, generate_best_scalping_trade_report, generate_best_swing_trade_report, generate_next_15m_movement_report
+        generate_best_high_lot_trade_report, generate_fomc_gold_map_report, generate_best_overall_trade_report, generate_daily_best_direction_report, generate_strongest_top_and_bottom_report, generate_best_top_and_bottom_report, generate_first_target_expected_report, generate_best_closing_point_report, generate_best_scalping_trade_report, generate_best_swing_trade_report, generate_next_15m_movement_report, generate_liquidity_target_timing_report
     )
 except ImportError:
     from bot_spot import get_full_market_data, cairo_now
@@ -23,7 +23,7 @@ except ImportError:
         generate_asian_session_liquidity_report, generate_european_session_liquidity_report,
         generate_american_session_liquidity_report, generate_scalping_setup_report,
         generate_fed_scenarios_report, generate_touch_and_go_report, generate_best_zero_drawdown_trade_report,
-        generate_best_high_lot_trade_report, generate_fomc_gold_map_report, generate_best_overall_trade_report, generate_daily_best_direction_report, generate_strongest_top_and_bottom_report, generate_best_top_and_bottom_report, generate_first_target_expected_report, generate_best_closing_point_report, generate_best_scalping_trade_report, generate_best_swing_trade_report, generate_next_15m_movement_report
+        generate_best_high_lot_trade_report, generate_fomc_gold_map_report, generate_best_overall_trade_report, generate_daily_best_direction_report, generate_strongest_top_and_bottom_report, generate_best_top_and_bottom_report, generate_first_target_expected_report, generate_best_closing_point_report, generate_best_scalping_trade_report, generate_best_swing_trade_report, generate_next_15m_movement_report, generate_liquidity_target_timing_report
     )
 
 log = logging.getLogger(__name__)
@@ -254,7 +254,13 @@ def process_and_send_bot6(data: dict, last_cot_report_date: str) -> tuple[str, l
             if fomc_map:
                 reports_to_send.append(("خريطة الذهب ليلة الفيدرالي 🗺️", fomc_map))
         
+            # توليد الوجهة القادمة للسيولة (القالب السابع والعشرون)
+            liq_timing = generate_liquidity_target_timing_report(data)
+            if liq_timing:
+                reports_to_send.append(("الوجهة القادمة للسيولة والزمن المتوقع 🎯⏳", liq_timing))
+        
         total_reports = len(reports_to_send)
+
         for index, (title, content) in enumerate(reports_to_send, 1):
             formatted_message = f"{index}/{total_reports} 📌 {title}\n\n{content}"
             log.info(f"✅ [Bot 6] جاري إرسال القالب {index}/{total_reports}: {title}")

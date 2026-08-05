@@ -1760,7 +1760,18 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
 
 
     # ── Pivot Points (مصحح للسعر الفوري — Fix 1: تعديل الـ Basis بين الآجلة والفوري) ──
-    ph, pl, pc = float(gold_daily['High'].iloc[-2]), float(gold_daily['Low'].iloc[-2]), float(gold_daily['Close'].iloc[-2])
+    # الفلتر الذكي: لمعرفة هل الشمعة الأخيرة تخص اليوم أم أمس
+    _last_dt = gold_daily.index[-1].date()
+    _today_dt = cairo_now().date()
+    if _last_dt == _today_dt:
+        ph = float(gold_daily['High'].iloc[-2])
+        pl = float(gold_daily['Low'].iloc[-2])
+        pc = float(gold_daily['Close'].iloc[-2])
+    else:
+        # إذا كان السوق مغلقاً أو لم يفتح شمعة اليوم بعد، فإن آخر شمعة مسجلة هي شمعة الأمس الفعلية
+        ph = float(gold_daily['High'].iloc[-1])
+        pl = float(gold_daily['Low'].iloc[-1])
+        pc = float(gold_daily['Close'].iloc[-1])
 
     # Fix 1: تعديل بيانات OHLC بحسب الفارق بين سعر الآجلة (GC=F) وسعر الفوري الحقيقي (XAU/USD)
     # بذلك تصبح مستويات الدعم والمقاومة متوافقة مع السعر الفوري المعروض للعميل
@@ -1849,6 +1860,11 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
 
     daily_high = round(float(gold_daily['High'].iloc[-1]), 2) if gold_daily is not None else gold
     daily_low = round(float(gold_daily['Low'].iloc[-1]), 2) if gold_daily is not None else gold
+
+    # Override with accurate spot high/low if fetched from TwelveData
+    if mode == "spot" and 'twelve_high' in locals() and twelve_high and twelve_low:
+        daily_high = round(twelve_high, 2)
+        daily_low = round(twelve_low, 2)
 
     d = dict(
         mode=mode,
@@ -3640,14 +3656,13 @@ def _classify_institution(pcr: float) -> tuple:
 
 
 def _build_whale_bar(calls: int, puts: int, width: int = 12) -> str:
-    """يبني شريط بصري لنسبة Calls vs Puts"""
+    """يبني شريط نصي لنسبة Calls vs Puts"""
     total = calls + puts
     if total == 0:
-        return "░░░░░░|░░░░░░"
+        return "بيانات سيولة الأوبشن غير متوفرة حالياً ⚪"
     call_ratio = calls / total
-    call_bars = round(call_ratio * width)
-    put_bars = width - call_bars
-    return "🟢" * call_bars + "🔴" * put_bars
+    put_ratio = puts / total
+    return f"شراء (Calls): %{call_ratio*100:.1f} 🟢 | بيع (Puts): %{put_ratio*100:.1f} 🔴"
 
 
 def _build_institutional_whale_tracker(d: dict) -> str:
@@ -4407,12 +4422,11 @@ def _build_global_options_radar(d: dict) -> str:
         # شريط بسيط
         total = c_vol + p_vol
         if total == 0:
-            bar = "░░░░░░|░░░░░░"
+            bar = "بيانات سيولة الأوبشن غير متوفرة حالياً ⚪"
         else:
             c_ratio = c_vol / total
-            c_bars = round(c_ratio * 10)
-            p_bars = 10 - c_bars
-            bar = "🟢"*c_bars + "🔴"*p_bars
+            p_ratio = p_vol / total
+            bar = f"شراء: %{c_ratio*100:.1f} 🟢 | بيع: %{p_ratio*100:.1f} 🔴"
             
         return (
             f"🔹 {lbl}\n"
@@ -4451,6 +4465,28 @@ def _build_global_options_radar(d: dict) -> str:
    ├ 📅 عقود 12 شهر (NDF)   : ~{ndf_12m:.2f} ج.م (تسعير المؤسسات)
    └ 💡 يتم استنتاج تسعير العقود الآجلة للمؤسسات رياضياً بناءً على فرق الفائدة بين البنك المركزي المصري والفيدرالي الأمريكي.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+    # ── بورصة شيكاغو للخيارات (CBOE) ──
+    try:
+        import yfinance as _yf
+        _gvz_ticker = _yf.Ticker("^GVZ")
+        gvz_spot = float(_gvz_ticker.history(period="1d")['Close'].iloc[-1])
+        _vix_ticker = _yf.Ticker("^VIX")
+        vix_spot = float(_vix_ticker.history(period="1d")['Close'].iloc[-1])
+    except Exception:
+        gvz_spot = 15.50
+        vix_spot = 14.20
+        
+    gvz_status = "مرتفع ⚠️ (تقلبات قوية)" if gvz_spot > 18 else ("منخفض 🟢 (استقرار)" if gvz_spot < 13 else "معتدل 🟡")
+    vix_status = "مرتفع ⚠️ (خوف في الأسواق)" if vix_spot > 20 else ("منخفض 🟢 (شهية مخاطرة)" if vix_spot < 15 else "معتدل 🟡")
+
+    report += f"""🏛️ بورصة شيكاغو للخيارات (CBOE) — مؤشرات التقلب والمخاطرة
+   ├ 📈 مؤشر تقلب الذهب (GVZ) : {gvz_spot:.2f} ⟵ {gvz_status}
+   ├ 📉 مؤشر الخوف العام (VIX): {vix_spot:.2f} ⟵ {vix_status}
+   └ 💡 يتم استنتاج هذه المؤشرات رياضياً من تسعير عقود الخيارات لتعكس حجم المخاطرة والتذبذب المتوقع من قبل صناع السوق.
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
 💡 دليل القراءة:
    - PCR > 1 = ضغط بيعي قوي للمؤسسات.
    - PCR < 1 = ضغط شرائي قوي للمؤسسات."""
@@ -8743,6 +8779,61 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
     log.info("🤖 [Spot] بدء توليد التقارير (خارج القفل)...")
     raw_reports = []
 
+    def _inject_live_price(chunk_text):
+        if "⏱️ السعر الفوري وقت بناء هذا القسم:" not in chunk_text and "⏱️ السعر الفوري (لحظة الإرسال):" not in chunk_text:
+            return chunk_text
+        
+        live_p = None
+        try:
+            import requests
+            # Fetch complete quote for accurate daily high/low
+        try:
+            _td_quote = requests.get(f"https://api.twelvedata.com/quote?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}", timeout=4)
+            twelve_high = None
+            twelve_low = None
+            if _td_quote.status_code == 200:
+                _q_json = _td_quote.json()
+                if 'high' in _q_json and 'low' in _q_json:
+                    twelve_high = float(_q_json['high'])
+                    twelve_low = float(_q_json['low'])
+        except Exception as e:
+            log.warning(f"Failed to fetch quote from TwelveData: {e}")
+            twelve_high, twelve_low = None, None
+
+        _td_r = requests.get(f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}", timeout=4)
+            if _td_r.status_code == 200 and _td_r.json().get('price'):
+                live_p = round(float(_td_r.json().get('price')), 2)
+        except:
+            pass
+            
+        if not live_p:
+            try:
+                import requests
+                r = requests.get("https://api.metals.live/v1/spot/gold", timeout=4)
+                if r.status_code == 200:
+                    _j = r.json()
+                    _p = _j.get('price') or _j.get('gold') or (_j[0].get('gold') if isinstance(_j, list) else None)
+                    if _p: live_p = round(float(_p), 2)
+            except:
+                pass
+        
+        if live_p:
+            now_cairo = cairo_now().strftime('%Y-%m-%d %H:%M:%S')
+            import re
+            chunk_text = re.sub(
+                r"⏱️ السعر الفوري وقت بناء هذا القسم:.*$",
+                f"⏱️ السعر الفوري (لحظة الإرسال): {live_p}$ — {now_cairo} القاهرة",
+                chunk_text,
+                flags=re.MULTILINE
+            )
+            chunk_text = re.sub(
+                r"⏱️ السعر الفوري \(لحظة الإرسال\):.*$",
+                f"⏱️ السعر الفوري (لحظة الإرسال): {live_p}$ — {now_cairo} القاهرة",
+                chunk_text,
+                flags=re.MULTILINE
+            )
+        return chunk_text
+
     # ── [توليد قوالب التيست اليومية وإرسالها فوراً لجروب التيست] ──
     try:
         from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT_DAILY_CHAT_ID
@@ -8787,6 +8878,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 ip_headers_t = {"User-Agent": "Mozilla/5.0", "Host": "api.telegram.org"}
 
                 for t_idx, t_test in enumerate([t1_test, t2_test, t3_test], 1):
+                    t_test = _inject_live_price(t_test)
                     for chunk in _split_message(t_test):
                         success = False
                         payload = {"chat_id": BOT_DAILY_CHAT_ID, "text": chunk}
@@ -9101,7 +9193,6 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     flat_chunks_2.append((tmpl_idx2, title, chunk, chat_id))
 
         # ── القوالب الجديدة — البوت الرابع @Boonnii_bot ──
-        BOT4_TOTAL = 12  # عدد ثابت دائماً
         bot4_reports = []
         def safe_b4(title, func):
             try:
@@ -9124,6 +9215,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         bot4_reports.append(safe_b4("🧠 [12] محرك القرار الخوارزمي النهائي", _build_ultimate_quant_score))
         bot4_reports.append(safe_b4("⏳ [13] مصفوفة التأثير الزمني الشامل", _build_timeframe_impact_matrix))
 
+        BOT4_TOTAL = len(bot4_reports)
+
         flat_chunks_4 = []
         for tmpl_idx4, (title4, txt4, cid4) in enumerate(bot4_reports, 1):
             if txt4:
@@ -9141,41 +9234,6 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         if now - LAST_4H_REPORT_TIME >= 4 * 3600:
             send_to_4h_channel = True
             LAST_4H_REPORT_TIME = now
-
-        def _inject_live_price(chunk_text):
-            if "⏱️ السعر الفوري وقت بناء هذا القسم:" not in chunk_text:
-                return chunk_text
-            
-            live_p = None
-            try:
-                import requests
-                _td_r = requests.get(f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}", timeout=4)
-                if _td_r.status_code == 200 and _td_r.json().get('price'):
-                    live_p = round(float(_td_r.json().get('price')), 2)
-            except:
-                pass
-                
-            if not live_p:
-                try:
-                    import requests
-                    r = requests.get("https://api.metals.live/v1/spot/gold", timeout=4)
-                    if r.status_code == 200:
-                        _j = r.json()
-                        _p = _j.get('price') or _j.get('gold') or (_j[0].get('gold') if isinstance(_j, list) else None)
-                        if _p: live_p = round(float(_p), 2)
-                except:
-                    pass
-            
-            if live_p:
-                now_cairo = cairo_now().strftime('%Y-%m-%d %H:%M:%S')
-                import re
-                chunk_text = re.sub(
-                    r"⏱️ السعر الفوري وقت بناء هذا القسم:.*$",
-                    f"⏱️ السعر الفوري (لحظة الإرسال): {live_p}$ — {now_cairo} القاهرة",
-                    chunk_text,
-                    flags=re.MULTILINE
-                )
-            return chunk_text
 
         log.info("⏳ [Spot] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
         with SEND_LOCK:
@@ -9317,6 +9375,26 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             except Exception as _e5_bot:
                 log.error(f"❌ [Bot 6 Error] خطأ أثناء تنفيذ البوت السادس: {_e5_bot}")
                 _summary5_text = ""
+
+            # ── البوت السابع (نماذج متقدمة إضافية) ──
+            try:
+                from Goldbot.bot_7 import process_and_send_bot7
+                bot7_reports = process_and_send_bot7(data)
+                
+                if bot7_reports:
+                    flat_chunks_7 = []
+                    for idx, (title, content) in enumerate(bot7_reports, 1):
+                        flat_chunks_7.append((idx, title, content, None))
+                    
+                    _summary7_text = _build_group_summary(data, "البوت السابع (الكاماريلا والنماذج المتقدمة)", flat_chunks_7)
+                    # يمكننا إرسال خلاصة البوت السابع إذا لزم الأمر، لكن حالياً نكتفي بتوليدها
+                    log.info("✅ [Summary7] تم معالجة البوت السابع بنجاح.")
+                else:
+                    _summary7_text = "لا توجد قوالب جديدة لهذا البوت حالياً."
+                    
+            except Exception as _e7_bot:
+                log.error(f"❌ [Bot 7 Error] خطأ أثناء تنفيذ البوت السابع: {_e7_bot}")
+                _summary7_text = ""
 
             # إرسال الملخص العام والشامل الملكي (الجامع للملخصات الخمسة) إلى الجروب الخامس (@Summariesboot54_bot)
             try:

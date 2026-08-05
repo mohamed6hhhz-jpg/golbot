@@ -52,7 +52,7 @@ def generate_ai_template(api_key: str, template_num: int, title: str, context: d
         
     ai_content = generate_robust_ai_response(system_prompt, prompt, max_tokens=1500)
     
-    prefix = f"[{'الفوري' if is_spot else 'الآجل'}] {template_num}/12 {title}\n\n"
+    prefix = f"[{'الفوري' if is_spot else 'الآجل'}] قالب رقم {template_num}: {title}\n\n"
     if "فشل توليد التقرير" in ai_content:
         return prefix + "⚠️ فشل توليد التقرير."
     return prefix + ai_content

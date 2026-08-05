@@ -1885,6 +1885,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         # [4] مستويات محسّنة
         vwap=vwap, prev_wk_high=prev_wk_high, prev_wk_low=prev_wk_low,
         prev_mo_high=prev_mo_high, prev_mo_low=prev_mo_low,
+        prev_high=ph, prev_low=pl, prev_close=pc,
         sd_demand=sd_demand, sd_supply=sd_supply,
         # [6] الأوبشن
         gld_pcr=gld_pcr, pcr_source=pcr_source,
@@ -2990,10 +2991,18 @@ def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
     import httpx
     import requests
     import time
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    ip_url = f"https://149.154.167.220/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
+    ip_headers = dict(headers)
+    ip_headers["Host"] = "api.telegram.org"
+    
     success = True
     targets = [chat_id] if chat_id else BOT1_CHATS
     for chat in targets:
@@ -3014,9 +3023,16 @@ def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
                     chat_success = True
                     break
                 except Exception as e2:
-                    wait = 2 ** attempt
-                    log.warning(f"⚠️ [HTTP requests] {attempt+1}/3 — {e2} — انتظار {wait}s")
-                    time.sleep(wait)
+                    log.warning(f"⚠️ [HTTP requests] {attempt+1}/3 — {e2} — تجربة Direct IPv4...")
+                    try:
+                        r = requests.post(ip_url, json=payload, headers=ip_headers, timeout=35.0, verify=False)
+                        r.raise_for_status()
+                        chat_success = True
+                        break
+                    except Exception as e3:
+                        wait = 2 ** attempt
+                        log.warning(f"⚠️ [HTTP IPv4] {attempt+1}/3 — {e3} — انتظار {wait}s")
+                        time.sleep(wait)
         if not chat_success: success = False
     return success
 
@@ -8762,13 +8778,33 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             test_bot_token = TELEGRAM_TOKENS.get("bot_daily")
             if test_bot_token and BOT_DAILY_CHAT_ID:
                 import requests
-                for t_test in [t1_test, t2_test, t3_test]:
-                    requests.post(
-                        f"https://api.telegram.org/bot{test_bot_token}/sendMessage",
-                        data={"chat_id": BOT_DAILY_CHAT_ID, "text": t_test},
-                        timeout=10
-                    )
-                log.info("✅ تم إرسال قوالب التيست (ATR) بنجاح إلى جروب التيست (بالتزامن مع التقارير الرئيسية).")
+                import urllib3
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                
+                url_t = f"https://api.telegram.org/bot{test_bot_token}/sendMessage"
+                ip_url_t = f"https://149.154.167.220/bot{test_bot_token}/sendMessage"
+                headers_t = {"User-Agent": "Mozilla/5.0"}
+                ip_headers_t = {"User-Agent": "Mozilla/5.0", "Host": "api.telegram.org"}
+
+                for t_idx, t_test in enumerate([t1_test, t2_test, t3_test], 1):
+                    success = False
+                    for attempt in range(2):
+                        try:
+                            requests.post(url_t, data={"chat_id": BOT_DAILY_CHAT_ID, "text": t_test}, headers=headers_t, timeout=15)
+                            success = True
+                            break
+                        except Exception as e:
+                            log.warning(f"⚠️ [TestTemplate] Failed to send template {t_idx} (attempt {attempt+1}): {e}")
+                            try:
+                                requests.post(ip_url_t, data={"chat_id": BOT_DAILY_CHAT_ID, "text": t_test}, headers=ip_headers_t, timeout=15, verify=False)
+                                success = True
+                                break
+                            except Exception as e2:
+                                log.warning(f"⚠️ [TestTemplate] IPv4 fallback failed for template {t_idx}: {e2}")
+                                time.sleep(1)
+                    if not success:
+                        log.error(f"❌ [TestTemplate] Final failure for test template {t_idx}")
+                log.info("✅ تم الانتهاء من إرسال قوالب التيست (ATR) إلى جروب التيست.")
     except Exception as e:
         log.error(f"❌ فشل توليد/إرسال قوالب التيست: {e}")
 

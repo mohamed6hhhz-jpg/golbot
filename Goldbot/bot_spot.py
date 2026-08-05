@@ -8771,26 +8771,30 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
     # ── [توليد قوالب التيست اليومية وإرسالها فوراً لجروب التيست] ──
     try:
         from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT_DAILY_CHAT_ID
-        from Goldbot.bot_daily_levels import calc_classical_pivots, calc_camarilla_pivots, _trades_from_levels, build_template_classical, build_template_camarilla, build_template_quant
+        from Goldbot.bot_daily_levels import calc_classical_pivots, calc_camarilla_pivots, _trades_from_levels, build_template_classical, build_template_camarilla, build_template_quant, get_full_market_data
         
-        h = data.get("prev_high", 0)
-        l = data.get("prev_low", 0)
-        c = data.get("prev_close", 0)
-        
-        if h > 0 and l > 0 and c > 0:
-            _ref = data.get("spot_price") or round((h + l + c) / 3, 2)
-            _atr = data.get("atr", 0)
+        test_data = get_full_market_data()
+        if not test_data:
+            log.error("❌ فشل جلب بيانات الأمس للتيست داخل السبوت.")
+        else:
+            h = test_data.get("prev_high", 0)
+            l = test_data.get("prev_low", 0)
+            c = test_data.get("prev_close", 0)
             
-            _cp  = calc_classical_pivots(h, l, c, ref_price=_ref, atr=_atr)
-            _cam = calc_camarilla_pivots(h, l, c)
-            
-            _trades_cl  = _trades_from_levels(_cp,  "classical",  _ref, _atr)
-            _trades_cam = _trades_from_levels(_cam, "camarilla",  _ref, _atr)
-            
-            t1_test = build_template_classical(data, _cp, _trades_cl)
-            t2_test = build_template_camarilla(data, _cam, _cp, _trades_cam)
-            
-            d_quant = data.copy()
+            if h > 0 and l > 0 and c > 0:
+                _ref = test_data.get("spot_price") or round((h + l + c) / 3, 2)
+                _atr = test_data.get("atr", 0)
+                
+                _cp  = calc_classical_pivots(h, l, c, ref_price=_ref, atr=_atr)
+                _cam = calc_camarilla_pivots(h, l, c)
+                
+                _trades_cl  = _trades_from_levels(_cp,  "classical",  _ref, _atr)
+                _trades_cam = _trades_from_levels(_cam, "camarilla",  _ref, _atr)
+                
+                t1_test = build_template_classical(test_data, _cp, _trades_cl)
+                t2_test = build_template_camarilla(test_data, _cam, _cp, _trades_cam)
+                
+                d_quant = test_data.copy()
             d_quant["pivot"] = _cp["pivot"]
             d_quant["r1"] = _cp["r1"]
             d_quant["r2"] = _cp["r2"]

@@ -4486,7 +4486,6 @@ def _build_global_options_radar(d: dict) -> str:
    ├ 📉 مؤشر الخوف العام (VIX): {vix_spot:.2f} ⟵ {vix_status}
    └ 💡 يتم استنتاج هذه المؤشرات رياضياً من تسعير عقود الخيارات لتعكس حجم المخاطرة والتذبذب المتوقع من قبل صناع السوق.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-"""
 💡 دليل القراءة:
    - PCR > 1 = ضغط بيعي قوي للمؤسسات.
    - PCR < 1 = ضغط شرائي قوي للمؤسسات."""
@@ -8787,7 +8786,6 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         try:
             import requests
             # Fetch complete quote for accurate daily high/low
-        try:
             _td_quote = requests.get(f"https://api.twelvedata.com/quote?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}", timeout=4)
             twelve_high = None
             twelve_low = None
@@ -8800,7 +8798,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             log.warning(f"Failed to fetch quote from TwelveData: {e}")
             twelve_high, twelve_low = None, None
 
-        _td_r = requests.get(f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}", timeout=4)
+        try:
+            _td_r = requests.get(f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}", timeout=4)
             if _td_r.status_code == 200 and _td_r.json().get('price'):
                 live_p = round(float(_td_r.json().get('price')), 2)
         except:

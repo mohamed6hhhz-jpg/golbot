@@ -106,31 +106,49 @@ def process_and_send_bot7(data: dict) -> list:
         log.warning("⚠️ [Bot 7] التوكن أو Chat ID غير معرفين، تم تخطي الإرسال.")
         return reports_to_send
 
+    def _split_msg(text: str, max_len: int = 4000) -> list:
+        chunks = []
+        while len(text) > max_len:
+            split_idx = text.rfind("\n", 0, max_len)
+            if split_idx == -1:
+                split_idx = max_len
+            chunks.append(text[:split_idx])
+            text = text[split_idx:].lstrip()
+        if text:
+            chunks.append(text)
+        return chunks
+
     total = len(reports_to_send)
     for idx, (title, content) in enumerate(reports_to_send, 1):
-        message = f"[{idx}/{total}] {title}\n\n{content}"
+        full_message = f"[{idx}/{total}] {title}\n\n{content}"
+        chunks = _split_msg(full_message)
         
-        # دالة الإرسال البسيطة عبر requests
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT7_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": TELEGRAM_BOT7_CHAT,
-            "text": message,
-            "disable_web_page_preview": True
-        }
         
-        for attempt in range(3):
-            try:
-                import requests
-                resp = requests.post(url, json=payload, timeout=20)
-                if resp.status_code == 200:
-                    log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} بنجاح.")
-                    break
-                else:
-                    log.warning(f"⚠️ [Bot 7] محاولة {attempt+1} - خطأ في الإرسال: {resp.text}")
+        for chunk_idx, chunk in enumerate(chunks, 1):
+            payload = {
+                "chat_id": TELEGRAM_BOT7_CHAT,
+                "text": chunk,
+                "disable_web_page_preview": True
+            }
+            
+            for attempt in range(3):
+                try:
+                    import requests
+                    resp = requests.post(url, json=payload, timeout=20)
+                    if resp.status_code == 200:
+                        if len(chunks) > 1:
+                            log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} (جزء {chunk_idx}/{len(chunks)}) بنجاح.")
+                        else:
+                            log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} بنجاح.")
+                        break
+                    else:
+                        log.warning(f"⚠️ [Bot 7] محاولة {attempt+1} - خطأ في الإرسال: {resp.text}")
+                        time.sleep(2)
+                except Exception as req_err:
+                    log.error(f"❌ [Bot 7] استثناء أثناء الإرسال: {req_err}")
                     time.sleep(2)
-            except Exception as req_err:
-                log.error(f"❌ [Bot 7] استثناء أثناء الإرسال: {req_err}")
-                time.sleep(2)
+            time.sleep(1)  # لتجنب حظر التيليجرام لكثرة الرسائل
 
     return reports_to_send
 

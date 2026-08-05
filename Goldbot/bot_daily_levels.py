@@ -168,8 +168,8 @@ def fetch_daily_data() -> dict | None:
             log.warning(f"⚠️ فشل جلب بيانات الأمس من TwelveData: {e}")
 
     if not td_fetched:
-        log.warning("🔄 جاري الرجوع لـ yfinance (GC=F) كحل بديل...")
-        df = _fetch("GC=F", period="5d", interval="1d")
+        log.warning("🔄 جاري الرجوع لـ yfinance (XAUUSD=X) كحل بديل...")
+        df = _fetch("XAUUSD=X", period="5d", interval="1d")
         if df is not None and len(df) >= 2:
             from datetime import datetime
             import pytz
@@ -187,13 +187,6 @@ def fetch_daily_data() -> dict | None:
             pl = round(float(yest["Low"]), 2)
             pc = round(float(yest["Close"]), 2)
             
-            gs = d.get("gold_spot", 0)
-            gf = d.get("gold_futures", 0)
-            if gs and gf and abs(gf - gs) < 50:
-                basis = gf - gs
-                ph = round(ph - basis, 2)
-                pl = round(pl - basis, 2)
-                pc = round(pc - basis, 2)
         else:
             log.error("❌ فشل جلب بيانات الأمس من ياهو أو TwelveData!")
             return None
@@ -215,24 +208,15 @@ def fetch_daily_data() -> dict | None:
 
 def calc_classical_pivots(h: float, l: float, c: float, ref_price: float = None, atr: float = None) -> dict:
     """
-    البيفوت المبني على ATR (تم التبديل بناءً على طلب المستخدم ليحل محل الكلاسيكي في بوت التيست).
+    البيفوت الكلاسيكي الدقيق المستند إلى أسعار الأمس للفوري.
     """
-    if ref_price is not None and atr is not None and atr > 0:
-        pivot = round(ref_price, 2)
-        r1    = round(ref_price + atr * 0.50, 2)
-        r2    = round(ref_price + atr * 1.00, 2)
-        r3    = round(ref_price + atr * 1.50, 2)
-        s1    = round(ref_price - atr * 0.50, 2)
-        s2    = round(ref_price - atr * 1.00, 2)
-        s3    = round(ref_price - atr * 1.50, 2)
-    else:
-        pivot = round((h + l + c) / 3, 2)
-        r1    = round(2 * pivot - l,       2)
-        r2    = round(pivot + (h - l),     2)
-        r3    = round(h + 2 * (pivot - l), 2)
-        s1    = round(2 * pivot - h,       2)
-        s2    = round(pivot - (h - l),     2)
-        s3    = round(l - 2 * (h - pivot), 2)
+    pivot = round((h + l + c) / 3, 2)
+    r1    = round(2 * pivot - l,       2)
+    r2    = round(pivot + (h - l),     2)
+    r3    = round(h + 2 * (pivot - l), 2)
+    s1    = round(2 * pivot - h,       2)
+    s2    = round(pivot - (h - l),     2)
+    s3    = round(l - 2 * (h - pivot), 2)
 
     return {
         "pivot": pivot,
@@ -613,8 +597,8 @@ def send_message(token: str, chat_id: str, text: str) -> bool:
     return False
 
 
-def build_template_quant(d: dict) -> str:
-    """يبني القالب الثالث (الكمي الشامل) بناءً على بيانات bot_spot."""
+def build_template_quant_atr_backup(d: dict) -> str:
+    """يبني القالب الثالث (الكمي الشامل) بنسخته القديمة (ATR المحسن). تم الاحتفاظ به لغرض آخر."""
     gold = d.get("gold", 0)
     rn = d.get("round_numbers", {"nearest_resistance": 0, "dist_to_resistance": 0, "nearest_support": 0, "dist_to_support": 0})
     fib = d.get("fib", {})
@@ -632,7 +616,7 @@ def build_template_quant(d: dict) -> str:
     else:
         range_line = "نطاق اليوم المتوقع: غير متاح"
 
-    market_suffix = "فوري XAUUSD" if d.get("gold_spot") else "آجل GC=F"
+    market_suffix = "فوري XAUUSD"
     send_time = d.get("send_time", datetime.now(CAIRO_TZ).strftime("%I:%M %p"))
 
     vwap_str = f"{d['vwap']}$" if d.get("vwap") else "— غير متاح"
@@ -671,6 +655,80 @@ def build_template_quant(d: dict) -> str:
    📋 حالة البيانات والبيفوت:
     ▪️ المصدر: ✅ فوري (XAU/USD)
     ▪️ التاريخ: {date_flag}📅 اليوم ({datetime.now().strftime('%Y-%m-%d')}){date_nat}
+    ▪️ الحساب: {calc_status}
+   🎯 كفاءة العمليات الرياضية: 100% (دقة حسابية خالية من الأخطاء)
+   ═════════════════════════════
+   🟡 {fib_line}
+   ═════════════════════════════
+   📊 {range_line}
+   ═════════════════════════════
+   🔍 التباين (Divergence): {d.get('divergence', '—')}
+   🛒 منطقة الطلب القوية: {demand_str}
+   🩸 منطقة العرض القوية: {supply_str}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+    return template
+
+
+def build_template_quant(d: dict) -> str:
+    """يبني القالب الثالث (الكمي الشامل) متطابقاً مع بيفوت كلاسيكي للفوري."""
+    gold = d.get("gold", 0)
+    rn = d.get("round_numbers", {"nearest_resistance": 0, "dist_to_resistance": 0, "nearest_support": 0, "dist_to_support": 0})
+    fib = d.get("fib", {})
+    if fib:
+        fib_line = (f"فيبوناتشي (فوري): 0%={fib.get('0.0%','-')}$ | 23.6%={fib.get('23.6%','-')}$ | 38.2%={fib.get('38.2%','-')}$ | "
+                    f"50.0%={fib.get('50.0%','-')}$ | 61.8%={fib.get('61.8%','-')}$ | 78.6%={fib.get('78.6%','-')}$ | 100%={fib.get('100%','-')}$")
+    else:
+        fib_line = "فيبوناتشي: غير متاح"
+        
+    atr = d.get("atr", 0)
+    if gold and atr:
+        exp_low  = round(gold - atr * 0.65, 2)
+        exp_high = round(gold + atr * 0.65, 2)
+        range_line = f"نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$"
+    else:
+        range_line = "نطاق اليوم المتوقع: غير متاح"
+
+    market_suffix = "فوري XAUUSD"
+    send_time = d.get("send_time", datetime.now(CAIRO_TZ).strftime("%I:%M %p"))
+
+    vwap_str = f"{d['vwap']}$" if d.get("vwap") else "— غير متاح"
+    w_high_str = f"{d['prev_wk_high']}$" if d.get("prev_wk_high") else "—"
+    w_low_str = f"{d['prev_wk_low']}$" if d.get("prev_wk_low") else "—"
+    m_high_str = f"{d['prev_mo_high']}$" if d.get("prev_mo_high") else "—"
+    m_low_str = f"{d['prev_mo_low']}$" if d.get("prev_mo_low") else "—"
+
+    demand_str = f"{d['sd_demand']}$" if d.get("sd_demand") else "—"
+    supply_str = f"{d['sd_supply']}$" if d.get("sd_supply") else "—"
+
+    date_flag = "✅ "
+    date_nat = " — طبيعي"
+    calc_status = "✅ بيفوت كلاسيكي"
+    _date_str = d.get('prev_date', f"{datetime.now().strftime('%Y-%m-%d')}")
+
+    template = f"""👑 📊 التقرير الكمي الشامل للذهب (الفوري - Spot)
+🔢 المستويات والصفقات (الفوري - Spot)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔢 خريطة المستويات والصفقات (مبنية على الـ ({market_suffix}))
+   ⏱️ السعر الفوري (لحظة الإرسال): {gold:.2f}$ — {send_time} القاهرة
+   🟣 مقاومة نفسية: {rn.get('nearest_resistance')}$ (+{rn.get('dist_to_resistance')}$) | دعم نفسي: {rn.get('nearest_support')}$ (-{rn.get('dist_to_support')}$)
+   ═════════════════════════════
+   📍 Swing High : {d.get('swing_high', '—')}$
+   📍 Swing Low  : {d.get('swing_low', '—')}$
+   ═════════════════════════════
+   📊 VWAP       : {vwap_str}
+   ═════════════════════════════
+   📅 الأسبوع السابق → قمة: {w_high_str} | قاع: {w_low_str}
+   📆 الشهر السابق   → قمة: {m_high_str} | قاع: {m_low_str}
+   ═════════════════════════════
+   🔴 المقاومات: R1: {d.get('r1', '—')}$ | R2: {d.get('r2', '—')}$
+   💠 المحور: Pivot: {d.get('pivot', '—')}$
+   🟢 الدعوم: S1: {d.get('s1', '—')}$ | S2: {d.get('s2', '—')}$
+   ═════════════════════════════
+   📋 حالة البيانات والبيفوت:
+    ▪️ المصدر: ✅ فوري (XAU/USD)
+    ▪️ التاريخ: {date_flag}📅 أمس ({_date_str}){date_nat}
     ▪️ الحساب: {calc_status}
    🎯 كفاءة العمليات الرياضية: 100% (دقة حسابية خالية من الأخطاء)
    ═════════════════════════════

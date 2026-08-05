@@ -16,7 +16,7 @@ def generate_ai_template(api_key: str, template_num: int, title: str, context: d
     if not api_key: return "⚠️ Missing Groq API Key."
     client = Groq(api_key=api_key)
     
-    market_type = "الفوري (Spot - XAU/USD)" if is_spot else "الآجل (Futures - GC=F)"
+    market_type = "الفوري (Spot - XAU/USD)" if is_spot else "الفوري (Spot - XAU/USD)"
     
     # Custom instructions per template
     custom_instruction = ""

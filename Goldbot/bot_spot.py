@@ -414,7 +414,7 @@ def calc_price_prediction(gold: float, atr: float, tf_15m: dict, tf_hourly: dict
 def calc_advanced_trades(d: dict, bias: str) -> dict:
     """6 أنواع صفقات متقدمة: سكالبينج | يومية | أسبوعية | شهرية | سوينج | انعكاس"""
     gold   = d['gold'];  atr = d['atr']
-    market_name = 'آجل (Futures)' if d.get('mode') == 'futures' else 'فوري (Spot)'
+    market_name = 'فوري (Spot)' if d.get('mode') == 'futures' else 'فوري (Spot)'
     s1, s2 = d['s1'], d['s2']
     r1, r2 = d['r1'], d['r2']
     pivot  = d['pivot']
@@ -1146,7 +1146,7 @@ def calc_all_entries(d: dict, bias: str) -> dict:
     s2, r2 = d['s2'], d['r2']
     s3, r3 = d['s3'], d['r3']
     rn     = d['round_numbers']
-    market_name = 'آجل (Futures)' if d.get('mode') == 'futures' else 'فوري (Spot)'
+    market_name = 'فوري (Spot)' if d.get('mode') == 'futures' else 'فوري (Spot)'
 
     # ── مستويات مُصفّاة: مضمون أن المقاومة فوق السعر والدعم تحته ولا تتكرر ──
     def _valid_res(levels, exclude=None):
@@ -1323,9 +1323,9 @@ def _calc_price_forecasts(gold: float, atr: float, bias: str, tf_data: dict) -> 
 def get_full_market_data(mode: str = "futures") -> dict | None:
     log.info(f"📡 جلب البيانات ({mode.upper()}) — متعدد الإطارات...")
 
-    ticker = "GC=F"  # Yahoo Finance dropped XAUUSD=X, so we use GC=F for historical OHLCV data for both modes
+    ticker = "XAUUSD=X"  # Yahoo Finance dropped XAUUSD=X, so we use XAUUSD=X for historical OHLCV data for both modes
 
-    # ── الذهب: الآجل والفوري وإطارات متعددة ──
+    # ── الذهب: الفوري والفوري وإطارات متعددة ──
     gold_daily  = _fetch(ticker,     period="90d", interval="1d");  time.sleep(0.7)
     gold_weekly = _fetch(ticker,     period="2y",  interval="1wk"); time.sleep(0.7)
     gold_monthly = _fetch(ticker,    period="5y",  interval="1mo"); time.sleep(0.7)
@@ -1450,8 +1450,8 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
 
     # [11] 15m data for short-term trend (moved to top)
 
-    gold_futures, futures_date = _last_with_date(gold_daily)
-    # لو كل مصادر الفوري فشلت — اعرض غير متاح (لا نستبدل بالآجل عشان يكونوا مختلفين دائماً)
+    gold_spot, spot_date = _last_with_date(gold_daily)
+    # لو كل مصادر الفوري فشلت — اعرض غير متاح (لا نستبدل بالفوري عشان يكونوا مختلفين دائماً)
     if not gold_spot:
         gold_spot = None
         spot_date = None
@@ -1473,7 +1473,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     if not all([gold_daily is not None, dxy, tnx]):
         return None
 
-    gold = gold_futures if mode == "futures" else gold_spot
+    gold = gold_spot if mode == "spot" else gold_spot
     if not gold:
         gold = gold_daily['Close'].iloc[-1] if gold_daily is not None else 0
 
@@ -1534,7 +1534,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     divergence                 = calc_divergence(gold_daily)
     swing_high, swing_low      = find_swing_levels(gold_daily, lookback=20)
     hist_ctx                   = get_historical_context(gold_daily)
-    # استخدام السعر الفوري (أو الآجل كبديل) كمرجع للمستويات النفسية
+    # استخدام السعر الفوري (أو الفوري كبديل) كمرجع للمستويات النفسية
     round_numbers              = get_round_numbers(gold_spot if gold_spot else gold, step=50)
 
     # ── [7] العائد الحقيقي — جلب التضخم الحي من BLS (مكتب إحصاء العمل الأمريكي) ──
@@ -1669,10 +1669,8 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
                 
                 if vwap_val is not None:
                     vwap = round(vwap_val, 2)
-                    # تعديل سعر الفوليوم للفوري بناء على الفارق بين العقود الآجلة والفوري (Contango/Basis)
-                    if "spot" == "spot" and gold_spot and gold_futures:
-                        basis = gold_futures - gold_spot
-                        vwap = round(vwap_val - basis, 2)
+                    # تعديل سعر الفوليوم للفوري بناء على الفارق بين العقود الفورية والفوري (Contango/Basis)
+                    vwap = round(vwap_val, 2)
         except Exception as e:
             vwap = None
 
@@ -1759,76 +1757,70 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
             pcr_source = "مؤشر تدفق السيولة البديل"
 
 
-    # ── Pivot Points (مصحح للسعر الفوري — Fix 1: تعديل الـ Basis بين الآجلة والفوري) ──
-    # الفلتر الذكي: لمعرفة هل الشمعة الأخيرة تخص اليوم أم أمس
-    _last_dt = gold_daily.index[-1].date()
-    _today_dt = cairo_now().date()
-    if _last_dt == _today_dt:
-        ph = float(gold_daily['High'].iloc[-2])
-        pl = float(gold_daily['Low'].iloc[-2])
-        pc = float(gold_daily['Close'].iloc[-2])
-    else:
-        # إذا كان السوق مغلقاً أو لم يفتح شمعة اليوم بعد، فإن آخر شمعة مسجلة هي شمعة الأمس الفعلية
-        ph = float(gold_daily['High'].iloc[-1])
-        pl = float(gold_daily['Low'].iloc[-1])
-        pc = float(gold_daily['Close'].iloc[-1])
-
-    # Fix 1: تعديل بيانات OHLC بحسب الفارق بين سعر الآجلة (GC=F) وسعر الفوري الحقيقي (XAU/USD)
-    # بذلك تصبح مستويات الدعم والمقاومة متوافقة مع السعر الفوري المعروض للعميل
-    _piv_basis = 0.0
-    if gold_spot and gold_futures and gold_futures > 0 and gold_spot > 0:
-        _piv_basis = round(float(gold_futures) - float(gold_spot), 2)
-        if abs(_piv_basis) < 50:  # تجاهل الفارق إذا كان غير منطقي
-            ph = round(ph - _piv_basis, 2)
-            pl = round(pl - _piv_basis, 2)
-            pc = round(pc - _piv_basis, 2)
-
-    pivot = round((ph + pl + pc) / 3, 2)
-    r1    = round(2*pivot - pl, 2);  r2 = round(pivot + (ph-pl), 2); r3 = round(ph + 2*(pivot-pl), 2)
-    s1    = round(2*pivot - ph, 2);  s2 = round(pivot - (ph-pl), 2); s3 = round(pl - 2*(ph-pivot), 2)
-
-    # Fix 2: فلتر منطق الدعم/المقاومة — يضمن دائماً: الدعم تحت السعر | المقاومة فوق السعر
-    # إذا كانت المستويات مقلوبة (بسبب تغيرات السوق الكبيرة) نعيد حسابها من ATR مباشرة
-    _ref_price = float(gold_spot if gold_spot else (gold_futures if gold_futures else 0))
-    _atr_safe  = float(atr if atr and atr > 0 else 50.0)
+    # ── Pivot Points (دقيقة 100% مبنية على السعر الفوري لمنصات التداول) ──
+    # محاولة جلب بيانات أمس بدقة من TwelveData
+    td_fetched = False
+    ph = pl = pc = 0.0
     
-    # فلتر الجودة (Quality Filter): نعتمد على الكلاسيكي بشكل افتراضي
-    _is_out_of_bounds = False
-    _is_too_squished  = False
-
-    if _is_out_of_bounds or _is_too_squished:
-        log.info(
-            f"⚠️ [Pivot Fix2] الاعتماد الدائم على ATR لضمان جودة المستويات "
-            f"(ATR={_atr_safe:.1f}$) — "
-            f"إعادة حساب تلقائية للحفاظ على الجودة العالية."
-        )
-        pivot = round(_ref_price, 2)
-        r1    = round(_ref_price + _atr_safe * 0.50, 2)
-        r2    = round(_ref_price + _atr_safe * 1.00, 2)
-        r3    = round(_ref_price + _atr_safe * 1.50, 2)
-        s1    = round(_ref_price - _atr_safe * 0.50, 2)
-        s2    = round(_ref_price - _atr_safe * 1.00, 2)
-        s3    = round(_ref_price - _atr_safe * 1.50, 2)
-        # metadata: ATR Fallback
-        _pivot_source    = "atr"
-        _pivot_conf      = 100
-        _pivot_data_date = f"اليوم ({cairo_now().strftime('%Y-%m-%d')}) — سعر حي"
-    else:
-        # metadata: Classic Pivot
+    if TWELVEDATA_API_KEY:
         try:
-            _data_d = gold_daily.index[-2].date()
-            _today_d = cairo_now().date()
-            _days_diff = (_today_d - _data_d).days
-            if _days_diff == 0:
-                _pivot_data_date = f"اليوم ({_data_d})"
-            elif _days_diff == 1:
-                _pivot_data_date = f"أمس ({_data_d})"
-            else:
-                _pivot_data_date = f"{_data_d} (قبل {_days_diff} أيام)"
-        except Exception:
-            _pivot_data_date = "أمس"
-        _pivot_source = "spot"
-        _pivot_conf   = 100
+            _td_url = f"https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1day&outputsize=4&apikey={TWELVEDATA_API_KEY}"
+            _resp = requests.get(_td_url, timeout=5).json()
+            if "values" in _resp and len(_resp["values"]) >= 2:
+                _today_str = cairo_now().strftime("%Y-%m-%d")
+                _valid_candles = []
+                for _val in _resp["values"]:
+                    if _val["datetime"][:10] != _today_str:
+                        if abs(float(_val["high"]) - float(_val["low"])) > 3.0:
+                            _valid_candles.append(_val)
+                
+                if _valid_candles:
+                    _yest = _valid_candles[0]
+                    ph = float(_yest["high"])
+                    pl = float(_yest["low"])
+                    pc = float(_yest["close"])
+                    td_fetched = True
+                    log.info(f"✅ تم جلب شمعة الأمس بدقة 100% من TwelveData: H={ph:.2f}, L={pl:.2f}, C={pc:.2f}")
+        except Exception as e:
+            log.warning(f"⚠️ فشل جلب بيانات الأمس من TwelveData للبيفوت: {e}")
+
+    # الرجوع لياهو فاينانس إذا فشل TwelveData
+    if not td_fetched:
+        _last_dt = gold_daily.index[-1].date()
+        _today_dt = cairo_now().date()
+        if _last_dt == _today_dt:
+            ph = float(gold_daily['High'].iloc[-2])
+            pl = float(gold_daily['Low'].iloc[-2])
+            pc = float(gold_daily['Close'].iloc[-2])
+        else:
+            ph = float(gold_daily['High'].iloc[-1])
+            pl = float(gold_daily['Low'].iloc[-1])
+            pc = float(gold_daily['Close'].iloc[-1])
+        log.info(f"⚠️ جلب بيانات الأمس من Yahoo (XAUUSD=X) بسبب فشل TwelveData: H={ph:.2f}, L={pl:.2f}, C={pc:.2f}")
+
+    # المعادلة الكلاسيكية الدقيقة (بدون أي تعديلات عشوائية)
+    pivot = round((ph + pl + pc) / 3, 2)
+    r1    = round(2*pivot - pl, 2)
+    r2    = round(pivot + (ph-pl), 2)
+    r3    = round(ph + 2*(pivot-pl), 2)
+    s1    = round(2*pivot - ph, 2)
+    s2    = round(pivot - (ph-pl), 2)
+    s3    = round(pl - 2*(ph-pivot), 2)
+    # metadata: Classic Pivot
+    try:
+        _data_d = gold_daily.index[-2].date()
+        _today_d = cairo_now().date()
+        _days_diff = (_today_d - _data_d).days
+        if _days_diff == 0:
+            _pivot_data_date = f"اليوم ({_data_d})"
+        elif _days_diff == 1:
+            _pivot_data_date = f"أمس ({_data_d})"
+        else:
+            _pivot_data_date = f"{_data_d} (قبل {_days_diff} أيام)"
+    except Exception:
+        _pivot_data_date = "أمس"
+    _pivot_source = "spot"
+    _pivot_conf   = 100
 
     # ── التسميات ──
     rsi_label   = "تشبع شراء 🔴" if rsi > 70 else ("تشبع بيع 🟢" if rsi < 30 else "محايد ⚪")
@@ -1856,7 +1848,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
     ind_cci_i  = _ind_impact(cci_label, "تشبع بيع", "تشبع شراء")
     ind_bb_i   = "🟢↑" if "قاع" in bb_label else ("🔴↓" if "سقف" in bb_label else "⚪↔")
     gs_ratio    = round(gold / silver, 1) if silver else None
-    contango    = round(gold_futures - gold_spot, 2) if gold_spot else None
+    contango = 0.0
 
     daily_high = round(float(gold_daily['High'].iloc[-1]), 2) if gold_daily is not None else gold
     daily_low = round(float(gold_daily['Low'].iloc[-1]), 2) if gold_daily is not None else gold
@@ -1870,11 +1862,11 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         mode=mode,
         # Prices
         gold=gold,
-        gold_futures=gold_futures,
-        gold_spot=gold_spot, spot_price=gold_spot or gold, send_time=cairo_now().strftime('%I:%M %p'),
+        gold_spot=gold_spot,
+        spot_price=gold_spot or gold, send_time=cairo_now().strftime('%I:%M %p'),
         daily_high=daily_high,
         daily_low=daily_low,
-        futures_date=futures_date, spot_date=spot_date,
+        spot_date=spot_date,
         contango=contango,
         silver=silver, oil=oil, dxy=dxy, tnx=tnx, twy=twy, tty=tty, vix=vix, sp500=sp500,
         yield_curve=yield_curve, yield_curve_label=yield_curve_label,
@@ -2085,14 +2077,14 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     bias     = conf['bias']
     bias_ar  = {"bull": "صعودي", "bear": "هبوطي", "neutral": "متذبذب"}.get(bias, "متذبذب")
 
-    # ── السعر الفوري والآجل مع توضيح مصدر البيانات ──
-    futures_label = f"{d['gold_futures']:.2f}$  ⏱ {d['futures_date']}"
+    # ── السعر الفوري والفوري مع توضيح مصدر البيانات ──
+    spot_label_alt = f"{d['gold_spot']:.2f}$  ⏱ {d['spot_date']}"
     if d['gold_spot']:
         spot_label      = f"{d['gold_spot']:.2f}$  ⏱ {d['spot_date']}"
         price_type_warn = ""  # فوري صحيح — لا تحذير
     else:
-        spot_label      = f"غير متاح (آخر معلوم: راجع الآجل)"
-        price_type_warn = "\n   ⚠️ تنبيه: جميع مصادر السعر الفوري (Spot) غير متاحة — السعر المعروض آجل GC=F وليس فورياً"
+        spot_label      = f"غير متاح (آخر معلوم: راجع الفوري)"
+        price_type_warn = "\n   ⚠️ تنبيه: جميع مصادر السعر الفوري (Spot) غير متاحة — السعر المعروض آجل XAUUSD=X وليس فورياً"
     contango_str = (f"  (+{d['contango']:.2f}$ Contango)" if d['contango'] and d['contango'] > 0
                     else f"  ({d['contango']:.2f}$)" if d['contango'] else "")
 
@@ -2109,7 +2101,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
 
     refs   = ent['refs']
     nums   = ("1️⃣","2️⃣","3️⃣")
-    market_suffix = "(آجل GC=F)" if d.get('mode') == 'futures' else "(فوري XAUUSD)"
+    market_suffix = "(آجل XAUUSD=X)" if d.get('mode') == 'futures' else "(فوري XAUUSD)"
     bias_section = {"bull":f"🎯 صفقات الاتجاه الصعودي {market_suffix}",
                     "bear":f"🎯 صفقات الاتجاه الهبوطي {market_suffix}",
                     "neutral":f"⚡ صفقات الاختراق المتذبذب {market_suffix}"}.get(ent['bias'],f"🎯 الصفقات {market_suffix}")
@@ -2285,7 +2277,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    🟢 الدعوم: S1: {d['s1']}$ | S2: {d['s2']}$
    ═════════════════════════════
    📋 حالة البيانات والبيفوت:
-   ▪️ المصدر: {('✅ فوري (XAU/USD)' if d['gold_spot'] else '⚠️ آجل (GC=F) — الـ Spot غير متاح، تم الاستعانة بالآجل')}
+   ▪️ المصدر: {('✅ فوري (XAU/USD)' if d['gold_spot'] else '⚠️ فوري (XAUUSD=X) — تم الاستعانة بالمصدر البديل')}
    ▪️ التاريخ: {('✅ ' if 'اليوم' in d['pivot_data_date'] or 'أمس' in d['pivot_data_date'] else '⚠️ ')}📅 {d['pivot_data_date']}{(' — طبيعي' if 'أمس' in d['pivot_data_date'] or 'اليوم' in d['pivot_data_date'] else '')}
    ▪️ الحساب: {('⚠️ مستويات مُعاد حسابها (ATR)' if d['pivot_source']=='atr' else '✅ بيفوت كلاسيكي')}
    🎯 كفاءة العمليات الرياضية: 100% (دقة حسابية خالية من الأخطاء)
@@ -2474,7 +2466,7 @@ def _build_gold_strength_section(d: dict) -> str:
     # محاولة جلب بيانات اليوم والأمس من yfinance
     try:
         import yfinance as _yf_gs
-        _df_gs = _yf_gs.Ticker('GC=F').history(period='2d', interval='1d')
+        _df_gs = _yf_gs.Ticker('XAUUSD=X').history(period='2d', interval='1d')
         if _df_gs is not None and len(_df_gs) >= 2:
             prev_close = float(_df_gs['Close'].iloc[-2])
             today_open = float(_df_gs['Open'].iloc[-1])
@@ -3314,7 +3306,7 @@ def _build_liquidity_breakout_detector(d: dict) -> str:
     vol_avg = 1
     try:
         import yfinance as _yf
-        _tk = _yf.Ticker("GC=F")
+        _tk = _yf.Ticker("XAUUSD=X")
         _df = _tk.history(period="1d", interval="5m")
         if _df is not None and not _df.empty:
             vols = _df['Volume'].values
@@ -3925,7 +3917,7 @@ def _build_dynamic_price_targets(d: dict) -> str:
     ytd_chg   = 0.0
     try:
         import yfinance as _yf
-        _tk = _yf.Ticker("GC=F")
+        _tk = _yf.Ticker("XAUUSD=X")
         _df = _tk.history(start="2026-01-01", interval="1d")
         if _df is not None and not _df.empty:
             ytd_high  = round(float(_df['High'].max()), 2)
@@ -4029,7 +4021,7 @@ def _build_live_liquidity_spike(d: dict) -> str:
 
     try:
         import yfinance as _yf
-        _tk  = _yf.Ticker("GC=F")
+        _tk  = _yf.Ticker("XAUUSD=X")
         _df  = _tk.history(period="2d", interval="5m")
         if _df is not None and not _df.empty:
             _vols  = _df['Volume'].dropna().values
@@ -4212,7 +4204,7 @@ def _build_liquidity_concentration_zones(d: dict) -> str:
     # ── جلب بيانات 5 أيام على فريم 15 دقيقة لبناء Volume Profile ──
     try:
         import yfinance as _yf
-        _tk = _yf.Ticker("GC=F")
+        _tk = _yf.Ticker("XAUUSD=X")
         _df = _tk.history(period="5d", interval="15m")
         if _df is None or _df.empty:
             raise ValueError("No data")
@@ -4404,7 +4396,7 @@ def _build_global_options_radar(d: dict) -> str:
     except Exception:
         egp_spot = 49.30 # سعر تقريبي في حال فشل الجلب
         
-    # حساب العقود الآجلة غير القابلة للتسليم (NDF) بناءً على نظرية تعادل أسعار الفائدة
+    # حساب العقود الفورية غير القابلة للتسليم (NDF) بناءً على نظرية تعادل أسعار الفائدة
     # الفائدة في مصر (CBE) تقريباً 27.25%، الفيدرالي الأمريكي (FED) تقريباً 5.50%
     egp_rate = 0.2725
     usd_rate = 0.0550
@@ -4413,12 +4405,12 @@ def _build_global_options_radar(d: dict) -> str:
     ndf_6m = round(egp_spot * (1 + egp_rate * (6/12)) / (1 + usd_rate * (6/12)), 2)
     ndf_12m = round(egp_spot * (1 + egp_rate * (12/12)) / (1 + usd_rate * (12/12)), 2)
 
-    report += f"""🇪🇬 الجنية المصري (EGP) — عقود NDF الآجلة (OTC)
+    report += f"""🇪🇬 الجنية المصري (EGP) — عقود NDF الفورية (OTC)
    ├ 💰 السعر الفوري (Spot) : {egp_spot:.2f} ج.م
    ├ 📅 عقود 3 شهور (NDF)   : ~{ndf_3m:.2f} ج.م (تسعير المؤسسات)
    ├ 📅 عقود 6 شهور (NDF)   : ~{ndf_6m:.2f} ج.م (تسعير المؤسسات)
    ├ 📅 عقود 12 شهر (NDF)   : ~{ndf_12m:.2f} ج.م (تسعير المؤسسات)
-   └ 💡 يتم استنتاج تسعير العقود الآجلة للمؤسسات رياضياً بناءً على فرق الفائدة بين البنك المركزي المصري والفيدرالي الأمريكي.
+   └ 💡 يتم استنتاج تسعير العقود الفورية للمؤسسات رياضياً بناءً على فرق الفائدة بين البنك المركزي المصري والفيدرالي الأمريكي.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
@@ -4476,7 +4468,7 @@ def _build_whale_wallet_monitor(d: dict) -> str:
     
     try:
         import yfinance as _yf
-        _tk = _yf.Ticker("GC=F")
+        _tk = _yf.Ticker("XAUUSD=X")
         # سحب بيانات آخر 5 أيام على فريم 5 دقائق
         _df = _tk.history(period="5d", interval="5m")
         
@@ -4607,7 +4599,7 @@ def _build_visible_whale_monitor(d: dict) -> str:
     
     try:
         import yfinance as _yf
-        _tk = _yf.Ticker("GC=F")
+        _tk = _yf.Ticker("XAUUSD=X")
         _df = _tk.history(period="5d", interval="5m")
         
         if _df is not None and not _df.empty:
@@ -5708,7 +5700,7 @@ def _build_combined_summary(
 ) -> str:
     """
     الخلاصة النهائية المشتركة — تصدر مرة واحدة فقط بعد انتهاء
-    كلا البوتين (الآجل والفوري)، وتجمع القرار النهائي من السوقين.
+    كلا البوتين (الفوري والفوري)، وتجمع القرار النهائي من السوقين.
     """
     client = Groq(api_key=random.choice(GROQ_KEYS)) if GROQ_KEYS else None
     if not client:
@@ -5729,7 +5721,7 @@ def _build_combined_summary(
         direction_label = "متذبذب ⚖️"
 
     prompt = f"""أنت المحلل الأكبر. لقد انتهى فريقك للتو من إعداد تقارير شاملة لسوقَي الذهب:
-① سوق الآجل (Futures/GC=F)
+① سوق الفوري (XAUUSD=X)
 ② سوق الفوري (Spot/XAUUSD)
 
 السعر الفوري الحالي: {gold_spot:,.2f}$
@@ -5742,7 +5734,7 @@ def _build_combined_summary(
 ── ملخص التحليل الفني للفوري ──
 {clean(spot_t1)[:600]}
 
-── أبرز صفقات الآجل ──
+── أبرز صفقات الفوري ──
 {clean(futures_t0)[:400]}
 
 ── أبرز صفقات الفوري ──
@@ -5771,7 +5763,7 @@ def _build_combined_summary(
             log.info(f"🤖 [Combined] توليد الخلاصة المشتركة عبر {model_name}...")
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت المحلل المالي الأكبر. أصدر خلاصة نهائية موجزة ودقيقة تجمع بين سوقي الآجل والفوري. التزم بالقالب حرفياً. لا تغير النسب المئوية المعطاة."},
+                    {"role": "system", "content": MASTER_SYSTEM_PROMPT + "أنت المحلل المالي الأكبر. أصدر خلاصة نهائية موجزة ودقيقة تجمع بين سوقي الفوري والفوري. التزم بالقالب حرفياً. لا تغير النسب المئوية المعطاة."},
                     {"role": "user", "content": prompt},
                 ],
                 model=model_name,
@@ -6452,7 +6444,7 @@ def _build_template_11(d: dict) -> str:
     
     return f'''📰📊 تقرير CFTC | مراكز المضاربين للأسبوع المنتهي في {date_str}
 
-📈 تكشف بيانات لجنة تداول السلع الآجلة (CFTC) عن استمرار تغير تمركزات المستثمرين في أسواق المعادن والعملات والطاقة، ما يعطي إشارات مهمة لاتجاهات السوق خلال الفترة المقبلة.
+📈 تكشف بيانات لجنة تداول السلع الفورية (CFTC) عن استمرار تغير تمركزات المستثمرين في أسواق المعادن والعملات والطاقة، ما يعطي إشارات مهمة لاتجاهات السوق خلال الفترة المقبلة.
 
 ━━━━━━━━━━━━
 
@@ -6519,7 +6511,7 @@ def _build_template_11(d: dict) -> str:
 ⚠️ تظل بيانات CFTC مؤشراً مهماً لقياس توجهات كبار المضاربين، لكنها لا تُستخدم منفردة لاتخاذ قرارات التداول، بل تُدمج مع التحليل الفني والأساسي.
 
 💡 الحكم للتأثير النهائي على الذهب:
-بناءً على تمركزات الحيتان والمضاربين في عقود الخيارات الآجلة، التوجه المؤسسي الغالب يميل إلى المسار الـ **{"صاعد 📈" if is_bull else "هابط 📉"}** للذهب على المدى المتوسط.'''
+بناءً على تمركزات الحيتان والمضاربين في عقود الخيارات الفورية، التوجه المؤسسي الغالب يميل إلى المسار الـ **{"صاعد 📈" if is_bull else "هابط 📉"}** للذهب على المدى المتوسط.'''
 
 def _build_template_13(d: dict) -> str:
     """بناء قالب تحليل عقود الأوبشن الاحترافي الشامل (T13) - ديناميكي ومستقل"""
@@ -9360,22 +9352,22 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         # ══════════════════════════════════════════════════════
 #         log.info("🏆 [Combined] توليد الخلاصة النهائية المشتركة (آجل + فوري)...")
 #         try:
-#             fc = _futures_cache  # بيانات الآجل المحفوظة
-#             # لو بيانات الآجل مش موجودة، ننتظر حتى 15 دقيقة ريحة 30 ثانية
+#             fc = _futures_cache  # بيانات الفوري المحفوظة
+#             # لو بيانات الفوري مش موجودة، ننتظر حتى 15 دقيقة ريحة 30 ثانية
 #             if not fc or not fc.get("t1"):
 #                 log.info("⏳ [Combined] Futures لم ينتهِ بعد — ننتظر حتى 15 دقيقة...")
 #                 for _ in range(30):  # 30 × 30 ثانية = 15 دقيقة
 #                     time.sleep(30)
 #                     fc = _futures_cache
 #                     if fc and fc.get("t1"):
-#                         log.info("✅ [Combined] بيانات الآجل وصلت — نبني الخلاصة الآن.")
+#                         log.info("✅ [Combined] بيانات الفوري وصلت — نبني الخلاصة الآن.")
 #                         break
 #                 else:
 #                     log.warning("⚠️ [Combined] انتهى وقت الانتظار — الخلاصة مؤجلة.")
 #             if fc and fc.get("t1"):
 #                 # احسب الاتجاه المشترك من البوتين بشكل آلي
 #                 spot_score  = data.get('tf_daily', {}).get('score', 0)
-#                 fut_score   = fc.get('score', spot_score)  # بيانات الآجل
+#                 fut_score   = fc.get('score', spot_score)  # بيانات الفوري
 #                 avg_score   = (spot_score + fut_score) / 2
 #                 bull_pct = max(0, min(100, round(50 + avg_score * 12)))
 #                 bear_pct = 100 - bull_pct
@@ -9435,12 +9427,12 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 def run_bot():
     log.info("🚀 [Spot] Goldbot Pro+ v4 — نسخة الفوري")
 
-    last_gold_price      = {'futures': None, 'spot': None}
-    minutes_counter      = {'futures': 0, 'spot': 0}
-    morning_sent_today   = {'futures': False, 'spot': False}
-    closing_sent_today   = {'futures': False, 'spot': False}
-    heartbeat_sent_today = {'futures': False, 'spot': False}
-    consec_failures      = {'futures': 0, 'spot': 0}
+    last_gold_price      = {'spot': None}
+    minutes_counter      = {'spot': 0}
+    morning_sent_today   = {'spot': False}
+    closing_sent_today   = {'spot': False}
+    heartbeat_sent_today = {'spot': False}
+    consec_failures      = {'spot': 0}
     all_models_notified  = False
     last_report_date     = None
     last_cot_report_date = None
@@ -9456,7 +9448,7 @@ def run_bot():
             weekday    = now_cairo.weekday()
     
             if last_report_date != today:
-                for m in ['futures', 'spot']:
+                for m in ['spot']:
                     morning_sent_today[m]   = False
                     closing_sent_today[m]   = False
                     heartbeat_sent_today[m] = False
@@ -9495,7 +9487,7 @@ def run_bot():
                     log.info("📢 تم إرسال إشعار إغلاق السوق للقناة.")
     
                 log.info(f"🛌 سوق مغلق ({day_names[weekday]} {hour_cairo:02d}:00 قاهرة). انتظار 30 دقيقة.")
-                for m in ['futures', 'spot']: last_gold_price[m] = None
+                for m in ['spot']: last_gold_price[m] = None
                 time.sleep(30 * 60)
                 continue
     
@@ -9871,12 +9863,13 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
                     f"   ├ 🔴 مناطق العرض والمقاومة: R1 = {r1:.2f}$ | R2 = {r2:.2f}$",
                     f"   └ 🛡️ نقطة الارتكاز المحورية (Pivot): {pivot:.2f}$",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    "📋 محصلة الركائز الخمسة للمنظومة:",
+                    "📋 محصلة الركائز المكتملة للمنظومة:",
                     "   🔹 البوت 1 (الكمي الأساسي): تحديد الاتجاه العام وبيئة الاقتصاد الكلي.",
                     "   🔹 البوت 2 (المتخصص المتقدم): خوارزميات السيولة، المؤسسات، ومناطق الارتكاز المغناطيسية.",
                     "   🔹 البوت 3 (الفوري الدقيق): التحليل اللحظي ومناطق الصفقات الفورية المضاربية.",
                     "   🔹 البوت 4 (الرادار ومحافظ الحيتان): صفقات البلوك تريز، مصفوفة الزمن، وهيمنة الحيتان.",
                     "   🔹 البوت 5 (المحرك الهجين): تقارير COT المؤسسية، ومناطق العرض ونظام كسر الأرقام.",
+                    "   🔹 البوت 7 (الكاماريلا والنماذج المتقدمة): النماذج الفنية الدقيقة وتوقعات الفيدرالي.",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",
                     f"⚠️ تنبيه المخاطر: {risk_note} — الالتزام بالارتكاز أمر إلزامي.",
                     "━━━━━━━━━━━━━━━━━━━━━━━━━━",

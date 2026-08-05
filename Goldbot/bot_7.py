@@ -8,14 +8,17 @@ import logging
 import traceback
 
 # استيراد دوال الكاماريلا من البوت التجريبي
-from Goldbot.bot_daily_levels import calc_camarilla_pivots, _trades_from_levels, build_template_camarilla
-from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT7_CHAT_ID
+from Goldbot.bot_daily_levels import calc_camarilla_pivots, _trades_from_levels, build_template_camarilla, build_template_quant_atr_backup
+from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT7_CHAT_ID, BOT_ATR_CHAT_ID
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("Goldbot.bot_7")
 
 TELEGRAM_BOT7_TOKEN = TELEGRAM_TOKENS.get("bot7", "")
 TELEGRAM_BOT7_CHAT = BOT7_CHAT_ID
+
+TELEGRAM_BOT_ATR_TOKEN = TELEGRAM_TOKENS.get("bot_atr", "")
+TELEGRAM_BOT_ATR_CHAT = BOT_ATR_CHAT_ID
 
 def process_and_send_bot7(data: dict) -> list:
     """
@@ -62,41 +65,77 @@ def process_and_send_bot7(data: dict) -> list:
         
         reports_to_send.append(("🎯 مستويات الكاماريلا الدقيقة", camarilla_report))
         
-        # ── القالب الثاني: التقرير الفني والميل السعري ──
-        outlook_report = _build_technical_outlook_template(data, cp_mock)
-        reports_to_send.append(("📈 النظرة الفنية وميل السعر", outlook_report))
+        try:
+            # ── القالب الثاني: التقرير الفني والميل السعري ──
+            outlook_report = _build_technical_outlook_template(data, cp_mock)
+            reports_to_send.append(("📈 النظرة الفنية وميل السعر", outlook_report))
+        except Exception as e:
+            log.error(f'❌ [Bot 7] فشل قالب: {e}')
+
         
-        # ── القالب الثالث: حركة السندات ──
-        bonds_report = _build_bonds_template()
-        reports_to_send.append(("📊 حركة السندات الأمريكية", bonds_report))
+        try:
+            # ── القالب الثالث: حركة السندات ──
+            bonds_report = _build_bonds_template()
+            reports_to_send.append(("📊 حركة السندات الأمريكية", bonds_report))
+        except Exception as e:
+            log.error(f'❌ [Bot 7] فشل قالب: {e}')
+
         
-        # ── القالب الرابع: تسعير الفائدة (FedWatch) ──
-        fedwatch_report = _build_fedwatch_template(data)
-        reports_to_send.append(("🏦 رادار الفيدرالي وتسعير الفائدة", fedwatch_report))
+        try:
+            # ── القالب الرابع: تسعير الفائدة (FedWatch) ──
+            fedwatch_report = _build_fedwatch_template(data)
+            reports_to_send.append(("🏦 رادار الفيدرالي وتسعير الفائدة", fedwatch_report))
+        except Exception as e:
+            log.error(f'❌ [Bot 7] فشل قالب: {e}')
+
         
-        # ── القالب الخامس: أفضل صفقة لوت عالي سريعة ──
-        best_scalp_report = _build_best_high_lot_scalp_template(data, cam)
-        reports_to_send.append(("⚡ أفضل صفقة لوت عالي (سكالبينج)", best_scalp_report))
+        try:
+            # ── القالب الخامس: أفضل صفقة لوت عالي سريعة ──
+            best_scalp_report = _build_best_high_lot_scalp_template(data, cam)
+            reports_to_send.append(("⚡ أفضل صفقة لوت عالي (سكالبينج)", best_scalp_report))
+        except Exception as e:
+            log.error(f'❌ [Bot 7] فشل قالب: {e}')
+
         
-        # ── القالب السادس: أفضل صفقة حتى نهاية الساعة ──
-        best_hourly_report = _build_best_hourly_trade_template(data)
-        reports_to_send.append(("⏳ أفضل صفقة حتى نهاية الساعة", best_hourly_report))
+        try:
+            # ── القالب السادس: أفضل صفقة حتى نهاية الساعة ──
+            best_hourly_report = _build_best_hourly_trade_template(data)
+            reports_to_send.append(("⏳ أفضل صفقة حتى نهاية الساعة", best_hourly_report))
+        except Exception as e:
+            log.error(f'❌ [Bot 7] فشل قالب: {e}')
+
         
-        # ── القالب السابع: مسار اليوم (خارطة الطريق) ──
-        trajectory_report = _build_daily_trajectory_template(data, cp_mock)
-        reports_to_send.append(("🗺️ خارطة طريق اليوم (المسار المتوقع)", trajectory_report))
+        try:
+            # ── القالب السابع: مسار اليوم (خارطة الطريق) ──
+            trajectory_report = _build_daily_trajectory_template(data, cp_mock)
+            reports_to_send.append(("🗺️ خارطة طريق اليوم (المسار المتوقع)", trajectory_report))
+        except Exception as e:
+            log.error(f'❌ [Bot 7] فشل قالب: {e}')
+
         
-        # ── القالب الثامن: المنطقة الحالية (الاتجاه، الهدف، ومتى؟) ──
-        zone_report = _build_current_zone_template(data, cp_mock)
-        reports_to_send.append(("🧭 حالة المنطقة الحالية (الهدف والزمن)", zone_report))
+        try:
+            # ── القالب الثامن: المنطقة الحالية (الاتجاه، الهدف، ومتى؟) ──
+            zone_report = _build_current_zone_template(data, cp_mock)
+            reports_to_send.append(("🧭 حالة المنطقة الحالية (الهدف والزمن)", zone_report))
+        except Exception as e:
+            log.error(f'❌ [Bot 7] فشل قالب: {e}')
+
         
-        # ── القالب التاسع: الصفقة الأعظم على الإطلاق ──
-        greatest_trade_report = _build_greatest_trade_template(data, cp_mock)
-        reports_to_send.append(("👑 الصفقة الأعظم على الإطلاق", greatest_trade_report))
+        try:
+            # ── القالب التاسع: الصفقة الأعظم على الإطلاق ──
+            greatest_trade_report = _build_greatest_trade_template(data, cp_mock)
+            reports_to_send.append(("👑 الصفقة الأعظم على الإطلاق", greatest_trade_report))
+        except Exception as e:
+            log.error(f'❌ [Bot 7] فشل قالب: {e}')
+
         
-        # ── القالب العاشر: عقلية الفيدرالي (الماكرو الاقتصادي) ──
-        fed_mindset_report = _build_fed_mindset_template(data)
-        reports_to_send.append(("🧠 كيف يفكر الفيدرالي؟ (الروابط الأربعة)", fed_mindset_report))
+        try:
+            # ── القالب العاشر: عقلية الفيدرالي (الماكرو الاقتصادي) ──
+            fed_mindset_report = _build_fed_mindset_template(data)
+            reports_to_send.append(("🧠 كيف يفكر الفيدرالي؟ (الروابط الأربعة)", fed_mindset_report))
+        except Exception as e:
+            log.error(f'❌ [Bot 7] فشل قالب: {e}')
+
         
     except Exception as e:
         log.error(f"❌ [Bot 7] فشل توليد قالب الكاماريلا: {e}\n{traceback.format_exc()}")
@@ -177,6 +216,51 @@ def process_and_send_bot7(data: dict) -> list:
                             local_time.sleep(2)
             import time
             time.sleep(1)  # لتجنب حظر التيليجرام لكثرة الرسائل
+
+    # ── إرسال قالب ATR للبوت الجديد ──
+    if TELEGRAM_BOT_ATR_TOKEN and TELEGRAM_BOT_ATR_CHAT:
+        try:
+            log.info("📤 [Bot 7 / ATR] جاري تجهيز وإرسال قالب الـ ATR للجروب السابع الخاص...")
+            atr_content = build_template_quant_atr_backup(data)
+            
+            atr_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_ATR_TOKEN}/sendMessage"
+            atr_ip_url = f"https://149.154.167.220/bot{TELEGRAM_BOT_ATR_TOKEN}/sendMessage"
+            atr_chunks = _split_msg(atr_content)
+            
+            for chunk_idx, chunk in enumerate(atr_chunks, 1):
+                payload = {
+                    "chat_id": TELEGRAM_BOT_ATR_CHAT,
+                    "text": chunk,
+                    "disable_web_page_preview": True
+                }
+                
+                for attempt in range(3):
+                    try:
+                        import httpx
+                        with httpx.Client(timeout=12.0, headers=headers) as client:
+                            client.post(atr_url, json=payload).raise_for_status()
+                            log.info("✅ [Bot 7 / ATR] تم الإرسال للجروب الخاص بنجاح (httpx).")
+                            break
+                    except Exception as e:
+                        try:
+                            import requests
+                            import urllib3
+                            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                            requests.post(atr_ip_url, json=payload, headers=ip_headers, timeout=10.0, verify=False).raise_for_status()
+                            log.info("✅ [Bot 7 / ATR] تم الإرسال بنجاح (Direct IPv4).")
+                            break
+                        except Exception as e2:
+                            try:
+                                import requests
+                                requests.post(atr_url, json=payload, headers=headers, timeout=12.0).raise_for_status()
+                                log.info("✅ [Bot 7 / ATR] تم الإرسال بنجاح (requests).")
+                                break
+                            except Exception as e3:
+                                log.error(f"❌ [Bot 7 / ATR] محاولة {attempt+1} فشلت: {e3}")
+                                import time
+                                time.sleep(2)
+        except Exception as e:
+            log.error(f"❌ [Bot 7 / ATR] فشل كلي في إرسال قالب الـ ATR: {e}")
 
     return reports_to_send
 
@@ -321,7 +405,7 @@ def _build_fedwatch_template(data: dict) -> str:
     current_fed_rate = data.get('interest_rate', 5.50)
     
     try:
-        # جلب عقود الفيدرالي الآجلة
+        # جلب عقود الفيدرالي الفورية
         tk = yf.Ticker("ZQ=F")
         df = tk.history(period="1d")
         if df.empty:

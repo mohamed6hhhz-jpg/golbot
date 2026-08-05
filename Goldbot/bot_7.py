@@ -173,8 +173,9 @@ def process_and_send_bot7(data: dict) -> list:
                             break
                         except Exception as req_err:
                             log.error(f"❌ [Bot 7] استثناء أثناء الإرسال: {req_err}")
-                            import time
-                            time.sleep(2)
+                            import time as local_time
+                            local_time.sleep(2)
+            import time
             time.sleep(1)  # لتجنب حظر التيليجرام لكثرة الرسائل
 
     return reports_to_send

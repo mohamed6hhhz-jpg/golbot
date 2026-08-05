@@ -9315,8 +9315,9 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                         flat_chunks_7.append((idx, title, content, None))
                     
                     _summary7_text = _build_group_summary(data, "البوت السابع (الكاماريلا والنماذج المتقدمة)", flat_chunks_7)
-                    # يمكننا إرسال خلاصة البوت السابع إذا لزم الأمر، لكن حالياً نكتفي بتوليدها
-                    log.info("✅ [Summary7] تم معالجة البوت السابع بنجاح.")
+                    from Goldbot.bot_7 import TELEGRAM_BOT7_TOKEN, TELEGRAM_BOT7_CHAT
+                    send_summary_to_bot(TELEGRAM_BOT7_TOKEN, _summary7_text, TELEGRAM_BOT7_CHAT)
+                    log.info("✅ [Summary7] تم معالجة وإرسال خلاصة البوت السابع بنجاح.")
                 else:
                     _summary7_text = "لا توجد قوالب جديدة لهذا البوت حالياً."
                     
@@ -9332,7 +9333,8 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     locals().get('_summary2_text', ''),
                     locals().get('_summary3_text', ''),
                     locals().get('_summary4_text', ''),
-                    locals().get('_summary5_text', '')
+                    locals().get('_summary5_text', ''),
+                    locals().get('_summary7_text', '')
                 )
                 
                 # بناء الحزمة الرباعية للبوت الخامس
@@ -9703,8 +9705,8 @@ MACD: {macd}
         return fallback_text
 
 
-def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text: str, s4_text: str, s5_text: str) -> str:
-    """الملخص الشامل والنهائي الملكي الجامع للملخصات الخمسة ولـ 50 قالباً خوارزمياً"""
+def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text: str, s4_text: str, s5_text: str, s7_text: str) -> str:
+    """الملخص الشامل والنهائي الملكي الجامع للملخصات الستة ولـ 50 قالباً خوارزمياً"""
     nums = _s_nums(data)
     gold   = nums['gold']
     atr    = nums['atr']
@@ -9772,7 +9774,7 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
         "👑🏆 الملخص العام والشامل للمنظومة الخوارزمية (Grand Master Summary) 🏆👑",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
         f"📅 التوقيت: {now_str}",
-        f"⚡ تم دمج وربط نتائج القوالب التحليلية من البوتات الخمسة للمنظومة",
+        f"⚡ تم دمج وربط نتائج القوالب التحليلية من البوتات الستة للمنظومة",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
         "🎯 الحكم الخوارزمي والمؤسسي الموحد:",
         f"   ├ 🏆 القرار النهائي للمنظومة: {grand_verdict}",
@@ -9785,12 +9787,13 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
         f"   ├ 🔴 مناطق العرض والمقاومة: R1 = {r1:.2f}$ | R2 = {r2:.2f}$",
         f"   └ 🛡️ نقطة الارتكاز المحورية (Pivot): {pivot:.2f}$",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "📋 محصلة الركائز الخمسة للمنظومة:",
+        "📋 محصلة الركائز الستة للمنظومة:",
         "   🔹 البوت 1 (الكمي الأساسي): تحديد الاتجاه العام وبيئة الاقتصاد الكلي.",
         "   🔹 البوت 2 (المتخصص المتقدم): خوارزميات السيولة، المؤسسات، ومناطق الارتكاز المغناطيسية.",
         "   🔹 البوت 3 (الفوري الدقيق): التحليل اللحظي ومناطق الصفقات الفورية المضاربية.",
         "   🔹 البوت 4 (الرادار ومحافظ الحيتان): صفقات البلوك تريز، مصفوفة الزمن، وهيمنة الحيتان.",
         "   🔹 البوت 5 (المحرك الهجين): تقارير COT المؤسسية، ومناطق العرض ونظام كسر الأرقام.",
+        "   🔹 البوت 7 (النماذج المتقدمة): كاماريلا، زوايا جان، هارمونيك، وموجات إليوت.",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
         f"⚠️ تنبيه المخاطر: {risk_note} — الالتزام بالارتكاز أمر إلزامي.",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━",
@@ -9801,7 +9804,7 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
     try:
         import random, requests
         prompt = f"""أنت كبير المحللين الاقتصاديين وخبير الخوارزميات المؤسسية لمنظومة Goldbot الملكية.
-مطلوب منك كتابة "خلاصة تنفيذية عليا" موجزة في 4-5 أسطر تربط بين ملخصات البوتات الخمسة التالية للذهب (XAU/USD) لتكون وثيقة واحدة متناغمة دون أي تعارض أو تناقض.
+مطلوب منك كتابة "خلاصة تنفيذية عليا" موجزة في 4-5 أسطر تربط بين ملخصات البوتات الستة التالية للذهب (XAU/USD) لتكون وثيقة واحدة متناغمة دون أي تعارض أو تناقض.
 
 البيانات الفنية الموحدة لجميع البوتات:
 السعر الحالي: {gold}$
@@ -9827,8 +9830,11 @@ def _build_grand_master_summary(data: dict, s1_text: str, s2_text: str, s3_text:
 ملخص البوت الخامس (COT وكسر الأرقام):
 {s5_text[:400]}
 
+ملخص البوت السابع (النماذج المتقدمة والكاماريلا):
+{s7_text[:400]}
+
 التعليمات:
-1. اكتب فقرة متصلة احترافية جداً وموجزة (4 إلى 5 أسطر فقط) تلخص المش المشهد العام للذهب وتربط الاتجاه اللحظي واليومي بنظرة الحيتان المؤسسية، وتستفيد من بيانات COT والعرض المذكورة في البوت الخامس.
+1. اكتب فقرة متصلة احترافية جداً وموجزة (4 إلى 5 أسطر فقط) تلخص المشهد العام للذهب وتربط الاتجاه اللحظي واليومي بنظرة الحيتان المؤسسية، وتستفيد من بيانات COT والأساليب المتقدمة المذكورة.
 2. اعتمد على الأرقام الموحدة المذكورة بالأعلى فقط (الدعم {s1} والمقاومة {r1} والارتكاز {pivot}) ولا تذكر أي أرقام أخرى منعاً للتعارض.
 3. وجه كلامك للمتداول بوضوح حول أفضل خطة للتعامل مع السوق في الجلسة الحالية.
 """
@@ -9955,44 +9961,50 @@ def _build_bot5_summaries_bundle(data: dict, grand_text: str, ai_text: str) -> s
     grand_report = f"""👑 [4/4] الملخص العام والشامل للمنظومة
 {grand_text}"""
 
-    bundle = f"{quant_report}\n\n{ai_report}\n\n{bias_report}\n\n{grand_report}"
+    bundle = [quant_report, ai_report, bias_report, grand_report]
     return bundle
 def send_summary_to_bot(token, message, chat_id):
     import asyncio
     from telethon import TelegramClient
     
+    messages_to_send = message if isinstance(message, list) else [message]
+    
     async def _send_via_telethon() -> bool:
         session_name = f"summary_bot_{token[:10]}"
         client = TelegramClient(session_name, API_ID, API_HASH)
         
-        chunks = []
-        msg = message
-        while len(msg) > 4000:
-            split_idx = msg.rfind('\n', 0, 4000)
-            if split_idx == -1: split_idx = 4000
-            chunks.append(msg[:split_idx])
-            msg = msg[split_idx:]
-        if msg:
-            chunks.append(msg)
-            
         success = True
         try:
             await client.start(bot_token=token)
-            for chunk in chunks:
-                chunk_ok = False
-                for attempt in range(3):
-                    try:
-                        target_chat = _resolve_peer(int(chat_id) if str(chat_id).lstrip('-').isdigit() else chat_id)
-                        await client.send_message(target_chat, chunk)
-                        log.info(f"✅ [Summary Telethon] Sent summary chunk to {target_chat}")
-                        chunk_ok = True
-                        break
-                    except Exception as e:
-                        wait = 2 ** attempt
-                        log.warning(f"⚠️ [Summary Telethon Fallback] {attempt+1}/3 — Failed to send summary: {e} — waiting {wait}s")
-                        await asyncio.sleep(wait)
-                if not chunk_ok:
-                    success = False
+            target_chat = _resolve_peer(int(chat_id) if str(chat_id).lstrip('-').isdigit() else chat_id)
+            
+            for msg in messages_to_send:
+                chunks = []
+                temp_msg = msg
+                while len(temp_msg) > 4000:
+                    split_idx = temp_msg.rfind('\n', 0, 4000)
+                    if split_idx == -1: split_idx = 4000
+                    chunks.append(temp_msg[:split_idx])
+                    temp_msg = temp_msg[split_idx:]
+                if temp_msg:
+                    chunks.append(temp_msg)
+                    
+                for chunk in chunks:
+                    chunk_ok = False
+                    for attempt in range(3):
+                        try:
+                            await client.send_message(target_chat, chunk)
+                            log.info(f"✅ [Summary Telethon] Sent summary chunk to {target_chat}")
+                            chunk_ok = True
+                            break
+                        except Exception as e:
+                            wait = 2 ** attempt
+                            log.warning(f"⚠️ [Summary Telethon Fallback] {attempt+1}/3 — Failed to send summary: {e} — waiting {wait}s")
+                            await asyncio.sleep(wait)
+                    if not chunk_ok:
+                        success = False
+                await asyncio.sleep(1.5)  # Pause briefly between separate summary messages
+                
         except Exception as e:
             log.warning(f"⚠️ [Summary Telethon Exception] {e}")
             success = False
@@ -10006,10 +10018,12 @@ def send_summary_to_bot(token, message, chat_id):
         loop.close()
         if not ok:
             log.warning("⚠️ [Summary] Telethon failed or incomplete — trying HTTP fallback...")
-            _http_fallback_send(message, token, [], chat_id)
+            for msg in messages_to_send:
+                _http_fallback_send(msg, token, [], chat_id)
     except Exception as e:
         log.error(f"❌ [Summary Error] Failed Telethon loop: {e} — trying HTTP fallback...")
-        _http_fallback_send(message, token, [], chat_id)
+        for msg in messages_to_send:
+            _http_fallback_send(msg, token, [], chat_id)
 
 
 if __name__ == "__main__":

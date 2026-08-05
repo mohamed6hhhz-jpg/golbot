@@ -61,7 +61,7 @@ def send_to_bot6_telegram(text: str):
     chat_success = False
     for attempt in range(3):
         try:
-            with httpx.Client(timeout=15.0, headers=headers) as client:
+            with httpx.Client(timeout=10.0, headers=headers) as client:
                 r = client.post(url, json=payload)
                 if r.status_code != 200:
                     log.warning(f"⚠️ [Bot 6] خطأ تيليجرام (httpx): {r.text}")
@@ -72,7 +72,7 @@ def send_to_bot6_telegram(text: str):
         except Exception as e:
             log.warning(f"⚠️ [Bot 6] {attempt+1}/3 محاولة httpx فشلت: {e}")
             try:
-                r = requests.post(ip_url, json=payload, headers=ip_headers, timeout=15.0, verify=False)
+                r = requests.post(ip_url, json=payload, headers=ip_headers, timeout=10.0, verify=False)
                 if r.status_code != 200:
                     log.warning(f"⚠️ [Bot 6] خطأ تيليجرام (IPv4): {r.text}")
                 r.raise_for_status()
@@ -82,7 +82,7 @@ def send_to_bot6_telegram(text: str):
             except Exception as e2:
                 log.warning(f"⚠️ [Bot 6] {attempt+1}/3 محاولة Direct IPv4 فشلت: {e2}")
                 try:
-                    r = requests.post(url, json=payload, headers=headers, timeout=15.0)
+                    r = requests.post(url, json=payload, headers=headers, timeout=10.0)
                     if r.status_code != 200:
                         log.warning(f"⚠️ [Bot 6] خطأ تيليجرام (requests): {r.text}")
                     r.raise_for_status()

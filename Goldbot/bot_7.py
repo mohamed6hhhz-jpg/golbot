@@ -139,7 +139,7 @@ def process_and_send_bot7(data: dict) -> list:
             for attempt in range(3):
                 try:
                     import httpx
-                    with httpx.Client(timeout=20.0, headers=headers) as client:
+                    with httpx.Client(timeout=12.0, headers=headers) as client:
                         resp = client.post(url, json=payload)
                         resp.raise_for_status()
                         if len(chunks) > 1:
@@ -153,7 +153,7 @@ def process_and_send_bot7(data: dict) -> list:
                         import requests
                         import urllib3
                         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-                        resp = requests.post(ip_url, json=payload, headers=ip_headers, timeout=20.0, verify=False)
+                        resp = requests.post(ip_url, json=payload, headers=ip_headers, timeout=10.0, verify=False)
                         resp.raise_for_status()
                         if len(chunks) > 1:
                             log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} (جزء {chunk_idx}/{len(chunks)}) بنجاح (Direct IPv4).")
@@ -164,7 +164,7 @@ def process_and_send_bot7(data: dict) -> list:
                         log.warning(f"⚠️ [Bot 7] محاولة {attempt+1} (Direct IPv4) فشلت: {e2} — تجربة requests...")
                         try:
                             import requests
-                            resp = requests.post(url, json=payload, headers=headers, timeout=20.0)
+                            resp = requests.post(url, json=payload, headers=headers, timeout=12.0)
                             resp.raise_for_status()
                             if len(chunks) > 1:
                                 log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} (جزء {chunk_idx}/{len(chunks)}) بنجاح (requests).")

@@ -3003,54 +3003,9 @@ async def _telethon_send(text: str) -> bool:
 
 
 def _http_send(text: str, is_public_allowed: bool = True, chat_id=None) -> bool:
-    """الإرسال عبر HTTP Bot API باستخدام httpx و requests كاحتياطي مزدوج مع timeout طويل."""
-    import httpx
-    import requests
-    import time
-    import urllib3
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    """الإرسال عبر HTTP Bot API باستخدام السقوط الاحتياطي المباشر للـ IPv4 بدون تأخير طويل."""
+    return _http_fallback_send(text, TELEGRAM_BOT_TOKEN, BOT1_CHATS, chat_id)
 
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    ip_url = f"https://149.154.167.220/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-    ip_headers = dict(headers)
-    ip_headers["Host"] = "api.telegram.org"
-    
-    success = True
-    targets = [chat_id] if chat_id else BOT1_CHATS
-    for chat in targets:
-        payload = {"chat_id": str(chat), "text": text}
-        chat_success = False
-        for attempt in range(3):
-            try:
-                with httpx.Client(timeout=35.0, headers=headers) as client:
-                    r = client.post(url, json=payload)
-                    r.raise_for_status()
-                    chat_success = True
-                    break
-            except Exception as e:
-                log.warning(f"⚠️ [HTTP httpx] {attempt+1}/3 — {e} — تجربة requests...")
-                try:
-                    r = requests.post(url, json=payload, headers=headers, timeout=35.0)
-                    r.raise_for_status()
-                    chat_success = True
-                    break
-                except Exception as e2:
-                    log.warning(f"⚠️ [HTTP requests] {attempt+1}/3 — {e2} — تجربة Direct IPv4...")
-                    try:
-                        r = requests.post(ip_url, json=payload, headers=ip_headers, timeout=35.0, verify=False)
-                        r.raise_for_status()
-                        chat_success = True
-                        break
-                    except Exception as e3:
-                        wait = 2 ** attempt
-                        log.warning(f"⚠️ [HTTP IPv4] {attempt+1}/3 — {e3} — انتظار {wait}s")
-                        time.sleep(wait)
-        if not chat_success: success = False
-    return success
 
 
 def send_to_telegram(message: str, chat_id=None) -> bool:
@@ -8867,36 +8822,10 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             
             test_bot_token = TELEGRAM_TOKENS.get("bot_daily")
             if test_bot_token and BOT_DAILY_CHAT_ID:
-                import requests
-                import urllib3
-                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-                
-                url_t = f"https://api.telegram.org/bot{test_bot_token}/sendMessage"
-                ip_url_t = f"https://149.154.167.220/bot{test_bot_token}/sendMessage"
-                headers_t = {"User-Agent": "Mozilla/5.0"}
-                ip_headers_t = {"User-Agent": "Mozilla/5.0", "Host": "api.telegram.org"}
-
                 for t_idx, t_test in enumerate([t1_test, t2_test, t3_test], 1):
                     t_test = _inject_live_price(t_test)
                     for chunk in _split_message(t_test):
-                        success = False
-                        payload = {"chat_id": BOT_DAILY_CHAT_ID, "text": chunk}
-                        for attempt in range(2):
-                            try:
-                                r = requests.post(url_t, json=payload, headers=headers_t, timeout=15)
-                                r.raise_for_status()
-                                success = True
-                                break
-                            except Exception as e:
-                                log.warning(f"⚠️ [TestTemplate] Failed to send chunk for template {t_idx} (attempt {attempt+1}): {e}")
-                                try:
-                                    r = requests.post(ip_url_t, json=payload, headers=ip_headers_t, timeout=15, verify=False)
-                                    r.raise_for_status()
-                                    success = True
-                                    break
-                                except Exception as e2:
-                                    log.warning(f"⚠️ [TestTemplate] IPv4 fallback failed for chunk of template {t_idx}: {e2}")
-                                    time.sleep(1)
+                        success = _http_fallback_send(chunk, test_bot_token, [BOT_DAILY_CHAT_ID])
                         if not success:
                             log.error(f"❌ [TestTemplate] Final failure for chunk of test template {t_idx}")
                         time.sleep(2)

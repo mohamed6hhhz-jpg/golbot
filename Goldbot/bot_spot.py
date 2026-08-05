@@ -8787,24 +8787,28 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 ip_headers_t = {"User-Agent": "Mozilla/5.0", "Host": "api.telegram.org"}
 
                 for t_idx, t_test in enumerate([t1_test, t2_test, t3_test], 1):
-                    success = False
-                    for attempt in range(2):
-                        try:
-                            requests.post(url_t, data={"chat_id": BOT_DAILY_CHAT_ID, "text": t_test}, headers=headers_t, timeout=15)
-                            success = True
-                            break
-                        except Exception as e:
-                            log.warning(f"⚠️ [TestTemplate] Failed to send template {t_idx} (attempt {attempt+1}): {e}")
+                    for chunk in _split_message(t_test):
+                        success = False
+                        payload = {"chat_id": BOT_DAILY_CHAT_ID, "text": chunk}
+                        for attempt in range(2):
                             try:
-                                requests.post(ip_url_t, data={"chat_id": BOT_DAILY_CHAT_ID, "text": t_test}, headers=ip_headers_t, timeout=15, verify=False)
+                                r = requests.post(url_t, json=payload, headers=headers_t, timeout=15)
+                                r.raise_for_status()
                                 success = True
                                 break
-                            except Exception as e2:
-                                log.warning(f"⚠️ [TestTemplate] IPv4 fallback failed for template {t_idx}: {e2}")
-                                time.sleep(1)
-                    if not success:
-                        log.error(f"❌ [TestTemplate] Final failure for test template {t_idx}")
-                    time.sleep(2)
+                            except Exception as e:
+                                log.warning(f"⚠️ [TestTemplate] Failed to send chunk for template {t_idx} (attempt {attempt+1}): {e}")
+                                try:
+                                    r = requests.post(ip_url_t, json=payload, headers=ip_headers_t, timeout=15, verify=False)
+                                    r.raise_for_status()
+                                    success = True
+                                    break
+                                except Exception as e2:
+                                    log.warning(f"⚠️ [TestTemplate] IPv4 fallback failed for chunk of template {t_idx}: {e2}")
+                                    time.sleep(1)
+                        if not success:
+                            log.error(f"❌ [TestTemplate] Final failure for chunk of test template {t_idx}")
+                        time.sleep(2)
                 log.info("✅ تم الانتهاء من إرسال قوالب التيست (ATR) إلى جروب التيست.")
     except Exception as e:
         log.error(f"❌ فشل توليد/إرسال قوالب التيست: {e}")

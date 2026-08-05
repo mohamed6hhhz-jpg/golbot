@@ -1450,11 +1450,8 @@ def get_full_market_data(mode: str = "spot") -> dict | None:
 
     # [11] 15m data for short-term trend (moved to top)
 
-    gold_spot, spot_date = _last_with_date(gold_daily)
-    # لو كل مصادر الفوري فشلت — اعرض غير متاح (لا نستبدل بالفوري عشان يكونوا مختلفين دائماً)
-    if not gold_spot:
-        gold_spot = None
-        spot_date = None
+    # تم الحفاظ على gold_spot المجلوب من مصادر الفوري في أعلى الدالة
+    # ولن يتم استبداله ببيانات gold_daily (التي أصبحت GC=F)
     silver = _last_close(silver_df)
     oil    = _last_close(oil_df)
     dxy    = _last_close(dxy_df)
@@ -1766,37 +1763,35 @@ def get_full_market_data(mode: str = "spot") -> dict | None:
         try:
             _td_url = f"https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1day&outputsize=4&apikey={TWELVEDATA_API_KEY}"
             _resp = requests.get(_td_url, timeout=5).json()
-            if "values" in _resp and len(_resp["values"]) >= 2:
-                _today_str = cairo_now().strftime("%Y-%m-%d")
-                _valid_candles = []
-                for _val in _resp["values"]:
-                    if _val["datetime"][:10] != _today_str:
-                        if abs(float(_val["high"]) - float(_val["low"])) > 3.0:
-                            _valid_candles.append(_val)
+            if "values" in _resp and len(_resp["values"]) > 0:
+                _today_candle = _resp["values"][0]
+                ph = float(_today_candle["high"])
+                pl = float(_today_candle["low"])
+                # استخدم السعر اللحظي الفعلي إذا كان متوفراً ليكون الإغلاق اللحظي، وإلا استخدم إغلاق الشمعة
+                pc = float(gold_spot) if gold_spot else float(_today_candle["close"])
                 
-                if _valid_candles:
-                    _yest = _valid_candles[0]
-                    ph = float(_yest["high"])
-                    pl = float(_yest["low"])
-                    pc = float(_yest["close"])
-                    td_fetched = True
-                    log.info(f"✅ تم جلب شمعة الأمس بدقة 100% من TwelveData: H={ph:.2f}, L={pl:.2f}, C={pc:.2f}")
+                # تحديث High و Low في حال كان السعر اللحظي اخترق أحدهما
+                if gold_spot:
+                    ph = max(ph, float(gold_spot))
+                    pl = min(pl, float(gold_spot))
+                    
+                td_fetched = True
+                log.info(f"✅ تم جلب شمعة اليوم بدقة 100% من TwelveData للبيفوت: H={ph:.2f}, L={pl:.2f}, C={pc:.2f}")
         except Exception as e:
-            log.warning(f"⚠️ فشل جلب بيانات الأمس من TwelveData للبيفوت: {e}")
+            log.warning(f"⚠️ فشل جلب بيانات اليوم من TwelveData للبيفوت: {e}")
 
     # الرجوع لياهو فاينانس إذا فشل TwelveData
     if not td_fetched:
         _last_dt = gold_daily.index[-1].date()
-        _today_dt = cairo_now().date()
-        if _last_dt == _today_dt:
-            ph = float(gold_daily['High'].iloc[-2])
-            pl = float(gold_daily['Low'].iloc[-2])
-            pc = float(gold_daily['Close'].iloc[-2])
-        else:
-            ph = float(gold_daily['High'].iloc[-1])
-            pl = float(gold_daily['Low'].iloc[-1])
-            pc = float(gold_daily['Close'].iloc[-1])
-        log.info(f"⚠️ جلب بيانات الأمس من Yahoo (XAUUSD=X) بسبب فشل TwelveData: H={ph:.2f}, L={pl:.2f}, C={pc:.2f}")
+        ph = float(gold_daily['High'].iloc[-1])
+        pl = float(gold_daily['Low'].iloc[-1])
+        pc = float(gold_spot) if gold_spot else float(gold_daily['Close'].iloc[-1])
+        
+        if gold_spot:
+            ph = max(ph, float(gold_spot))
+            pl = min(pl, float(gold_spot))
+            
+        log.info(f"⚠️ جلب بيانات اليوم من Yahoo (GC=F) بسبب فشل TwelveData: H={ph:.2f}, L={pl:.2f}, C={pc:.2f}")
 
     # المعادلة الكلاسيكية الدقيقة (بدون أي تعديلات عشوائية)
     pivot = round((ph + pl + pc) / 3, 2)
@@ -1808,17 +1803,10 @@ def get_full_market_data(mode: str = "spot") -> dict | None:
     s3    = round(pl - 2*(ph-pivot), 2)
     # metadata: Classic Pivot
     try:
-        _data_d = gold_daily.index[-2].date()
         _today_d = cairo_now().date()
-        _days_diff = (_today_d - _data_d).days
-        if _days_diff == 0:
-            _pivot_data_date = f"اليوم ({_data_d})"
-        elif _days_diff == 1:
-            _pivot_data_date = f"أمس ({_data_d})"
-        else:
-            _pivot_data_date = f"{_data_d} (قبل {_days_diff} أيام)"
+        _pivot_data_date = f"اليوم ({_today_d}) — مبني على سعر وحركة اليوم المباشرة"
     except Exception:
-        _pivot_data_date = "أمس"
+        _pivot_data_date = "اليوم — مباشر"
     _pivot_source = "spot"
     _pivot_conf   = 100
 

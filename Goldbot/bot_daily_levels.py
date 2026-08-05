@@ -126,7 +126,7 @@ def fetch_daily_data() -> dict | None:
     except ImportError:
         from bot_spot import get_full_market_data
 
-    d = get_full_market_data()
+    d = get_full_market_data(mode="spot")
     if not d:
         log.error("❌ فشل جلب البيانات اليومية الدقيقة!")
         return None
@@ -634,7 +634,7 @@ def build_template_quant(d: dict) -> str:
 
     date_flag = "✅ "
     date_nat = " — طبيعي"
-    calc_status = "✅ بيفوت كلاسيكي"
+    calc_status = "✅ بيفوت ATR المحسن"
 
     template = f"""👑 📊 التقرير الكمي الشامل للذهب (الفوري - Spot)
 🔢 المستويات والصفقات (الفوري - Spot)
@@ -652,9 +652,9 @@ def build_template_quant(d: dict) -> str:
    📅 الأسبوع السابق → قمة: {w_high_str} | قاع: {w_low_str}
    📆 الشهر السابق   → قمة: {m_high_str} | قاع: {m_low_str}
    ═════════════════════════════
-   🔴 المقاومات: R1: {d.get('r1', '—')}$ | R2: {d.get('r2', '—')}$
-   💠 المحور: Pivot: {d.get('pivot', '—')}$
-   🟢 الدعوم: S1: {d.get('s1', '—')}$ | S2: {d.get('s2', '—')}$
+   🔴 المقاومات: R1: {d.get('atr_r1', '—')}$ | R2: {d.get('atr_r2', '—')}$
+   💠 المحور: Pivot: {d.get('atr_pivot', '—')}$
+   🟢 الدعوم: S1: {d.get('atr_s1', '—')}$ | S2: {d.get('atr_s2', '—')}$
    ═════════════════════════════
    📋 حالة البيانات والبيفوت:
     ▪️ المصدر: ✅ فوري (XAU/USD)

@@ -126,7 +126,7 @@ def fetch_daily_data() -> dict | None:
     except ImportError:
         from bot_spot import get_full_market_data
 
-    d = get_full_market_data(mode="spot")
+    d = get_full_market_data()
     if not d:
         log.error("❌ فشل جلب البيانات اليومية الدقيقة!")
         return None
@@ -204,7 +204,7 @@ def fetch_daily_data() -> dict | None:
 
 def calc_classical_pivots(h: float, l: float, c: float, ref_price: float = None, atr: float = None) -> dict:
     """
-    البيفوت المبني على ATR (تم التبديل بناءً على طلب المستخدم ليحل محل الكلاسيكي).
+    البيفوت المبني على ATR (تم التبديل بناءً على طلب المستخدم ليحل محل الكلاسيكي في بوت التيست).
     """
     if ref_price is not None and atr is not None and atr > 0:
         pivot = round(ref_price, 2)
@@ -437,7 +437,7 @@ def build_template_classical(data: dict, cp: dict, trades: dict) -> str:
         f"\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📅 بيانات شمعة أمس ({data['prev_date']})"
-        f" — المصدر الذي تُحسب منه كل المستويات\n"
+        f" — المصدر الذي تُحسب منه بعض المؤشرات\n"
         f"   📈 القمة  (High)  : {data['prev_high']}$"
         f"  ← أعلى سعر وصله الذهب أمس\n"
         f"   📉 القاع  (Low)   : {data['prev_low']}$"
@@ -450,6 +450,7 @@ def build_template_classical(data: dict, cp: dict, trades: dict) -> str:
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🔢 خريطة المستويات المستندة لـ ATR\n"
         f"   (المحسوبة من السعر الفوري والـ ATR)\n"
+        f"\n"
         f"   🔴 R3 = {cp['r3']}$  ← مقاومة قوية جداً (يصلها السعر نادراً)\n"
         f"   🟠 R2 = {cp['r2']}$  ← مقاومة ثانية (هدف صعود متقدم)\n"
         f"   🔺 R1 = {cp['r1']}$  ← مقاومة أولى (أول عائق أمام الصعود)\n"
@@ -652,9 +653,9 @@ def build_template_quant(d: dict) -> str:
    📅 الأسبوع السابق → قمة: {w_high_str} | قاع: {w_low_str}
    📆 الشهر السابق   → قمة: {m_high_str} | قاع: {m_low_str}
    ═════════════════════════════
-   🔴 المقاومات: R1: {d.get('atr_r1', '—')}$ | R2: {d.get('atr_r2', '—')}$
-   💠 المحور: Pivot: {d.get('atr_pivot', '—')}$
-   🟢 الدعوم: S1: {d.get('atr_s1', '—')}$ | S2: {d.get('atr_s2', '—')}$
+   🔴 المقاومات: R1: {d.get('r1', '—')}$ | R2: {d.get('r2', '—')}$
+   💠 المحور: Pivot: {d.get('pivot', '—')}$
+   🟢 الدعوم: S1: {d.get('s1', '—')}$ | S2: {d.get('s2', '—')}$
    ═════════════════════════════
    📋 حالة البيانات والبيفوت:
     ▪️ المصدر: ✅ فوري (XAU/USD)
@@ -717,6 +718,7 @@ def _run_once():
     cp  = calc_classical_pivots(h, l, c, ref_price=ref, atr=atr)
     cam = calc_camarilla_pivots(h, l, c)
 
+
     log.info(f"📐 [Classical] Pivot={cp['pivot']} | R1={cp['r1']} | S1={cp['s1']}")
     log.info(f"🎯 [Camarilla] H3={cam['h3']} | L3={cam['l3']} | H4={cam['h4']} | L4={cam['l4']}")
 
@@ -727,6 +729,15 @@ def _run_once():
     # 4. بناء القوالب
     t1 = build_template_classical(data, cp, trades_cl)
     t2 = build_template_camarilla(data, cam, cp, trades_cam)
+    
+    # تحديث البيانات بالبيفوت الخاص بـ ATR للقالب الكمي
+    data["pivot"] = cp["pivot"]
+    data["r1"] = cp["r1"]
+    data["r2"] = cp["r2"]
+    data["r3"] = cp["r3"]
+    data["s1"] = cp["s1"]
+    data["s2"] = cp["s2"]
+    data["s3"] = cp["s3"]
     t3 = build_template_quant(data)
 
     # 5. الإرسال

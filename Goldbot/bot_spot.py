@@ -8687,6 +8687,51 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
     log.info("🤖 [Spot] بدء توليد التقارير (خارج القفل)...")
     raw_reports = []
 
+    # ── [توليد قوالب التيست اليومية وإرسالها فوراً لجروب التيست] ──
+    try:
+        from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT_DAILY_CHAT_ID
+        from Goldbot.bot_daily_levels import calc_classical_pivots, calc_camarilla_pivots, _trades_from_levels, build_template_classical, build_template_camarilla, build_template_quant
+        
+        h = data.get("prev_high", 0)
+        l = data.get("prev_low", 0)
+        c = data.get("prev_close", 0)
+        
+        if h > 0 and l > 0 and c > 0:
+            _ref = data.get("spot_price") or round((h + l + c) / 3, 2)
+            _atr = data.get("atr", 0)
+            
+            _cp  = calc_classical_pivots(h, l, c, ref_price=_ref, atr=_atr)
+            _cam = calc_camarilla_pivots(h, l, c)
+            
+            _trades_cl  = _trades_from_levels(_cp,  "classical",  _ref, _atr)
+            _trades_cam = _trades_from_levels(_cam, "camarilla",  _ref, _atr)
+            
+            t1_test = build_template_classical(data, _cp, _trades_cl)
+            t2_test = build_template_camarilla(data, _cam, _cp, _trades_cam)
+            
+            d_quant = data.copy()
+            d_quant["pivot"] = _cp["pivot"]
+            d_quant["r1"] = _cp["r1"]
+            d_quant["r2"] = _cp["r2"]
+            d_quant["r3"] = _cp["r3"]
+            d_quant["s1"] = _cp["s1"]
+            d_quant["s2"] = _cp["s2"]
+            d_quant["s3"] = _cp["s3"]
+            t3_test = build_template_quant(d_quant)
+            
+            test_bot_token = TELEGRAM_TOKENS.get("bot_daily")
+            if test_bot_token and BOT_DAILY_CHAT_ID:
+                import requests
+                for t_test in [t1_test, t2_test, t3_test]:
+                    requests.post(
+                        f"https://api.telegram.org/bot{test_bot_token}/sendMessage",
+                        data={"chat_id": BOT_DAILY_CHAT_ID, "text": t_test},
+                        timeout=10
+                    )
+                log.info("✅ تم إرسال قوالب التيست (ATR) بنجاح إلى جروب التيست (بالتزامن مع التقارير الرئيسية).")
+    except Exception as e:
+        log.error(f"❌ فشل توليد/إرسال قوالب التيست: {e}")
+
     # ── القسم الثابت: تقسيم بمحتوى حقيقي لا بعدد الفواصل ──
     if report_text:
         for label, part in _split_fixed_report(report_text, "الفوري - Spot"):

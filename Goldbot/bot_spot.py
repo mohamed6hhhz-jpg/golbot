@@ -8804,6 +8804,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                                 time.sleep(1)
                     if not success:
                         log.error(f"❌ [TestTemplate] Final failure for test template {t_idx}")
+                    time.sleep(2)
                 log.info("✅ تم الانتهاء من إرسال قوالب التيست (ATR) إلى جروب التيست.")
     except Exception as e:
         log.error(f"❌ فشل توليد/إرسال قوالب التيست: {e}")
@@ -9193,14 +9194,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 log.info(f"✅ قالب {tmpl_idx}/{total_templates} وصل." if ok else f"❌ فشل قالب {tmpl_idx}/{total_templates}.")
                 time.sleep(2)
 
-            # ── خلاصة محورية 1 بعد انتهاء التقرير الأول ──
-            try:
-                _summary1_text = _build_group_summary(data, "التقرير الأول (الكمي الأساسي)", flat_chunks)
-                for c in BOT1_CHATS:
-                    send_summary_to_bot(TELEGRAM_BOT_TOKEN, _summary1_text, c)
-                log.info("✅ [Summary1] تم إرسال خلاصة التقرير الأول.")
-            except Exception as _e1:
-                log.error(f"❌ [Summary1] خطأ: {_e1}")
+
 
             # ── إرسال للبوت الجديد (القسم الثاني) ──
             if flat_chunks_2:
@@ -9221,14 +9215,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     log.info(f"✅ قالب البوت الثاني {tmpl_idx2}/{total_templates_2} وصل." if ok2 else f"❌ فشل قالب البوت الثاني {tmpl_idx2}/{total_templates_2}.")
                     time.sleep(2)
 
-            # ── خلاصة محورية 2 بعد انتهاء التقرير الثاني ──
-            try:
-                _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", flat_chunks_2)
-                for c in BOT2_CHATS:
-                    send_summary_to_bot(TELEGRAM_BOT_TOKEN_2, _summary2_text, c)
-                log.info("✅ [Summary2] تم إرسال خلاصة التقرير الثاني.")
-            except Exception as _e2:
-                log.error(f"❌ [Summary2] خطأ: {_e2}")
+
 
             # ── البوت الثالث: القوالب الفورية S1-S12 (@Dsssoppp78_bot) ──
             if 'bot3_reports' in locals() and bot3_reports:
@@ -9253,14 +9240,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     log.info(f"{'✅' if ok3 else '❌'} [Bot3] {tmpl_idx3}/{total_templates_3}")
                     time.sleep(2)
 
-                # ── خلاصة محورية 3 بعد انتهاء التقرير الثالث ──
-                try:
-                    _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", flat_chunks_3)
-                    for c in BOT3_CHATS:
-                        send_summary_to_bot(TELEGRAM_BOT_TOKEN_3, _summary3_text, c)
-                    log.info("✅ [Summary3] تم إرسال خلاصة التقرير الثالث.")
-                except Exception as _e3:
-                    log.error(f"❌ [Summary3] خطأ: {_e3}")
+
 
             # ── البوت الرابع: القوالب الجديدة (@Boonnii_bot) ──
             if flat_chunks_4:
@@ -9277,14 +9257,41 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                     log.info(f"{'✅' if ok4 else '❌'} [Bot4] {tmpl_idx4}/{BOT4_TOTAL}")
                     time.sleep(2)
 
-            # ── الخلاصة النهائية المجمعة من الثلاثة ──
+            # ── إرسال جميع الخلاصات بعد انتهاء كل البوتات ──
             try:
-                _summary4_text = _build_group_summary(data, "المجموعة الرابعة (الرادار الخوارزمي والمؤسسي)", flat_chunks_4)
-                for c in BOT4_CHATS:
-                    send_summary_to_bot(TELEGRAM_BOT_TOKEN_4, _summary4_text, c)
-                log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
-            except Exception as _e4:
-                log.error(f"❌ [Summary4] خطأ: {_e4}")
+                _summary1_text = _build_group_summary(data, "التقرير الأول (الكمي الأساسي)", flat_chunks)
+                for c in BOT1_CHATS:
+                    send_summary_to_bot(TELEGRAM_BOT_TOKEN, _summary1_text, c)
+                log.info("✅ [Summary1] تم إرسال خلاصة التقرير الأول.")
+            except Exception as _e1:
+                log.error(f"❌ [Summary1] خطأ: {_e1}")
+            
+            if flat_chunks_2:
+                try:
+                    _summary2_text = _build_group_summary(data, "التقرير الثاني (المتخصص والمتقدم)", flat_chunks_2)
+                    for c in BOT2_CHATS:
+                        send_summary_to_bot(TELEGRAM_BOT_TOKEN_2, _summary2_text, c)
+                    log.info("✅ [Summary2] تم إرسال خلاصة التقرير الثاني.")
+                except Exception as _e2:
+                    log.error(f"❌ [Summary2] خطأ: {_e2}")
+            
+            if 'bot3_reports' in locals() and bot3_reports:
+                try:
+                    _summary3_text = _build_group_summary(data, "التقرير الثالث (الفوري الدقيق)", flat_chunks_3)
+                    for c in BOT3_CHATS:
+                        send_summary_to_bot(TELEGRAM_BOT_TOKEN_3, _summary3_text, c)
+                    log.info("✅ [Summary3] تم إرسال خلاصة التقرير الثالث.")
+                except Exception as _e3:
+                    log.error(f"❌ [Summary3] خطأ: {_e3}")
+            
+            if flat_chunks_4:
+                try:
+                    _summary4_text = _build_group_summary(data, "المجموعة الرابعة (الرادار الخوارزمي والمؤسسي)", flat_chunks_4)
+                    for c in BOT4_CHATS:
+                        send_summary_to_bot(TELEGRAM_BOT_TOKEN_4, _summary4_text, c)
+                    log.info("✅ [Summary4] تم إرسال الخلاصة النهائية المجمعة.")
+                except Exception as _e4:
+                    log.error(f"❌ [Summary4] خطأ: {_e4}")
 
             # ── البوت السادس (المدمج في السلسلة) ──
             try:

@@ -1885,7 +1885,7 @@ def get_full_market_data(mode: str = "futures") -> dict | None:
         # [4] مستويات محسّنة
         vwap=vwap, prev_wk_high=prev_wk_high, prev_wk_low=prev_wk_low,
         prev_mo_high=prev_mo_high, prev_mo_low=prev_mo_low,
-        prev_high=ph, prev_low=pl, prev_close=pc,
+        prev_high=ph, prev_low=pl, prev_close=pc, prev_date="أمس",
         sd_demand=sd_demand, sd_supply=sd_supply,
         # [6] الأوبشن
         gld_pcr=gld_pcr, pcr_source=pcr_source,

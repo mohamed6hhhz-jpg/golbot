@@ -124,6 +124,10 @@ def process_and_send_bot7(data: dict) -> list:
         chunks = _split_msg(full_message)
         
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT7_TOKEN}/sendMessage"
+        ip_url = f"https://149.154.167.220/bot{TELEGRAM_BOT7_TOKEN}/sendMessage"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        ip_headers = dict(headers)
+        ip_headers["Host"] = "api.telegram.org"
         
         for chunk_idx, chunk in enumerate(chunks, 1):
             payload = {
@@ -134,20 +138,43 @@ def process_and_send_bot7(data: dict) -> list:
             
             for attempt in range(3):
                 try:
-                    import requests
-                    resp = requests.post(url, json=payload, timeout=20)
-                    if resp.status_code == 200:
+                    import httpx
+                    with httpx.Client(timeout=20.0, headers=headers) as client:
+                        resp = client.post(url, json=payload)
+                        resp.raise_for_status()
                         if len(chunks) > 1:
-                            log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} (جزء {chunk_idx}/{len(chunks)}) بنجاح.")
+                            log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} (جزء {chunk_idx}/{len(chunks)}) بنجاح (httpx).")
                         else:
-                            log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} بنجاح.")
+                            log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} بنجاح (httpx).")
                         break
-                    else:
-                        log.warning(f"⚠️ [Bot 7] محاولة {attempt+1} - خطأ في الإرسال: {resp.text}")
-                        time.sleep(2)
-                except Exception as req_err:
-                    log.error(f"❌ [Bot 7] استثناء أثناء الإرسال: {req_err}")
-                    time.sleep(2)
+                except Exception as e:
+                    log.warning(f"⚠️ [Bot 7] محاولة {attempt+1} (httpx) فشلت: {e} — تجربة Direct IPv4...")
+                    try:
+                        import requests
+                        import urllib3
+                        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                        resp = requests.post(ip_url, json=payload, headers=ip_headers, timeout=20.0, verify=False)
+                        resp.raise_for_status()
+                        if len(chunks) > 1:
+                            log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} (جزء {chunk_idx}/{len(chunks)}) بنجاح (Direct IPv4).")
+                        else:
+                            log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} بنجاح (Direct IPv4).")
+                        break
+                    except Exception as e2:
+                        log.warning(f"⚠️ [Bot 7] محاولة {attempt+1} (Direct IPv4) فشلت: {e2} — تجربة requests...")
+                        try:
+                            import requests
+                            resp = requests.post(url, json=payload, headers=headers, timeout=20.0)
+                            resp.raise_for_status()
+                            if len(chunks) > 1:
+                                log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} (جزء {chunk_idx}/{len(chunks)}) بنجاح (requests).")
+                            else:
+                                log.info(f"✅ [Bot 7] تم إرسال القالب {idx}/{total} بنجاح (requests).")
+                            break
+                        except Exception as req_err:
+                            log.error(f"❌ [Bot 7] استثناء أثناء الإرسال: {req_err}")
+                            import time
+                            time.sleep(2)
             time.sleep(1)  # لتجنب حظر التيليجرام لكثرة الرسائل
 
     return reports_to_send

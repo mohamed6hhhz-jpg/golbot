@@ -149,24 +149,23 @@ def fetch_daily_data() -> dict | None:
         try:
             url = f"https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1day&outputsize=4&apikey={td_key}"
             resp = requests.get(url, timeout=5).json()
-            if "values" in resp and len(resp["values"]) > 0:
-                today_candle = resp["values"][0]
-                ph = round(float(today_candle["high"]), 2)
-                pl = round(float(today_candle["low"]), 2)
+            if "values" in resp and len(resp["values"]) >= 2:
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                valid_candles = []
+                for val in resp["values"]:
+                    if val["datetime"][:10] != today_str:
+                        if abs(float(val["high"]) - float(val["low"])) > 3.0:
+                            valid_candles.append(val)
                 
-                # استخدام السعر الفوري كإغلاق لحظي إن وجد
-                live_gold = d.get('gold', 0)
-                if live_gold > 0:
-                    pc = round(float(live_gold), 2)
-                    ph = max(ph, pc)
-                    pl = min(pl, pc)
-                else:
-                    pc = round(float(today_candle["close"]), 2)
-                    
-                td_fetched = True
-                log.info(f"✅ تم جلب الهاي واللو بدقة من TwelveData لليوم المباشر: H={ph}, L={pl}, C={pc}")
+                if valid_candles:
+                    yest = valid_candles[0]
+                    ph = round(float(yest["high"]), 2)
+                    pl = round(float(yest["low"]), 2)
+                    pc = round(float(yest["close"]), 2)
+                    td_fetched = True
+                    log.info(f"✅ تم جلب الهاي واللو بدقة من TwelveData: H={ph}, L={pl}, C={pc}")
         except Exception as e:
-            log.warning(f"⚠️ فشل جلب بيانات اليوم من TwelveData: {e}")
+            log.warning(f"⚠️ فشل جلب بيانات الأمس من TwelveData: {e}")
 
     if not td_fetched:
         log.warning("🔄 جاري الرجوع لـ yfinance (XAUUSD=X) كحل بديل...")
@@ -176,30 +175,27 @@ def fetch_daily_data() -> dict | None:
             import pytz
             CAIRO_TZ_LOCAL = pytz.timezone('Africa/Cairo')
             last_date = df.index[-1].date()
+            today_date = datetime.now(CAIRO_TZ_LOCAL).date()
             
-            # نأخذ شمعة اليوم الحالية دائماً
-            yest = df.iloc[-1]
+            # الفلتر الذكي: لو شمعة اليوم لسه مفتوحتش أو احنا في إجازة، هناخد الشمعة الأخيرة كأمس
+            if last_date == today_date:
+                yest = df.iloc[-2]
+            else:
+                yest = df.iloc[-1]
                 
             ph = round(float(yest["High"]), 2)
             pl = round(float(yest["Low"]), 2)
-            
-            live_gold = d.get('gold', 0)
-            if live_gold > 0:
-                pc = round(float(live_gold), 2)
-                ph = max(ph, pc)
-                pl = min(pl, pc)
-            else:
-                pc = round(float(yest["Close"]), 2)
+            pc = round(float(yest["Close"]), 2)
             
         else:
-            log.error("❌ فشل جلب بيانات اليوم من ياهو أو TwelveData!")
+            log.error("❌ فشل جلب بيانات الأمس من ياهو أو TwelveData!")
             return None
 
     d["prev_high"]  = ph
     d["prev_low"]   = pl
     d["prev_close"] = pc
     d["spot_price"] = d.get('gold', 0)
-    d["prev_date"]  = f"اليوم (مباشر)"
+    d["prev_date"]  = d.get('pivot_data_date', "أمس")
     d["send_time"]  = datetime.now(CAIRO_TZ).strftime("%I:%M %p")
 
     log.info(f"✅ [DailyLevels] أمس (معدلة للفوري): H={ph} L={pl} C={pc} | ATR={d.get('atr', 0)}")
@@ -435,14 +431,14 @@ def build_template_classical(data: dict, cp: dict, trades: dict) -> str:
         f"🔄 تتجدد يومياً عند افتتاح السوق (الساعة 1 صباحاً)\n"
         f"\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📅 بيانات شمعة اليوم ({data['prev_date']})"
+        f"📅 بيانات شمعة أمس ({data['prev_date']})"
         f" — المصدر الذي تُحسب منه بعض المؤشرات\n"
         f"   📈 القمة  (High)  : {data['prev_high']}$"
-        f"  ← أعلى سعر وصله الذهب اليوم\n"
+        f"  ← أعلى سعر وصله الذهب أمس\n"
         f"   📉 القاع  (Low)   : {data['prev_low']}$"
-        f"  ← أدنى سعر وصله الذهب اليوم\n"
+        f"  ← أدنى سعر وصله الذهب أمس\n"
         f"   🔒 الإغلاق (Close): {data['prev_close']}$"
-        f"  ← السعر اللحظي الحالي\n"
+        f"  ← آخر سعر عند نهاية جلسة أمس\n"
         f"   📏 متوسط التحرك (ATR): {data.get('atr', prev_rng)}$"
         f"  ← متوسط الحركة السعرية (يقيس تقلب السوق)\n"
         f"\n"

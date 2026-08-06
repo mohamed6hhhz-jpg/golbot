@@ -1810,11 +1810,6 @@ def get_full_market_data(mode: str = "spot") -> dict | None:
     _pivot_source = "spot"
     _pivot_conf   = 100
 
-    # ── التخلص من ATR بالكامل وتوحيد البوت على النطاق الكلاسيكي ──
-    atr = round(ph - pl, 2)
-    if atr == 0: atr = 20.0
-    atr_reg = "نطاق كلاسيكي مباشر (Range)"
-
     # ── التسميات ──
     rsi_label   = "تشبع شراء 🔴" if rsi > 70 else ("تشبع بيع 🟢" if rsi < 30 else "محايد ⚪")
     macd_label  = "زخم صعودي 🟢" if macd_hist > 0 else "زخم هبوطي 🔴"
@@ -2155,9 +2150,11 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
     fib = d['fib']
     fib_line = (f"فيبوناتشي (فوري): 0%={fib['0.0%']}$ | 23.6%={fib['23.6%']}$ | 38.2%={fib['38.2%']}$ | "
                 f"50.0%={fib['50.0%']}$ | 61.8%={fib['61.8%']}$ | 78.6%={fib['78.6%']}$ | 100%={fib['100%']}$")
-    # نطاق اليوم المتوقع من ATR
-    exp_low  = round(gold - d['atr'] * 0.65, 2)
-    exp_high = round(gold + d['atr'] * 0.65, 2)
+    # حساب النطاق الكلاسيكي خصيصاً لقالب 3/30 بناءً على طلب العميل
+    classic_range = round(d.get('prev_high', d.get('daily_high', gold + 20)) - d.get('prev_low', d.get('daily_low', gold - 20)), 2)
+    if classic_range == 0: classic_range = 20.0
+    exp_low  = round(gold - classic_range * 0.65, 2)
+    exp_high = round(gold + classic_range * 0.65, 2)
     range_line = f"نطاق اليوم المتوقع (±0.65×Range): {exp_low}$ ↔ {exp_high}$"
 
     try:
@@ -2247,7 +2244,7 @@ def _build_fixed_template(d: dict, header: str) -> tuple[str, str]:
    ─────────────────────────────
    📊 W%R  : {_wr_gold_impact(d['williams_r'])}
    ─────────────────────────────
-   📊 Range: النطاق الكلاسيكي المعتمد لليوم: {d['atr']}$ (بديل الـ ATR)
+   📊 Range: النطاق الكلاسيكي المعتمد لليوم: {classic_range}$ (بديل الـ ATR)
    ─────────────────────────────
    📋 💡 الخلاصة النهائية للمؤشرات (حكم الماكينة):
       {_indicators_verdict(d)}
@@ -6680,7 +6677,12 @@ def _s_nums(d):
     s1 = float(d.get('s1', 0) or 0) or round(pivot - atr * 0.9, 2)
     s2 = float(d.get('s2', 0) or 0) or round(pivot - atr * 1.8, 2)
     s3 = float(d.get('s3', 0) or 0) or round(pivot - atr * 2.7, 2)
-    # تم إزالة جميع تدخلات تعديل المستويات للحفاظ على نقاء البيفوت الكلاسيكي
+    if abs(r1 - pivot) < atr * 0.35: r1 = round(pivot + atr * 0.5, 2)
+    if abs(r2 - pivot) < atr * 0.7:  r2 = round(pivot + atr * 1.0, 2)
+    if abs(r3 - pivot) < atr * 1.0:  r3 = round(pivot + atr * 1.5, 2)
+    if abs(pivot - s1) < atr * 0.35: s1 = round(pivot - atr * 0.5, 2)
+    if abs(pivot - s2) < atr * 0.7:  s2 = round(pivot - atr * 1.0, 2)
+    if abs(pivot - s3) < atr * 1.0:  s3 = round(pivot - atr * 1.5, 2)
     swing_h = float(d.get('swing_high', 0) or 0) or r2
     swing_l = float(d.get('swing_low',  0) or 0) or s2
     if swing_h <= gold: swing_h = round(r2 + atr * 0.5, 2)

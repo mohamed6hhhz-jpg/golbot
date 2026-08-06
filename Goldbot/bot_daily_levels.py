@@ -228,18 +228,18 @@ def calc_classical_pivots(h: float, l: float, c: float, ref_price: float = None,
 def calc_camarilla_pivots(h: float, l: float, c: float) -> dict:
     """
     بيفوت كاماريلا — الأدق للتداول اليومي والسكالبينج.
-    مُعدل ليُحسب انطلاقاً من البيفوت الكلاسيكي بدلاً من سعر الإغلاق لتوحيد القيم.
+    (تم استرجاع الحساب الأصلي المبني على سعر الإغلاق بناءً على طلب العميل)
     """
     rng = h - l
-    pivot = round((h + l + c) / 3,   2)  # مشترك وأساسي في الحساب
-    h4  = round(pivot + rng * 1.1 / 2,   2)
-    h3  = round(pivot + rng * 1.1 / 4,   2)
-    h2  = round(pivot + rng * 1.1 / 6,   2)
-    h1  = round(pivot + rng * 1.1 / 12,  2)
-    l1  = round(pivot - rng * 1.1 / 12,  2)
-    l2  = round(pivot - rng * 1.1 / 6,   2)
-    l3  = round(pivot - rng * 1.1 / 4,   2)
-    l4  = round(pivot - rng * 1.1 / 2,   2)
+    h4  = round(c + rng * 1.1 / 2,   2)
+    h3  = round(c + rng * 1.1 / 4,   2)
+    h2  = round(c + rng * 1.1 / 6,   2)
+    h1  = round(c + rng * 1.1 / 12,  2)
+    l1  = round(c - rng * 1.1 / 12,  2)
+    l2  = round(c - rng * 1.1 / 6,   2)
+    l3  = round(c - rng * 1.1 / 4,   2)
+    l4  = round(c - rng * 1.1 / 2,   2)
+    pivot = round((h + l + c) / 3, 2)
     return {
         "pivot": pivot,
         "h4": h4, "h3": h3, "h2": h2, "h1": h1,

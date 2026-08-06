@@ -41,7 +41,7 @@ def process_and_send_bot7(data: dict) -> list:
         
         # استخراج صفقات الكاماريلا
         ref = (h + l + c) / 3 # pivot مرجعي
-        cp_mock = {"pivot": ref, "r1": ref+atr, "s1": ref-atr} # بيانات كلاسيكية وهمية أو يمكن جلبها إن لزم الأمر
+        cp_mock = {"pivot": ref, "r1": ref+atr, "s1": ref-atr, "r2": ref+atr*2, "s2": ref-atr*2} # بيانات كلاسيكية وهمية أو يمكن جلبها إن لزم الأمر
         trades_cam = _trades_from_levels(cam, "camarilla", ref, atr)
         
         # بعض البيانات الناقصة التي يتوقعها القالب
@@ -157,6 +157,10 @@ def process_and_send_bot7(data: dict) -> list:
             chunks.append(text)
         return chunks
 
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    ip_headers = dict(headers)
+    ip_headers["Host"] = "api.telegram.org"
+    
     total = len(reports_to_send)
     for idx, (title, content) in enumerate(reports_to_send, 1):
         full_message = f"[{idx}/{total}] {title}\n\n{content}"
@@ -164,9 +168,6 @@ def process_and_send_bot7(data: dict) -> list:
         
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT7_TOKEN}/sendMessage"
         ip_url = f"https://149.154.167.220/bot{TELEGRAM_BOT7_TOKEN}/sendMessage"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        ip_headers = dict(headers)
-        ip_headers["Host"] = "api.telegram.org"
         
         for chunk_idx, chunk in enumerate(chunks, 1):
             payload = {

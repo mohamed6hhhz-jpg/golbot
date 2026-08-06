@@ -258,7 +258,16 @@ def _trades_from_levels(levels: dict, lvl_type: str, ref_price: float, atr: floa
     """
     buys  = []
     sells = []
-    sl_buf = round(atr * 0.20, 2)  # بافر وقف الخسارة = 20% ATR
+    
+    # استبدال الـ ATR بحساب النطاق (Range) من مستويات البيفوت الكلاسيكي
+    if "r2" in levels and "pivot" in levels:
+        rng = round(levels["r2"] - levels["pivot"], 2)
+    elif "h4" in levels and "pivot" in levels:
+        rng = round((levels["h4"] - levels["pivot"]) * 2 / 1.1, 2)
+    else:
+        rng = atr
+
+    sl_buf = round(rng * 0.20, 2)  # بافر وقف الخسارة = 20% من النطاق الكلاسيكي
 
     if lvl_type == "classical":
         pivot = levels["pivot"]
@@ -269,7 +278,7 @@ def _trades_from_levels(levels: dict, lvl_type: str, ref_price: float, atr: floa
         for entry, sl_base, label, t1, t2, t3 in [
             (s1, s2,    "🟢 دخول من S1 — الدعم الأول",  pivot, r1, r2),
             (s2, s3,    "🔵 دخول من S2 — الدعم الثاني", s1,    pivot, r1),
-            (s3, s3-atr,"🟣 دخول من S3 — الدعم القوي",  s2,    s1,    pivot),
+            (s3, s3-rng,"🟣 دخول من S3 — الدعم القوي",  s2,    s1,    pivot),
         ]:
             sl   = round(sl_base - sl_buf, 2)
             risk = round(entry - sl, 2)
@@ -287,7 +296,7 @@ def _trades_from_levels(levels: dict, lvl_type: str, ref_price: float, atr: floa
         for entry, sl_base, label, t1, t2, t3 in [
             (r1, r2,    "🔴 بيع من R1 — المقاومة الأولى",  pivot, s1, s2),
             (r2, r3,    "🟠 بيع من R2 — المقاومة الثانية", r1,    pivot, s1),
-            (r3, r3+atr,"⚡ بيع من R3 — ذروة الصعود",      r2,    r1,    pivot),
+            (r3, r3+rng,"⚡ بيع من R3 — ذروة الصعود",      r2,    r1,    pivot),
         ]:
             sl   = round(sl_base + sl_buf, 2)
             risk = round(sl - entry, 2)
@@ -375,8 +384,9 @@ def _fmt_trade_block(trades: list, direction: str) -> str:
 def _day_range_analysis(cp: dict, cam: dict, atr: float, spot: float | None) -> str:
     """تحليل نطاق اليوم والسيناريوهات المحتملة."""
     ref = spot or cp["pivot"]
-    exp_high = round(ref + atr * 0.65, 2)
-    exp_low  = round(ref - atr * 0.65, 2)
+    rng = round(cp["r2"] - cp["pivot"], 2)
+    exp_high = round(ref + rng * 0.65, 2)
+    exp_low  = round(ref - rng * 0.65, 2)
 
     # موقع السعر من الكلاسيكي
     if ref > cp["r1"]:
@@ -407,7 +417,7 @@ def _day_range_analysis(cp: dict, cam: dict, atr: float, spot: float | None) -> 
     return (
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📊 تحليل نطاق جلسة اليوم\n"
-        f"   📏 نطاق ATR المتوقع: {exp_low}$ ↔ {exp_high}$\n"
+        f"   📏 النطاق المتوقع (Range): {exp_low}$ ↔ {exp_high}$\n"
         f"   🗺️  موقع السعر (الكلاسيكي): {zone_cl}\n"
         f"   🎯 السيناريو الأرجح (كلاسيكي): {scenario_cl}\n"
         f"   🎰 موقع السعر (كاماريلا): {zone_cam}\n"
@@ -425,7 +435,7 @@ def build_template_classical(data: dict, cp: dict, trades: dict) -> str:
     sell_block = _fmt_trade_block(trades["sells"], "sell")
 
     return (
-        f"1/2 📐 المستويات المبنية على متوسط التحرك (ATR) — ذهب XAU/USD\n"
+        f"1/2 📐 مستويات البيفوت الكلاسيكي — ذهب XAU/USD\n"
         f"🕐 {data['send_time']} القاهرة\n"
         f"🔄 تتجدد يومياً عند افتتاح السوق (الساعة 1 صباحاً)\n"
         f"\n"
@@ -438,12 +448,12 @@ def build_template_classical(data: dict, cp: dict, trades: dict) -> str:
         f"  ← أدنى سعر وصله الذهب أمس\n"
         f"   🔒 الإغلاق (Close): {data['prev_close']}$"
         f"  ← آخر سعر عند نهاية جلسة أمس\n"
-        f"   📏 متوسط التحرك (ATR): {data.get('atr', prev_rng)}$"
-        f"  ← متوسط الحركة السعرية (يقيس تقلب السوق)\n"
+        f"   📏 النطاق (Range) : {prev_rng}$"
+        f"  ← المسافة بين القمة والقاع (High - Low)\n"
         f"\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔢 خريطة المستويات المستندة لـ ATR\n"
-        f"   (المحسوبة من السعر الفوري والـ ATR)\n"
+        f"🔢 خريطة مستويات البيفوت الكلاسيكي\n"
+        f"   (المحسوبة رياضياً من معادلة البيفوت)\n"
         f"\n"
         f"   🔴 R3 = {cp['r3']}$  ← مقاومة قوية جداً (يصلها السعر نادراً)\n"
         f"   🟠 R2 = {cp['r2']}$  ← مقاومة ثانية (هدف صعود متقدم)\n"
@@ -524,9 +534,7 @@ def build_template_camarilla(data: dict, cam: dict, cp: dict, trades: dict) -> s
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📊 بيانات السوق الآن\n"
         f"   📡 السعر الفوري      : {spot_str}\n"
-        f"   📏 ATR اليومي        : {atr_exp}$"
-        f"  ← متوسط تقلب الذهب اليومي (Average True Range)\n"
-        f"   📐 نطاق أمس          : {prev_rng}$"
+        f"   📐 نطاق أمس (Range)  : {prev_rng}$"
         f"  ← المسافة بين القمة والقاع أمس\n"
         f"\n"
         f"{day_analysis}\n"
@@ -680,11 +688,11 @@ def build_template_quant(d: dict) -> str:
     else:
         fib_line = "فيبوناتشي: غير متاح"
         
-    atr = d.get("atr", 0)
-    if gold and atr:
-        exp_low  = round(gold - atr * 0.65, 2)
-        exp_high = round(gold + atr * 0.65, 2)
-        range_line = f"نطاق اليوم المتوقع (±0.65×ATR): {exp_low}$ ↔ {exp_high}$"
+    rng = round(d.get("prev_high", 0) - d.get("prev_low", 0), 2)
+    if gold and rng > 0:
+        exp_low  = round(gold - rng * 0.65, 2)
+        exp_high = round(gold + rng * 0.65, 2)
+        range_line = f"نطاق اليوم المتوقع (±0.65×Range): {exp_low}$ ↔ {exp_high}$"
     else:
         range_line = "نطاق اليوم المتوقع: غير متاح"
 

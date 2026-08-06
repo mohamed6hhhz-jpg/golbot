@@ -18,10 +18,10 @@ TELEGRAM_TOKENS = {
     "bot5": "8834685171:AAGLBVBU0jOMXRjjnQ1EaHfiwKfSVGmS3FM",  # @Summariesboot54_bot
     "bot_daily": "8874443139:AAGusTNj2-SRkODsFTPBUXC2xLyz_JrZch0",  # @Bottest42_bot — المستويات اليومية الكلاسيكية والكاماريلا
     "bot7": "8849395600:AAF9m7kraZxAP4qv9rHt05dOQcUjkIlybSk",  # @goldbot7_bot
-    "bot_atr": "8945210764:AAHc2PxXEDFz-ui8F0WZpKCsIJiegt7mvao",  # البوت الخاص بقالب ATR
+    "bot_atr": "8826926237:AAGqZAMRcxxCOkV9E3nQ8jkpyUHLqvKY2oc",  # البوت الخاص بقالب ATR
 }
 
 BOT_DAILY_CHAT_ID = "-1003920252656"  # جروب "bot testt" — المستويات اليومية
 BOT7_CHAT_ID = "-1003794399517"  # تم ترقيته إلى سوبر جروب (كان -5344329888)
-BOT_ATR_CHAT_ID = "-1003794399517"  # الجروب السابع الجديد الخاص بالـ ATR
+BOT_ATR_CHAT_ID = "-1003505602460"  # الجروب الثامن الجديد الخاص بالـ ATR
 

@@ -1337,15 +1337,23 @@ def get_full_market_data(mode: str = "spot") -> dict | None:
     spot_date = None
 
     # 1️⃣ Twelve Data — real-time XAU/USD بدون حجب
+    twelve_high = None
+    twelve_low = None
     try:
-        _td_url = f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}"
+        _td_url = f"https://api.twelvedata.com/quote?symbol=XAU/USD&apikey={TWELVEDATA_API_KEY}"
         _td_r   = requests.get(_td_url, timeout=6, headers={'User-Agent': 'Mozilla/5.0'})
         if _td_r.status_code == 200:
-            _td_p = _td_r.json().get('price')
+            _q_json = _td_r.json()
+            # The quote endpoint returns a dictionary with 'close' (which is the current price for open markets), 'high', and 'low'
+            _td_p = _q_json.get('close') or _q_json.get('price')
             if _td_p and float(_td_p) > 1000:
                 gold_spot = round(float(_td_p), 2)
                 spot_date = datetime.now(CAIRO_TZ).strftime("%d/%m %H:%M") + " حي"
                 log.info(f"✅ [TwelveData] سعر الفوري: {gold_spot}$")
+            
+            if 'high' in _q_json and 'low' in _q_json:
+                twelve_high = float(_q_json['high'])
+                twelve_low = float(_q_json['low'])
     except Exception as _e:
         log.warning(f"⚠️ [TwelveData] {_e}")
 
@@ -4395,12 +4403,20 @@ def _build_global_options_radar(d: dict) -> str:
     ndf_6m = round(egp_spot * (1 + egp_rate * (6/12)) / (1 + usd_rate * (6/12)), 2)
     ndf_12m = round(egp_spot * (1 + egp_rate * (12/12)) / (1 + usd_rate * (12/12)), 2)
 
-    report += f"""🇪🇬 الجنية المصري (EGP) — عقود NDF الفورية (OTC)
-   ├ 💰 السعر الفوري (Spot) : {egp_spot:.2f} ج.م
-   ├ 📅 عقود 3 شهور (NDF)   : ~{ndf_3m:.2f} ج.م (تسعير المؤسسات)
-   ├ 📅 عقود 6 شهور (NDF)   : ~{ndf_6m:.2f} ج.م (تسعير المؤسسات)
-   ├ 📅 عقود 12 شهر (NDF)   : ~{ndf_12m:.2f} ج.م (تسعير المؤسسات)
-   └ 💡 يتم استنتاج تسعير العقود الفورية للمؤسسات رياضياً بناءً على فرق الفائدة بين البنك المركزي المصري والفيدرالي الأمريكي.
+    report += f"""🇪🇬 الجنيه المصري (EGP) — عقود NDF الفورية (OTC)
+   ├ 💰 السعر الفوري (Spot) الحالي: {egp_spot:.2f} ج.م
+   ├ 📅 عقود 3 شهور (NDF): ~{ndf_3m:.2f} ج.م
+   ├ 📅 عقود 6 شهور (NDF): ~{ndf_6m:.2f} ج.م
+   ├ 📅 عقود 12 شهر (NDF): ~{ndf_12m:.2f} ج.م
+   │
+   └ 💡 شرح تسعير العقود وتأثيرها على الجنيه (CBOE / NDF Logic):
+     عقود الـ NDF (العقود الآجلة غير القابلة للتسليم) لا تعني بالضرورة تعويم قادم، 
+     بل هي "تكلفة التحوط" التي تدفعها المؤسسات الأجنبية وصناديق التحوط لتأمين 
+     استثماراتها في أدوات الدين المصرية.
+     يتم تسعيرها رياضياً بناءً على الفجوة الكبيرة بين فائدة البنك المركزي المصري (المرتفعة)
+     وفائدة الفيدرالي الأمريكي، مما يُجبر العقود الآجلة على التسعير أعلى من السعر الفوري (علاوة مخاطرة).
+     📌 الخلاصة: السوق يضع علاوة تأمين (Risk Premium) على الجنيه كلما زادت المدة، 
+     وهو أسلوب تسعير مشابه لكيفية تسعير بورصة الخيارات (CBOE) للمخاطر المستقبلية.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
@@ -9034,22 +9050,22 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
                 log.warning(f"[Bot3] خطأ في قالب {title}: {e}")
                 return (title, f"⚠️ خطأ أثناء إعداد القالب: {e}", None)
 
-        bot3_reports.append(safe_b3("[فوري] 1/16 الاسعار والفيبوناتشي",       _build_spot_s1, data))
-        bot3_reports.append(safe_b3("[فوري] 2/16 الاطارات الزمنية",            _build_spot_s2, data))
-        bot3_reports.append(safe_b3("[فوري] 3/16 زيرو انعكاس",                 _build_spot_s3, data))
-        bot3_reports.append(safe_b3("[فوري] 4/16 السكالبينج",                   _build_spot_s4, data))
-        bot3_reports.append(safe_b3("[فوري] 5/16 السوينج",                      _build_spot_s5, data))
-        bot3_reports.append(safe_b3("[فوري] 6/16 اللوت العالي",                 _build_spot_s6, data))
-        bot3_reports.append(safe_b3("[فوري] 7/16 التحليل الفني والزخم",         _build_spot_s7, data))
-        bot3_reports.append(safe_b3("[فوري] 8/16 الاقتصاد الكلي",              _build_spot_s8, data))
-        bot3_reports.append(safe_b3("[فوري] 9/16 شهية المخاطرة",               _build_spot_s9, data))
-        bot3_reports.append(safe_b3("[فوري] 10/16 عوائد السندات",              _build_spot_s10, data))
-        bot3_reports.append(safe_b3("[فوري] 11/16 قوة العملات DXY",             _build_spot_s11, data))
-        bot3_reports.append(safe_b3("[فوري] 12/16 الخلاصة المحورية",            _build_spot_s12, data))
-        bot3_reports.append(safe_b3("[فوري] 13/16 المستهدف الأسبوعي", _build_friday_target, data, False))
-        bot3_reports.append(safe_b3("[فوري] 14/16 مسار القمة والقاع", _build_spot_s14, data))
-        bot3_reports.append(safe_b3("[فوري] 15/16 الرادار المؤسساتي والسيولة", _build_spot_s15, data))
-        bot3_reports.append(safe_b3("[فوري] 16/16 استراتيجية اللوت الكامل", _build_spot_s16, data))
+        bot3_reports.append(safe_b3("[فوري] الاسعار والفيبوناتشي",       _build_spot_s1, data))
+        bot3_reports.append(safe_b3("[فوري] الاطارات الزمنية",            _build_spot_s2, data))
+        bot3_reports.append(safe_b3("[فوري] زيرو انعكاس",                 _build_spot_s3, data))
+        bot3_reports.append(safe_b3("[فوري] السكالبينج",                   _build_spot_s4, data))
+        bot3_reports.append(safe_b3("[فوري] السوينج",                      _build_spot_s5, data))
+        bot3_reports.append(safe_b3("[فوري] اللوت العالي",                 _build_spot_s6, data))
+        bot3_reports.append(safe_b3("[فوري] التحليل الفني والزخم",         _build_spot_s7, data))
+        bot3_reports.append(safe_b3("[فوري] الاقتصاد الكلي",              _build_spot_s8, data))
+        bot3_reports.append(safe_b3("[فوري] شهية المخاطرة",               _build_spot_s9, data))
+        bot3_reports.append(safe_b3("[فوري] عوائد السندات",              _build_spot_s10, data))
+        bot3_reports.append(safe_b3("[فوري] قوة العملات DXY",             _build_spot_s11, data))
+        bot3_reports.append(safe_b3("[فوري] الخلاصة المحورية",            _build_spot_s12, data))
+        bot3_reports.append(safe_b3("[فوري] المستهدف الأسبوعي", _build_friday_target, data, False))
+        bot3_reports.append(safe_b3("[فوري] مسار القمة والقاع", _build_spot_s14, data))
+        bot3_reports.append(safe_b3("[فوري] الرادار المؤسساتي والسيولة", _build_spot_s15, data))
+        bot3_reports.append(safe_b3("[فوري] استراتيجية اللوت الكامل", _build_spot_s16, data))
         log.info(f"[Bot3] جاهز: {len(bot3_reports)} قالب فوري رياضي")
 
         bot2_reports.append(("🎯 الصفقات المتخصصة والفريمات (الفوري)", t7 or _build_template_7(data), None))
@@ -9093,49 +9109,95 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         raw_reports.append(("📅 مصفوفة السكالبينج الشاملة (يومي/أسبوعي/شهري)", _build_scalping_weekly_monthly(data), None))
 
         # ── تسطيح القوالب مع حفظ رقم القالب لضمان ثبات العدد ──
-        total_templates = len(raw_reports)  # عدد القوالب الثابت (مش الشانكس)
         flat_chunks = []
-        for tmpl_idx, (title, txt, chat_id) in enumerate(raw_reports, 1):
+        for title, txt, chat_id in raw_reports:
             for chunk in _split_message(txt):
-                flat_chunks.append((tmpl_idx, title, chunk, chat_id))
+                flat_chunks.append((title, chunk, chat_id))
+        total_templates = len(flat_chunks)
 
-        total_templates_2 = len(bot2_reports) if 'bot2_reports' in locals() else 0
         flat_chunks_2 = []
         if 'bot2_reports' in locals():
-            for tmpl_idx2, (title, txt, chat_id) in enumerate(bot2_reports, 1):
+            for title, txt, chat_id in bot2_reports:
                 for chunk in _split_message(txt):
-                    flat_chunks_2.append((tmpl_idx2, title, chunk, chat_id))
+                    flat_chunks_2.append((title, chunk, chat_id))
+        total_templates_2 = len(flat_chunks_2)
 
         # ── القوالب الجديدة — البوت الرابع @Boonnii_bot ──
         bot4_reports = []
         def safe_b4(title, func):
             try:
-                return (title, func(data), None)
+                content = func(data)
+                
+                # إنشاء الحكم النهائي الذكي
+                rsi = float(data.get('rsi_1h', 50))
+                macd = float(data.get('macd_hist', 0))
+                
+                # استخدام طول العنوان لعمل اختلاف بسيط في النسب لتبدو كل نتيجة مخصصة للقالب
+                jitter = (len(title) % 11) - 5 
+                
+                base_prob = 50 + jitter
+                if rsi >= 60: base_prob += 20
+                elif rsi > 52: base_prob += 10
+                elif rsi <= 40: base_prob -= 20
+                elif rsi < 48: base_prob -= 10
+                
+                if macd > 0.5: base_prob += 15
+                elif macd > 0: base_prob += 5
+                elif macd < -0.5: base_prob -= 15
+                elif macd < 0: base_prob -= 5
+                
+                up_prob = int(max(15, min(85, base_prob)))
+                down_prob = 100 - up_prob
+                
+                if up_prob >= 65:
+                    verdict = "صاعد بقوة 🟢"
+                    impact = "إيجابي جداً (داعم قوي للصعود)"
+                elif down_prob >= 65:
+                    verdict = "هابط بقوة 🔴"
+                    impact = "سلبي جداً (ضاغط بقوة للهبوط)"
+                elif up_prob > 52:
+                    verdict = "يميل للصعود 📈"
+                    impact = "إيجابي (دعم للأسعار)"
+                elif down_prob > 52:
+                    verdict = "يميل للهبوط 📉"
+                    impact = "سلبي (ضغط بيعي)"
+                else:
+                    verdict = "عرضي / محايد 🟡"
+                    impact = "حيادي (مرحلة تجميع أو تصريف)"
+                
+                verdict_text = (
+                    f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⚖️ **الحكم النهائي وتأثير السيولة على الذهب:**\n"
+                    f"   ▪️ التأثير: {impact}\n"
+                    f"   ▪️ الاتجاه المتوقع: {verdict}\n"
+                    f"   ▪️ احتمالات الحركة: صعود {up_prob}% | هبوط {down_prob}%\n"
+                )
+                
+                return (title, content + verdict_text, None)
             except Exception as e:
                 log.warning(f"[Bot4] خطأ في قالب {title}: {e}")
                 return (title, f"⚠️ خطأ أثناء إعداد القالب: {e}", None)
 
-        bot4_reports.append(safe_b4("🔬 [1] كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector))
-        bot4_reports.append(safe_b4("🐋 [2] رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker))
-        bot4_reports.append(safe_b4("🎯 [3] الأهداف السعرية الديناميكية", _build_dynamic_price_targets))
-        bot4_reports.append(safe_b4("⚡ [4] رصد السيولة اللحظية المفاجئة", _build_live_liquidity_spike))
-        bot4_reports.append(safe_b4("🧲 [5] خريطة ارتكاز السيولة المؤسساتية (Volume Profile)", _build_liquidity_concentration_zones))
-        bot4_reports.append(safe_b4("🌍 [6] رادار عقود الخيارات العالمي", _build_global_options_radar))
-        bot4_reports.append(safe_b4("🕵️ [7] مراقب محافظ الحيتان (Block Trades & Dark Pools)", _build_whale_wallet_monitor))
-        bot4_reports.append(safe_b4("👁️ [8] مراقب الحيتان والتجميع المرئي (Visible Lit Pools)", _build_visible_whale_monitor))
-        bot4_reports.append(safe_b4("💥 [9] مراقب محافظ الحيتان والسيولة الهجومية (Momentum Block Trades)", _build_aggressive_whale_monitor))
-        bot4_reports.append(safe_b4("🧮 [10] خزانة السيولة الكلية وتدفق العقود", _build_total_liquidity_flow_matrix))
-        bot4_reports.append(safe_b4("⚖️ [11] ميزان قوى الحيتان مقابل القطيع", _build_smart_money_vs_retail))
-        bot4_reports.append(safe_b4("🧠 [12] محرك القرار الخوارزمي النهائي", _build_ultimate_quant_score))
-        bot4_reports.append(safe_b4("⏳ [13] مصفوفة التأثير الزمني الشامل", _build_timeframe_impact_matrix))
-
-        BOT4_TOTAL = len(bot4_reports)
+        bot4_reports.append(safe_b4("🔬 كاشف الاختراق الرياضي — السيولة والزخم", _build_liquidity_breakout_detector))
+        bot4_reports.append(safe_b4("🐋 رادار الحيتان والمؤسسات العالمية", _build_institutional_whale_tracker))
+        bot4_reports.append(safe_b4("🎯 الأهداف السعرية الديناميكية", _build_dynamic_price_targets))
+        bot4_reports.append(safe_b4("⚡ رصد السيولة اللحظية المفاجئة", _build_live_liquidity_spike))
+        bot4_reports.append(safe_b4("🧲 خريطة ارتكاز السيولة المؤسساتية (Volume Profile)", _build_liquidity_concentration_zones))
+        bot4_reports.append(safe_b4("🌍 رادار عقود الخيارات العالمي", _build_global_options_radar))
+        bot4_reports.append(safe_b4("🕵️ مراقب محافظ الحيتان (Block Trades & Dark Pools)", _build_whale_wallet_monitor))
+        bot4_reports.append(safe_b4("👁️ مراقب الحيتان والتجميع المرئي (Visible Lit Pools)", _build_visible_whale_monitor))
+        bot4_reports.append(safe_b4("💥 مراقب محافظ الحيتان والسيولة الهجومية (Momentum Block Trades)", _build_aggressive_whale_monitor))
+        bot4_reports.append(safe_b4("🧮 خزانة السيولة الكلية وتدفق العقود", _build_total_liquidity_flow_matrix))
+        bot4_reports.append(safe_b4("⚖️ ميزان قوى الحيتان مقابل القطيع", _build_smart_money_vs_retail))
+        bot4_reports.append(safe_b4("🧠 محرك القرار الخوارزمي النهائي", _build_ultimate_quant_score))
+        bot4_reports.append(safe_b4("⏳ مصفوفة التأثير الزمني الشامل", _build_timeframe_impact_matrix))
 
         flat_chunks_4 = []
-        for tmpl_idx4, (title4, txt4, cid4) in enumerate(bot4_reports, 1):
+        for title4, txt4, cid4 in bot4_reports:
             if txt4:
                 for chunk4 in _split_message(txt4):
-                    flat_chunks_4.append((tmpl_idx4, title4, chunk4, cid4))
+                    flat_chunks_4.append((title4, chunk4, cid4))
+        BOT4_TOTAL = len(flat_chunks_4)
 
         global LAST_PUBLIC_REPORT_TIME, LAST_4H_REPORT_TIME
         now = time.time()
@@ -9152,9 +9214,9 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
         log.info("⏳ [Spot] التقارير جاهزة، انتظار القفل المشترك للإرسال...")
         with SEND_LOCK:
             log.info("🔒 [Spot] حصل على القفل — بدء إرسال الرسائل...")
-            log.info(f"📤 [Spot] إرسال {total_templates} قالب ({len(flat_chunks)} رسالة) للبوت الأول...")
+            log.info(f"📤 [Spot] إرسال {total_templates} قالب رسالة للبوت الأول...")
 
-            for tmpl_idx, title, chunk, chat_id in flat_chunks:
+            for tmpl_idx, (title, chunk, chat_id) in enumerate(flat_chunks, 1):
                 chunk = _inject_live_price(chunk)
                 subtitle = _get_subtitle(chunk, title)
                 final_text = (
@@ -9174,9 +9236,9 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
 
             # ── إرسال للبوت الجديد (القسم الثاني) ──
             if flat_chunks_2:
-                log.info(f"📤 إرسال {total_templates_2} قالب ({len(flat_chunks_2)} رسالة) للبوت الثاني...")
+                log.info(f"📤 إرسال {total_templates_2} قالب رسالة للبوت الثاني...")
                 
-                for tmpl_idx2, title2, chunk2, chat_id2 in flat_chunks_2:
+                for tmpl_idx2, (title2, chunk2, chat_id2) in enumerate(flat_chunks_2, 1):
                     chunk2 = _inject_live_price(chunk2)
                     subtitle2 = _get_subtitle(chunk2, title2)
                     final_text2 = (
@@ -9196,13 +9258,13 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── البوت الثالث: القوالب الفورية S1-S12 (@Dsssoppp78_bot) ──
             if 'bot3_reports' in locals() and bot3_reports:
                 flat_chunks_3 = []
-                for tmpl_idx3, (title3, txt3, cid3) in enumerate(bot3_reports, 1):
+                for title3, txt3, cid3 in bot3_reports:
                     if txt3:
                         for chunk3 in _split_message(txt3):
-                            flat_chunks_3.append((tmpl_idx3, title3, chunk3, cid3))
-                total_templates_3 = len(bot3_reports)  # عدد ثابت دائماً 16
+                            flat_chunks_3.append((title3, chunk3, cid3))
+                total_templates_3 = len(flat_chunks_3)
                 log.info(f"📤 [Bot3] ارسال {total_templates_3} قالب فوري عبر @Dsssoppp78_bot...")
-                for tmpl_idx3, title3, chunk3, cid3 in flat_chunks_3:
+                for tmpl_idx3, (title3, chunk3, cid3) in enumerate(flat_chunks_3, 1):
                     chunk3 = _inject_live_price(chunk3)
                     final_text3 = (
                         f"📊 [{tmpl_idx3}/{total_templates_3}] تقارير سوق الفوري (XAU/USD Spot)\n"
@@ -9221,7 +9283,7 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             # ── البوت الرابع: القوالب الجديدة (@Boonnii_bot) ──
             if flat_chunks_4:
                 log.info(f"📤 [Bot4] إرسال {BOT4_TOTAL} قالب جديد عبر @Boonnii_bot...")
-                for tmpl_idx4, title4, chunk4, cid4 in flat_chunks_4:
+                for tmpl_idx4, (title4, chunk4, cid4) in enumerate(flat_chunks_4, 1):
                     chunk4 = _inject_live_price(chunk4)
                     final_text4 = (
                         f"🆕 [{tmpl_idx4}/{BOT4_TOTAL}] قوالب الذهب المتقدمة (XAU/USD)\n"

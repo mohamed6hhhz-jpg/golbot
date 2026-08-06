@@ -435,7 +435,7 @@ def build_template_classical(data: dict, cp: dict, trades: dict) -> str:
     sell_block = _fmt_trade_block(trades["sells"], "sell")
 
     return (
-        f"1/3 📐 مستويات البيفوت الكلاسيكي — ذهب XAU/USD\n"
+        f"📐 مستويات البيفوت الكلاسيكي — ذهب XAU/USD\n"
         f"🕐 {data['send_time']} القاهرة\n"
         f"🔄 تتجدد يومياً عند افتتاح السوق (الساعة 1 صباحاً)\n"
         f"\n"
@@ -498,7 +498,7 @@ def build_template_camarilla(data: dict, cam: dict, cp: dict, trades: dict) -> s
     sell_block = _fmt_trade_block(trades["sells"], "sell")
 
     return (
-        f"2/3 🎯 مستويات كاماريلا الدقيقة — ذهب XAU/USD\n"
+        f"🎯 مستويات كاماريلا الدقيقة — ذهب XAU/USD\n"
         f"🕐 {data['send_time']} القاهرة\n"
         f"🔄 تتجدد يومياً عند افتتاح السوق (الساعة 1 صباحاً)\n"
         f"\n"
@@ -713,7 +713,7 @@ def build_template_quant(d: dict) -> str:
     calc_status = "✅ بيفوت كلاسيكي"
     _date_str = d.get('prev_date', f"{datetime.now().strftime('%Y-%m-%d')}")
 
-    template = f"""3/3 👑 📊 التقرير الكمي الشامل للذهب (الفوري - Spot)
+    template = f"""👑 📊 التقرير الكمي الشامل للذهب (الفوري - Spot)
 🔢 المستويات والصفقات (الفوري - Spot)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -753,21 +753,31 @@ def build_template_quant(d: dict) -> str:
 
 def send_daily_report(token: str, chat_id: str, template1: str, template2: str, template3: str):
 
-    """يرسل القوالب للقناة المخصصة."""
+    """يرسل القوالب للقناة المخصصة بتسلسل رقمي دقيق."""
     if not token or not chat_id:
         log.error("❌ [DailyLevels] Token أو Chat ID غير مضبوط — لا يمكن الإرسال!")
         return
 
-    for idx, tmpl in enumerate([template1, template2, template3], 1):
-        log.info(f"📤 [DailyLevels] إرسال القالب {idx}...")
-        for chunk in _split_msg(tmpl):
-            ok = send_message(token, chat_id, chunk)
-            if ok:
-                log.info("✅ جزء وصل.")
-            else:
-                log.error("❌ فشل جزء.")
-            time.sleep(2)
-        time.sleep(3)
+    # جمع وتسطيح جميع الرسائل
+    all_chunks = []
+    for tmpl in [template1, template2, template3]:
+        if tmpl:
+            for chunk in _split_msg(tmpl):
+                all_chunks.append(chunk)
+
+    total_chunks = len(all_chunks)
+    log.info(f"📤 [DailyLevels] سيتم إرسال {total_chunks} رسالة...")
+
+    for idx, chunk in enumerate(all_chunks, 1):
+        # إضافة الترقيم الديناميكي في بداية كل رسالة
+        numbered_chunk = f"📊 [{idx}/{total_chunks}]\n" + chunk
+        ok = send_message(token, chat_id, numbered_chunk)
+        if ok:
+            log.info(f"✅ تم إرسال الرسالة {idx}/{total_chunks}.")
+        else:
+            log.error(f"❌ فشل إرسال الرسالة {idx}/{total_chunks}.")
+        time.sleep(2)
+    time.sleep(3)
 
 
 # ════════════════════════════════════════════════════════════════

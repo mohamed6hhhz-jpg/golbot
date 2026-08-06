@@ -819,10 +819,10 @@ def _build_fed_mindset_template(data: dict) -> str:
     قالب عقلية الفيدرالي: يدمج النص الفلسفي الخاص بالمستخدم مع البيانات الحية 
     للتضخم، النفط، السندات، والدولار (كمؤشر للتوظيف) لاستنتاج النبرة القادمة.
     """
-    inflation = float(data.get('inflation', 3.0)) 
-    oil = float(data.get('oil', 80.0))
-    tnx = float(data.get('tnx', 4.2))
-    dxy = float(data.get('dxy', 104.0))
+    inflation = float(data.get('inflation') or 3.0) 
+    oil = float(data.get('oil') or 80.0)
+    tnx = float(data.get('tnx') or 4.2)
+    dxy = float(data.get('dxy') or 104.0)
     
     # استقراء وضع التوظيف وقوة الاقتصاد من مؤشر الدولار (DXY)
     if dxy > 104.5:

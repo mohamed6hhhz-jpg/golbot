@@ -4332,13 +4332,18 @@ def _build_global_options_radar(d: dict) -> str:
     # سنستخدم الدالة الموجودة مسبقاً _fetch_options_institutional
     # لجمع البيانات لكل أصل
     
-    report = f"""🌍 رادار عقود الخيارات العالمي (الحيتان والمؤسسات)
+    report = f"""🌍 [6/13] رادار عقود الخيارات العالمي (الحيتان والمؤسسات)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🕐 تحديث: {now.strftime('%d %b %Y - %H:%M UTC')}
 
 📊 يوضح هذا التقرير أحجام تداول عقود الخيارات (Options) خلال اليوم والأسبوع الماضي:
    • Calls (شراء) 🟢: مراهنة على الصعود
    • Puts (بيع) 🔴: مراهنة على الهبوط أو تحوط
+
+💡 تأثير عقود الخيارات (CBOE) على الجنيه:
+   ارتفاع التقلبات وعقود التحوط عالمياً يدفع المستثمرين للدولار والذهب كملاذ آمن، مما يشكل ضغطاً غير مباشر على سيولة الأسواق الناشئة مثل مصر.
+💡 تأثير العقود الآجلة (NDF) على الجنيه:
+   تعكس عقود الـ NDF تسعير المؤسسات الأجنبية لمستقبل الجنيه، وتُعتبر مؤشراً استباقياً لتوقعات تحركات سعر الصرف وتدفقات الأموال الساخنة.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
@@ -9372,6 +9377,27 @@ def send_reports(data: dict, report_text: str, prefix: str = ""):
             except Exception as _e7_bot:
                 log.error(f"❌ [Bot 7 Error] خطأ أثناء تنفيذ البوت السابع: {_e7_bot}")
                 _summary7_text = ""
+
+            # ── البوت الثامن (الخوارزمية الذكية - Pivot + ATR) ──
+            try:
+                from Goldbot.bot_8 import process_and_send_bot8
+                process_and_send_bot8()
+            except Exception as _e8_bot:
+                log.error(f"❌ [Bot 8 Error] خطأ أثناء تنفيذ البوت الثامن: {_e8_bot}")
+
+            # ── البوت التاسع (الاتجاه والتصحيحات - Trend & Retracement) ──
+            try:
+                from Goldbot.bot_9 import process_and_send_bot9
+                process_and_send_bot9()
+            except Exception as _e9_bot:
+                log.error(f"❌ [Bot 9 Error] خطأ أثناء تنفيذ البوت التاسع: {_e9_bot}")
+
+            # ── البوت العاشر ──
+            try:
+                from Goldbot.bot_10 import process_and_send_bot10
+                process_and_send_bot10()
+            except Exception as _e10_bot:
+                log.error(f"❌ [Bot 10 Error] خطأ أثناء تنفيذ البوت العاشر: {_e10_bot}")
 
             # إرسال الملخص العام والشامل الملكي (الجامع للملخصات الخمسة) إلى الجروب الخامس (@Summariesboot54_bot)
             try:

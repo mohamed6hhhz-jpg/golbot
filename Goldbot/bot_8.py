@@ -1,195 +1,190 @@
-import os
 import time
 import logging
-import traceback
-import asyncio
-from telethon import TelegramClient
+from datetime import datetime
+import os
+import sys
 
-from Goldbot.bot_spot import get_full_market_data, cairo_now, tf_gold_impact, _rsi_gold_impact, _macd_gold_impact, _adx_gold_impact, _obv_gold_impact, _cci_gold_impact, _wr_gold_impact, _indicators_verdict, calc_trade_confidence, API_ID, API_HASH, _split_message
-from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT_ATR_CHAT_ID
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+# إعداد اللوجز
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    level=logging.INFO,
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 log = logging.getLogger("Goldbot.bot_8")
 
-TELEGRAM_BOT_ATR_TOKEN = TELEGRAM_TOKENS.get("bot_atr", "")
-TELEGRAM_BOT_ATR_CHAT = BOT_ATR_CHAT_ID
+try:
+    import pytz
+    CAIRO_TZ = pytz.timezone("Africa/Cairo")
+except ImportError:
+    from datetime import timezone, timedelta
+    CAIRO_TZ = timezone(timedelta(hours=3))
 
-def _build_atr_report(d: dict) -> str:
-    """
-    نسخة من التقرير الكمي الشامل (Spot S1) تعتمد بالكامل على مؤشر متوسط المدى الحقيقي (ATR).
-    """
-    # ── البيانات الأساسية ──
-    date_now   = cairo_now().strftime('%Y-%m-%d %H:%M:%S')
-    gold       = d['gold_spot'] if d['gold_spot'] else d['gold']
-    
-    # ── حساب مستويات الـ ATR ──
-    # السعر المرجعي (البيفوت) هنا هو افتتاح اليوم، وإذا لم يكن متاحاً نستخدم الإغلاق السابق أو السعر الحالي تقريبياً
-    daily_open = float(d.get('daily_open', d.get('prev_close', gold)))
-    atr_val = float(d.get('atr', 25.0))
-    
-    pivot = round(daily_open, 2)
-    r1 = round(pivot + (atr_val * 0.5), 2)
-    r2 = round(pivot + (atr_val * 1.0), 2)
-    s1 = round(pivot - (atr_val * 0.5), 2)
-    s2 = round(pivot - (atr_val * 1.0), 2)
-    
-    # ── الأجزاء المقتبسة من التقرير الأصلي ──
-    ent  = d['entries']
-    conf = d['confluence']
-    rn   = d['round_numbers']
-    fib  = d['fib']
-    
-    fib_line = (f"فيبوناتشي (فوري): 0%={fib['0.0%']}$ | 23.6%={fib['23.6%']}$ | 38.2%={fib['38.2%']}$ | "
-                f"50.0%={fib['50.0%']}$ | 61.8%={fib['61.8%']}$ | 78.6%={fib['78.6%']}$ | 100%={fib['100%']}$")
-                
-    range_line = f"نطاق الـ ATR المتوقع (كامل النطاق الحقيقي): {s2}$ ↔ {r2}$"
+def cairo_now() -> datetime:
+    return datetime.now(CAIRO_TZ)
 
-    # حساب حجم السيولة 
-    try:
-        current_vol = int(float(d.get('last_vol', 0)))
-    except (ValueError, TypeError):
-        current_vol = 0
-    if current_vol == 0:
-        current_vol = int(float(d.get('atr', 20)) * float(d.get('rel_vol', 1.0) or 1.0) * 1000)
+def calc_algo_pivot_atr(data: dict) -> dict:
+    """
+    يطبق القواعد الخوارزمية الأربعة الذهبية لدمج البيفوت مع الـ ATR.
+    """
+    spot = data.get("spot_price", 0) or data.get("gold", 0)
+    atr = data.get("atr", 0)
+    h = data.get("prev_high", 0)
+    l = data.get("prev_low", 0)
+    c = data.get("prev_close", 0)
     
-    rel_vol = float(d.get('rel_vol', 1.0) or 1.0)
-    normal_vol = int(current_vol / rel_vol) if rel_vol > 0.1 else current_vol
-    vol_increase_pct = int((rel_vol - 1) * 100)
-    
-    if vol_increase_pct > 0:
-        liq_desc = f"الحالية: {current_vol:,} عقد | الطبيعي: {normal_vol:,} عقد | زادت بنسبة {vol_increase_pct}% 📈"
-    elif vol_increase_pct < 0:
-        liq_desc = f"الحالية: {current_vol:,} عقد | الطبيعي: {normal_vol:,} عقد | انخفضت بنسبة {abs(vol_increase_pct)}% 📉"
-    else:
-        liq_desc = f"السيولة حالياً في معدلاتها الطبيعية حول {normal_vol:,} عقد ⚖️"
+    if not (h > 0 and l > 0 and c > 0 and atr > 0):
+        return {}
         
-    trend_impact = "يدعم عمليات الشراء (Buy Dips) ويقوي مستويات الدعم للذهب" if 'صعود' in ent['trend'] else "يدعم عمليات البيع (Sell Rallies) ويضعف مستويات الدعم للذهب" if 'هبوط' in ent['trend'] else "يحفز التذبذب ويدعم صفقات السكالبينج السريعة للذهب"
-    verdict_impact = "يعطي أفضلية واضحة للثيران (المشترين) لدفع سعر الذهب للأعلى" if 'صاعد' in conf['verdict'] or 'شراء' in conf['verdict'] else "يعطي أفضلية واضحة للدببة (البائعين) لدفع سعر الذهب للأسفل" if 'هابط' in conf['verdict'] or 'بيع' in conf['verdict'] else "يفرض حالة من الترقب وتساوي الكفتين مؤقتاً على حركة الذهب"
+    p = (h + l + c) / 3
+    r1 = (2 * p) - l
+    r2 = p + (h - l)
+    r3 = r1 + (h - l)
+    
+    s1 = (2 * p) - h
+    s2 = p - (h - l)
+    s3 = s1 - (h - l)
+    
+    # Rule 1: Zones (±10% ATR)
+    z_margin = atr * 0.10
+    # Rule 2: Dynamic Stop Loss (30% ATR)
+    sl_margin = atr * 0.30
+    # Rule 3: Breakout Filter (15% ATR)
+    bo_margin = atr * 0.15
+    # Rule 4: Max TP Distance (100% ATR)
+    max_tp_dist = atr
+    
+    def _build_level_data(level_price: float, is_resistance: bool) -> dict:
+        zone_low = round(level_price - z_margin, 2)
+        zone_high = round(level_price + z_margin, 2)
+        
+        if is_resistance:
+            # بالنسبة للمقاومة (بيع أو كسر)
+            sl = round(level_price + sl_margin, 2)  # الستوب للمركز البيعي من هنا
+            breakout_confirm = round(level_price + bo_margin, 2) # تأكيد اختراق المقاومة (شراء)
+            target_down = round(level_price - max_tp_dist, 2) # هدف البيع الأقصى
+            return {
+                "price": round(level_price, 2),
+                "zone": (zone_low, zone_high),
+                "sl": sl,
+                "breakout_confirm": breakout_confirm,
+                "max_target": target_down
+            }
+        else:
+            # بالنسبة للدعم (شراء أو كسر)
+            sl = round(level_price - sl_margin, 2) # الستوب للمركز الشرائي من هنا
+            breakout_confirm = round(level_price - bo_margin, 2) # تأكيد كسر الدعم (بيع)
+            target_up = round(level_price + max_tp_dist, 2) # هدف الشراء الأقصى
+            return {
+                "price": round(level_price, 2),
+                "zone": (zone_low, zone_high),
+                "sl": sl,
+                "breakout_confirm": breakout_confirm,
+                "max_target": target_up
+            }
 
-    def fmt_block(trades, dir_label):
-        nums = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
-        lines = []
-        count = 1
-        for t in trades:
-            pct, lbl, reason = calc_trade_confidence(d, t)
-            if pct < 65:
-                continue
+    algo = {
+        "atr": round(atr, 2),
+        "pivot": _build_level_data(p, False), # المحور ممكن يكون دعم أو مقاومة، نعتبره نقطة ارتكاز
+        "r1": _build_level_data(r1, True),
+        "r2": _build_level_data(r2, True),
+        "r3": _build_level_data(r3, True),
+        "s1": _build_level_data(s1, False),
+        "s2": _build_level_data(s2, False),
+        "s3": _build_level_data(s3, False),
+    }
+    
+    return algo
 
-            if pct >= 75:
-                entry_rule = f"✅ ادخل بثقة — (فرصة قوية مدعومة بالترند والسيولة)"
-            elif pct >= 60:
-                entry_rule = f"⚠️ دخول بحذر (نصف عقد) — (مخاطرة متوسطة، يُفضل الانتظار لتأكيد الاتجاه)"
-            elif pct >= 45:
-                entry_rule = f"⛔ لا تدخل — (السوق متضارب والعائد لا يبرر المخاطرة الحالية)"
-            else:
-                entry_rule = f"❌ خطر مرتفع — (يفضل تجاهل الصفقة ما لم يكن السعر مغرياً جداً)"
-            
-            lines.append(
-                f"\n   ╭─────────────────────────────╮\n"
-                f"   │ {nums[count-1] if count <= len(nums) else '🔹'} {t['dir']}  ·  {t.get('style', '')}\n"
-                f"   ├─────────────────────────────┤\n"
-                f"   │ 🏪 السوق  : {t.get('market', 'فوري')}\n"
-                f"   │ 📊 الثقة  : {pct}%  {lbl}\n"
-                f"   │ 🔔 القرار : {entry_rule}\n"
-                f"   │ 💡 السبب  : {reason}\n"
-                f"   ├─────────────────────────────┤\n"
-                f"   │ 📍 دخول   : {t.get('entry', '0')}$\n"
-                f"   │ 🛡️  وقف   : {t.get('sl', '0')}$  (خطر: {t.get('risk', '0')}$)\n"
-                f"   │ 🎯 الأهداف:\n"
-                f"   │    T1 ← {t.get('t1', '0')}$  (R: {t.get('rr1', '0')}x)\n"
-                f"   │    T2 ← {t.get('t2', '0')}$  (R: {t.get('rr2', '0')}x)\n"
-                f"   │    T3 ← {t.get('t3', '0')}$  (R: {t.get('rr3', '0')}x)\n"
-                f"   ╰─────────────────────────────╯"
-            )
-            count += 1
-            if count > len(nums):
-                break
-                
-        if not lines:
-            return f"\n   ❌ لا توجد صفقات {dir_label} مطابقة حالياً حتى بنسبة ضعيفة.\n"
-        return "\n".join(lines)
+def build_template_algo_pivot_atr(data: dict, algo: dict) -> str:
+    """
+    يبني القالب الاحترافي للبوت الثامن (المعادلات الخوارزمية).
+    """
+    spot_str = f"{data.get('spot_price', 0):.2f}$" if data.get("spot_price") else "غير متاح"
+    send_time = data.get("send_time", cairo_now().strftime("%I:%M %p"))
+    atr = algo.get("atr", 0)
+    
+    if not algo or atr == 0:
+        return "⚠️ بيانات ATR أو مستويات البيفوت غير متوفرة لحساب القالب الخوارزمي."
 
-    # تجهيز بلوكات الصفقات الأساسية (التي تأتي من البيانات الأساسية ولكن سنعتمد على ATR في المستويات)
-    try: buy_block = fmt_block(ent.get('buys', []), "شراء")
-    except Exception as e: buy_block = f"   ❌ خطأ: {e}"
-    try: sell_block = fmt_block(ent.get('sells', []), "بيع")
-    except Exception as e: sell_block = f"   ❌ خطأ: {e}"
+    def fmt_zone(z: tuple) -> str:
+        return f"{z[0]:.2f}$ ↔ {z[1]:.2f}$"
+        
+    p = algo['pivot']
+    r1 = algo['r1']
+    s1 = algo['s1']
 
-    # إعداد النتيجة النهائية
-    report = f"""👑 📊 التقرير الكمي الشامل للذهب (الـفوري - Spot)
-🔢 المستويات والصفقات (مبنية على ATR 100%)
+    report = f"""👑 📊 التقرير الخوارزمي الذكي للذهب (البيفوت × ATR)
+🔢 خوارزمية التداول المؤسسي (الفوري XAUUSD)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔢 خريطة المستويات والصفقات (مبنية على الـ فوري XAUUSD)
-   ⏱️ السعر الفوري (لحظة الإرسال): {gold:.2f}$ — {date_now} القاهرة
-   🟣 مقاومة نفسية: {rn['nearest_resistance']}$ (+{rn['dist_to_resistance']}$) | دعم نفسي: {rn['nearest_support']}$ (-{rn['dist_to_support']}$)
-   ═════════════════════════════
-   📍 Swing High : {d.get('swing_high', '')}$
-   📍 Swing Low  : {d.get('swing_low', '')}$
-   ═════════════════════════════
-   📊 VWAP       : {f"{d['vwap']}$" if d.get('vwap') else '— غير متاح'}
-   ═════════════════════════════
-   🔴 المقاومات: R1: {r1}$ | R2: {r2}$
-   💠 المحور المستند للافتتاح: Pivot: {pivot}$
-   🟢 الدعوم: S1: {s1}$ | S2: {s2}$
-   ═════════════════════════════
-   📋 حالة البيانات والبيفوت:
-    ▪️ المصدر: ✅ فوري (XAU/USD)
-    ▪️ الحساب: ✅ بيفوت ATR 100% (يعتمد على الافتتاح + التذبذب الحقيقي)
-    ▪️ قيمة التذبذب (ATR): {atr_val}$
-   🎯 كفاءة العمليات الرياضية: 100% (دقة حسابية خالية من الأخطاء)
-   ═════════════════════════════
-   🟡 {fib_line}
-   ═════════════════════════════
-   📊 {range_line}
-   ═════════════════════════════
-   🔍 التباين (Divergence): {d.get('divergence', '—')}
-   🛒 منطقة الطلب القوية: {f"{d['sd_demand']}$" if d.get('sd_demand') else '—'}
-   🩸 منطقة العرض القوية: {f"{d['sd_supply']}$" if d.get('sd_supply') else '—'}
+⏱️ السعر الفوري (لحظة الإرسال): {spot_str} — {send_time} القاهرة
+⚡ طاقة السوق اليومية (ATR): {atr}$
+═════════════════════════════
+🛡️ القاعدة 1: تحويل الخطوط إلى مناطق سيولة (±10% ATR)
+   ▪️ منطقة (R1) للبيع: {fmt_zone(r1['zone'])}
+   ▪️ منطقة (Pivot) للمحور: {fmt_zone(p['zone'])}
+   ▪️ منطقة (S1) للشراء: {fmt_zone(s1['zone'])}
+═════════════════════════════
+🛑 القاعدة 2: وقف الخسارة الديناميكي (30% ATR للحماية من ضرب الستوب)
+   ▪️ ستوب بيع (R1): إغلاق أعلى {r1['sl']}$
+   ▪️ ستوب شراء (S1): إغلاق أسفل {s1['sl']}$
+═════════════════════════════
+🚀 القاعدة 3: فلتر الاختراق الكاذب (تأكيد 15% ATR)
+   ▪️ شراء باختراق R1: فقط إذا أغلق وتجاوز {r1['breakout_confirm']}$
+   ▪️ بيع بكسر S1: فقط إذا أغلق وانخفض عن {s1['breakout_confirm']}$
+═════════════════════════════
+🎯 القاعدة 4: الأهداف المرنة (حد أقصى يعادل طاقة السوق ATR)
+   ▪️ أقصى هدف شرائي من S1: {s1['max_target']}$
+   ▪️ أقصى هدف بيعي من R1: {r1['max_target']}$
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛒 صفقات الشراء:
-{buy_block}
-━━
-📉 صفقات البيع:
-{sell_block}"""
-
+💡 خلاصة التداول:
+النظام يمنع الدخول المبكر عبر (مناطق السيولة)، يحميك من ذيول الشموع عبر (الستوب الديناميكي)، ويفلتر الاختراقات الوهمية لتجنب فخاخ صناع السوق.
+"""
     return report
 
-
-async def _send_via_telethon(report: str) -> bool:
-    if not TELEGRAM_BOT_ATR_TOKEN or not TELEGRAM_BOT_ATR_CHAT:
-        log.warning("⚠️ Token or Chat ID for Bot ATR missing.")
-        return False
-        
-    client = TelegramClient("bot_atr_session", API_ID, API_HASH)
+def process_and_send_bot8():
+    """
+    دالة التشغيل الرئيسية للبوت الثامن.
+    """
+    log.info("🚀 [Bot8] بدء توليد التقرير الخوارزمي الذكي...")
     try:
-        await client.start(bot_token=TELEGRAM_BOT_ATR_TOKEN)
-        chunks = _split_message(report)
-        for chunk in chunks:
-            await client.send_message(int(TELEGRAM_BOT_ATR_CHAT), chunk)
-        log.info(f"✅ تم الإرسال بنجاح إلى جروب ATR ({TELEGRAM_BOT_ATR_CHAT})")
-        return True
-    except Exception as e:
-        log.error(f"❌ فشل الإرسال إلى جروب ATR: {e}")
+        from Goldbot.bot_daily_levels import fetch_daily_data
+        from Goldbot.bot_spot import _http_fallback_send
+        from Goldbot.secrets_config import TELEGRAM_TOKENS, BOT8_CHAT_ID
+    except ImportError:
+        try:
+            from bot_daily_levels import fetch_daily_data
+            from bot_spot import _http_fallback_send
+            from secrets_config import TELEGRAM_TOKENS, BOT8_CHAT_ID
+        except ImportError:
+            log.error("❌ فشل استدعاء الملفات المطلوبة في Bot 8.")
+            return False
+
+    token = TELEGRAM_TOKENS.get("bot8")
+    if not token or not BOT8_CHAT_ID:
+        log.error("❌ التوكن أو جروب Bot8 غير معرف.")
         return False
-    finally:
-        await client.disconnect()
 
-
-def run_bot():
-    log.info("🚀 بدء تشغيل ATR Bot (Bot 8)...")
-    
-    # جلب البيانات الشاملة
-    data = get_full_market_data(mode="spot")
+    data = fetch_daily_data()
     if not data:
-        log.error("❌ فشل جلب بيانات السوق، لا يمكن توليد التقرير.")
-        return
-        
-    # توليد التقرير
-    report = _build_atr_report(data)
+        log.error("❌ فشل جلب البيانات في Bot 8.")
+        return False
+
+    algo = calc_algo_pivot_atr(data)
+    if not algo:
+        log.error("❌ فشل حساب الخوارزمية في Bot 8.")
+        return False
+
+    template = build_template_algo_pivot_atr(data, algo)
     
-    # إرسال التقرير
-    asyncio.run(_send_via_telethon(report))
+    # الإرسال للجروب
+    success = _http_fallback_send(template, token, [BOT8_CHAT_ID])
+    if success:
+        log.info("✅ [Bot8] تم إرسال القالب الخوارزمي بنجاح!")
+    else:
+        log.error("❌ [Bot8] فشل في إرسال القالب.")
+    
+    return success
 
 if __name__ == "__main__":
-    run_bot()
+    process_and_send_bot8()

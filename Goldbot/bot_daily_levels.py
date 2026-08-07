@@ -435,7 +435,7 @@ def build_template_classical(data: dict, cp: dict, trades: dict) -> str:
     sell_block = _fmt_trade_block(trades["sells"], "sell")
 
     return (
-        f"📐 مستويات البيفوت الكلاسيكي — ذهب XAU/USD\n"
+        f"[1/3] 📐 مستويات البيفوت الكلاسيكي — ذهب XAU/USD\n"
         f"🕐 {data['send_time']} القاهرة\n"
         f"🔄 تتجدد يومياً عند افتتاح السوق (الساعة 1 صباحاً)\n"
         f"\n"
@@ -498,7 +498,7 @@ def build_template_camarilla(data: dict, cam: dict, cp: dict, trades: dict) -> s
     sell_block = _fmt_trade_block(trades["sells"], "sell")
 
     return (
-        f"🎯 مستويات كاماريلا الدقيقة — ذهب XAU/USD\n"
+        f"[2/3] 🎯 مستويات كاماريلا الدقيقة — ذهب XAU/USD\n"
         f"🕐 {data['send_time']} القاهرة\n"
         f"🔄 تتجدد يومياً عند افتتاح السوق (الساعة 1 صباحاً)\n"
         f"\n"
@@ -713,7 +713,7 @@ def build_template_quant(d: dict) -> str:
     calc_status = "✅ بيفوت كلاسيكي"
     _date_str = d.get('prev_date', f"{datetime.now().strftime('%Y-%m-%d')}")
 
-    template = f"""👑 📊 التقرير الكمي الشامل للذهب (الفوري - Spot)
+    template = f"""[3/3] 👑 📊 التقرير الكمي الشامل للذهب (الفوري - Spot)
 🔢 المستويات والصفقات (الفوري - Spot)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━

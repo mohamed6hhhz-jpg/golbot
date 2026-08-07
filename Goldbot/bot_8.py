@@ -113,7 +113,7 @@ def build_template_algo_pivot_atr(data: dict, algo: dict) -> str:
     r1 = algo['r1']
     s1 = algo['s1']
 
-    report = f"""👑 📊 التقرير الخوارزمي الذكي للذهب (البيفوت × ATR)
+    report = f"""[1/1] 👑 📊 التقرير الخوارزمي الذكي للذهب (البيفوت × ATR)
 🔢 خوارزمية التداول المؤسسي (الفوري XAUUSD)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━

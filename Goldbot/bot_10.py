@@ -89,7 +89,7 @@ def build_template_fed_expectations(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""🏦 رادار الفائدة الفيدرالية (Fed Expectations)
+    report = f"""[1/7] 🏦 رادار الفائدة الفيدرالية (Fed Expectations)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 السعر الفوري للذهب: {data['spot']}$
@@ -180,7 +180,7 @@ def build_template_economic_data(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""📰 رادار تأثير البيانات الاقتصادية (Macro News Impact)
+    report = f"""[2/7] 📰 رادار تأثير البيانات الاقتصادية (Macro News Impact)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 ═════════════════════════════
@@ -281,7 +281,7 @@ def build_template_geopolitical(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""🌍 رادار التوترات الجيوسياسية (Safe-Haven Radar)
+    report = f"""[3/7] 🌍 رادار التوترات الجيوسياسية (Safe-Haven Radar)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 ═════════════════════════════
@@ -365,7 +365,7 @@ def build_template_options(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""📊 رادار سوق الأوبشن (Options Market Sentiment)
+    report = f"""[4/7] 📊 رادار سوق الأوبشن (Options Market Sentiment)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 ═════════════════════════════
@@ -463,7 +463,7 @@ def build_template_market_maker(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""🕵️‍♂️ رؤية صانع السوق (Market Maker Vision)
+    report = f"""[5/7] 🕵️‍♂️ رؤية صانع السوق (Market Maker Vision)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 السعر الحالي: {data['current_price']}$
@@ -628,7 +628,7 @@ def build_template_news_sentiment(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""📰 رؤية المستثمرين لأخبار اليوم (Daily News Sentiment)
+    report = f"""[6/7] 📰 رؤية المستثمرين لأخبار اليوم (Daily News Sentiment)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 الافتتاح: {data['open']}$ | السعر الآن: {data['current']}$
@@ -779,7 +779,7 @@ def build_template_options_mm(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""🕵️‍♂️ رؤية صانع سوق الأوبشن (Options Dealer Vision)
+    report = f"""[7/7] 🕵️‍♂️ رؤية صانع سوق الأوبشن (Options Dealer Vision)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 السعر الآن: {data['current_price']}$ | (القمة: {data['pdh']}$ - القاع: {data['pdl']}$)

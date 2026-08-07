@@ -159,7 +159,7 @@ def build_template_trend_correction(data: dict) -> str:
 
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""🧭 رادار الاتجاه والتصحيحات (Trend & Retracement)
+    report = f"""[1/7] 🧭 رادار الاتجاه والتصحيحات (Trend & Retracement)
 📈 تحليل دقيق للاتجاه العام ومناطق الارتداد المتوقعة
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -290,9 +290,9 @@ def build_template_exhaustion(data: dict) -> str:
     send_time = cairo_now().strftime("%I:%M %p")
     
     if data['danger_level'] >= 4:
-        header = "🚨🚨 إنذار أحمر: رادار انهيار الاتجاه 🚨🚨"
+        header = "🚨🚨 [2/7] إنذار أحمر: رادار انهيار الاتجاه 🚨🚨"
     else:
-        header = "🔍 رادار الإرهاق وانعكاس الاتجاه (Trend Exhaustion)"
+        header = "🔍 [2/7] رادار الإرهاق وانعكاس الاتجاه (Trend Exhaustion)"
         
     report = f"""{header}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -359,7 +359,7 @@ def build_template_breakout(data: dict) -> str:
         return "⚠️ بيانات الاختراق غير متوفرة."
         
     # الهيكل الثابت الذي طلبه المستخدم بالحرف
-    report = f"""كسر {data['support']}$ للبيع او اختراق {data['resistance']}$ للشرا الاستوب 90 نقطه
+    report = f"""[3/7] كسر {data['support']}$ للبيع او اختراق {data['resistance']}$ للشرا الاستوب 90 نقطه
 السعر الحالي {data['spot']}$"""
     
     return report
@@ -452,7 +452,7 @@ def build_template_bounce(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""🎯 رادار قنص الارتداد (Bounce Prediction)
+    report = f"""[4/7] 🎯 رادار قنص الارتداد (Bounce Prediction)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 🧭 الاتجاه المسيطر: {data['trend']}
@@ -570,7 +570,7 @@ def build_template_explosion(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""🚀 رادار الانفجار السعري (Volatility Radar)
+    report = f"""[5/7] 🚀 رادار الانفجار السعري (Volatility Radar)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 ═════════════════════════════
@@ -679,7 +679,7 @@ def build_template_continuation(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""⚖️ رادار الاستكمال أو الانعكاس (Continuation vs Reversal)
+    report = f"""[6/7] ⚖️ رادار الاستكمال أو الانعكاس (Continuation vs Reversal)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 🧭 الاتجاه المسيطر اليوم: {data['intraday_trend']}
@@ -790,7 +790,7 @@ def build_template_conditions(data: dict) -> str:
         
     send_time = cairo_now().strftime("%I:%M %p")
     
-    report = f"""📋 خريطة شروط الاتجاه (Trend Checklist)
+    report = f"""[7/7] 📋 خريطة شروط الاتجاه (Trend Checklist)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ التحديث: {send_time} القاهرة
 🎯 الخلاصة الفنية: {data['verdict']}

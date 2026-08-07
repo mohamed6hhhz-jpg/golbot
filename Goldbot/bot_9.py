@@ -357,11 +357,21 @@ def build_template_breakout(data: dict) -> str:
     """
     if not data:
         return "⚠️ بيانات الاختراق غير متوفرة."
-        
-    # الهيكل الثابت الذي طلبه المستخدم بالحرف
-    report = f"""[3/7] كسر {data['support']}$ للبيع او اختراق {data['resistance']}$ للشرا الاستوب 90 نقطه
-السعر الحالي {data['spot']}$"""
+    send_time = cairo_now().strftime("%I:%M %p")
     
+    report = f"""[3/7] 🚀 رادار الاختراقات السعرية (Price Breakout)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏱️ التحديث: {send_time} القاهرة
+السعر الفوري للذهب: {data['spot']}$
+═════════════════════════════
+🎯 استراتيجية قنص الاختراق (Breakout Strategy):
+   🟢 سيناريو الشراء: اختراق مستوى المقاومة ({data['resistance']}$) بثبات.
+   🔴 سيناريو البيع: كسر مستوى الدعم ({data['support']}$) بثبات.
+
+🛡️ إدارة المخاطر الصارمة:
+   وقف الخسارة (Stop Loss): 90 نقطة من نقطة الدخول لتجنب الفخاخ.
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
     return report
 
 def analyze_bounce_prediction() -> dict | None:
